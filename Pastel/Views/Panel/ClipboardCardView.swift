@@ -7,11 +7,21 @@ import AppKit
 ///
 /// Card height varies by content type: 90pt for images, 72pt for all others.
 /// Cards have rounded corners, subtle background, and a hover highlight.
+/// When selected (via keyboard navigation or single-click), the card shows
+/// an accent-colored background and border distinct from the hover state.
 struct ClipboardCardView: View {
 
     let item: ClipboardItem
+    var isSelected: Bool
+    var onPaste: (() -> Void)?
 
     @State private var isHovered = false
+
+    init(item: ClipboardItem, isSelected: Bool = false, onPaste: (() -> Void)? = nil) {
+        self.item = item
+        self.isSelected = isSelected
+        self.onPaste = onPaste
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -32,14 +42,21 @@ struct ClipboardCardView: View {
         .frame(height: cardHeight)
         .frame(maxWidth: .infinity)
         .background(
-            isHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.06),
+            isSelected ? Color.accentColor.opacity(0.3)
+                : isHovered ? Color.white.opacity(0.12)
+                : Color.white.opacity(0.06),
             in: RoundedRectangle(cornerRadius: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .onHover { hovering in
             isHovered = hovering
         }
         .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 
     // MARK: - Private Views
