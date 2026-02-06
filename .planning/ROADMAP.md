@@ -93,11 +93,11 @@ Plans:
   1. User opens a Settings window from the menu bar icon and can view/change all preferences
   2. User can change the panel position to any screen edge (top, left, right, bottom) and the panel appears at the new position
   3. User can enable launch at login and the app starts automatically after system restart
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md -- Settings window infrastructure, General tab (launch at login, hotkey recorder, panel position picker, retention), PanelEdge enum, PanelController 4-edge refactor, RetentionService
+- [ ] 05-02-PLAN.md -- Labels tab with full CRUD, horizontal panel layout adaptation for top/bottom edges, keyboard nav direction swap
 
 ## Progress
 
