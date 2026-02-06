@@ -44,6 +44,7 @@ final class AppState {
     /// Pass the model container to the panel controller so @Query works inside the panel.
     func setupPanel(modelContainer: ModelContainer) {
         panelController.setModelContainer(modelContainer)
+        panelController.setAppState(self)
 
         // Wire paste callback: SwiftUI -> PanelActions -> onPasteItem -> AppState.paste -> PasteService
         panelController.onPasteItem = { [weak self] item in

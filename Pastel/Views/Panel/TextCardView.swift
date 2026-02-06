@@ -9,8 +9,8 @@ struct TextCardView: View {
 
     var body: some View {
         Text(item.textContent ?? "")
-            .font(.system(.body, design: .default))
-            .lineLimit(3)
+            .font(.system(.callout, design: .default))
+            .lineLimit(4)
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

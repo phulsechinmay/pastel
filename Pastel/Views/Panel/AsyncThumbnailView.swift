@@ -16,7 +16,7 @@ struct AsyncThumbnailView: View {
             if let image {
                 Image(nsImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
             } else {
                 Rectangle()
                     .fill(Color.white.opacity(0.04))

@@ -9,13 +9,13 @@ struct URLCardView: View {
     let item: ClipboardItem
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: "globe")
-                .font(.system(size: 14))
+                .font(.system(size: 16))
                 .foregroundStyle(Color.blue)
 
             Text(item.textContent ?? "")
-                .font(.system(.body, design: .default))
+                .font(.system(.callout, design: .default))
                 .lineLimit(2)
                 .foregroundStyle(Color.blue)
         }

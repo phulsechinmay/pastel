@@ -9,14 +9,14 @@ struct FileCardView: View {
     let item: ClipboardItem
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: "doc")
-                .font(.system(size: 14))
+                .font(.system(size: 16))
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(filename)
-                    .font(.body)
+                    .font(.callout)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 

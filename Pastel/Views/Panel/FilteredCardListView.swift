@@ -72,7 +72,7 @@ struct FilteredCardListView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 6) {
+                        LazyVStack(spacing: 8) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                                 ClipboardCardView(
                                     item: item,
@@ -87,8 +87,8 @@ struct FilteredCardListView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
                     }
                     .onChange(of: selectedIndex) { _, newValue in
                         if let newValue {

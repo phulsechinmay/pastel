@@ -12,12 +12,13 @@ struct ImageCardView: View {
         Group {
             if let thumbnailPath = item.thumbnailPath {
                 AsyncThumbnailView(filename: thumbnailPath)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .frame(maxWidth: .infinity, maxHeight: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 Image(systemName: "photo")
                     .font(.system(size: 24))
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 60)
             }
         }
     }

@@ -19,7 +19,7 @@ final class PanelController {
 
     // MARK: - Constants
 
-    private let panelWidth: CGFloat = 300
+    private let panelWidth: CGFloat = 320
     private let animationDuration: TimeInterval = 0.2
 
     // MARK: - Private State
@@ -28,6 +28,7 @@ final class PanelController {
     private var globalClickMonitor: Any?
     private var localKeyMonitor: Any?
     private var modelContainer: ModelContainer?
+    private var appState: AppState?
 
     /// The app that was frontmost before the panel was shown.
     /// Captured in show() so paste-back targets the correct app.
@@ -66,6 +67,11 @@ final class PanelController {
         self.modelContainer = container
     }
 
+    /// Store the app state so the panel's SwiftUI views can observe item count changes.
+    func setAppState(_ state: AppState) {
+        self.appState = state
+    }
+
     // MARK: - Show / Hide
 
     /// Slide the panel in from the right edge of the screen containing the mouse cursor.
@@ -76,7 +82,7 @@ final class PanelController {
         previousApp = NSWorkspace.shared.frontmostApplication
 
         let screen = screenWithMouse()
-        let visibleFrame = screen.visibleFrame
+        let screenFrame = screen.frame
 
         if panel == nil {
             createPanel()
@@ -87,20 +93,20 @@ final class PanelController {
 
         guard let panel else { return }
 
-        // On-screen: right-aligned within the visible frame, full height
+        // On-screen: right-aligned within the full screen frame (overlays Dock)
         let onScreenFrame = NSRect(
-            x: visibleFrame.maxX - panelWidth,
-            y: visibleFrame.origin.y,
+            x: screenFrame.maxX - panelWidth,
+            y: screenFrame.origin.y,
             width: panelWidth,
-            height: visibleFrame.height
+            height: screenFrame.height
         )
 
         // Off-screen: just beyond the right edge
         let offScreenFrame = NSRect(
-            x: visibleFrame.maxX,
-            y: visibleFrame.origin.y,
+            x: screenFrame.maxX,
+            y: screenFrame.origin.y,
             width: panelWidth,
-            height: visibleFrame.height
+            height: screenFrame.height
         )
 
         panel.setFrame(offScreenFrame, display: false)
@@ -120,12 +126,12 @@ final class PanelController {
     func hide() {
         guard let panel, panel.isVisible else { return }
 
-        let visibleFrame = panel.screen?.visibleFrame
-            ?? NSScreen.main?.visibleFrame
+        let screenFrame = panel.screen?.frame
+            ?? NSScreen.main?.frame
             ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
 
         let offScreenFrame = NSRect(
-            x: visibleFrame.maxX,
+            x: screenFrame.maxX,
             y: panel.frame.origin.y,
             width: panelWidth,
             height: panel.frame.height
@@ -216,10 +222,17 @@ final class PanelController {
             .environment(panelActions)
 
         let hostingView: NSView
-        if let container = modelContainer {
+        if let container = modelContainer, let appState {
+            let hv = NSHostingView(rootView: contentView
+                .environment(appState)
+                .modelContainer(container))
+            hv.translatesAutoresizingMaskIntoConstraints = false
+            hostingView = hv
+        } else if let container = modelContainer {
             let hv = NSHostingView(rootView: contentView.modelContainer(container))
             hv.translatesAutoresizingMaskIntoConstraints = false
             hostingView = hv
+            logger.warning("Panel created without AppState -- live refresh will not work")
         } else {
             let hv = NSHostingView(rootView: contentView)
             hv.translatesAutoresizingMaskIntoConstraints = false

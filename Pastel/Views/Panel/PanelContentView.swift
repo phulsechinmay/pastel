@@ -11,6 +11,7 @@ import SwiftData
 struct PanelContentView: View {
 
     @Environment(PanelActions.self) private var panelActions
+    @Environment(AppState.self) private var appState
 
     @Query(sort: \Label.sortOrder) private var labels: [Label]
 
@@ -46,6 +47,7 @@ struct PanelContentView: View {
                 selectedIndex: $selectedIndex,
                 onPaste: { item in pasteItem(item) }
             )
+            .id(appState.itemCount)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: searchText) {

@@ -30,34 +30,33 @@ struct ClipboardCardView: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            // Source app icon (left)
-            sourceAppIcon
+        VStack(alignment: .leading, spacing: 6) {
+            // Header row: source app icon + timestamp
+            HStack {
+                sourceAppIcon
+                Spacer()
+                Text(item.timestamp, format: .relative(presentation: .named))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
 
-            // Content preview (center, fills space)
+            // Content preview (full-width)
             contentPreview
-
-            // Relative timestamp (right)
-            Text(item.timestamp, format: .relative(presentation: .named))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .layoutPriority(1)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(height: cardHeight)
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: cardMinHeight, alignment: .topLeading)
         .background(
             isSelected ? Color.accentColor.opacity(0.3)
                 : isHovered ? Color.white.opacity(0.12)
                 : Color.white.opacity(0.06),
-            in: RoundedRectangle(cornerRadius: 8)
+            in: RoundedRectangle(cornerRadius: 10)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .onHover { hovering in
             isHovered = hovering
         }
@@ -127,13 +126,13 @@ struct ClipboardCardView: View {
            let icon = NSWorkspace.shared.appIcon(forBundleIdentifier: bundleID) {
             Image(nsImage: icon)
                 .resizable()
-                .frame(width: 20, height: 20)
+                .frame(width: 24, height: 24)
                 .clipShape(Circle())
         } else {
             Image(systemName: "app")
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .foregroundStyle(.secondary)
-                .frame(width: 20, height: 20)
+                .frame(width: 24, height: 24)
         }
     }
 
@@ -151,7 +150,7 @@ struct ClipboardCardView: View {
         }
     }
 
-    private var cardHeight: CGFloat {
-        item.type == .image ? 90 : 72
+    private var cardMinHeight: CGFloat {
+        item.type == .image ? 120 : 80
     }
 }
