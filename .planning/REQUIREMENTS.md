@@ -107,41 +107,41 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLIP-01 | TBD | Pending |
-| CLIP-02 | TBD | Pending |
-| CLIP-03 | TBD | Pending |
-| CLIP-04 | TBD | Pending |
-| CLIP-05 | TBD | Pending |
-| CLIP-06 | TBD | Pending |
-| PNUI-01 | TBD | Pending |
-| PNUI-02 | TBD | Pending |
-| PNUI-03 | TBD | Pending |
-| PNUI-04 | TBD | Pending |
-| PNUI-05 | TBD | Pending |
-| PNUI-06 | TBD | Pending |
-| PNUI-07 | TBD | Pending |
-| PNUI-08 | TBD | Pending |
-| PNUI-09 | TBD | Pending |
-| PNUI-10 | TBD | Pending |
-| PAST-01 | TBD | Pending |
-| PAST-02 | TBD | Pending |
-| PAST-03 | TBD | Pending |
-| ORGN-01 | TBD | Pending |
-| ORGN-02 | TBD | Pending |
-| ORGN-03 | TBD | Pending |
-| ORGN-04 | TBD | Pending |
-| ORGN-05 | TBD | Pending |
-| ORGN-06 | TBD | Pending |
-| INFR-01 | TBD | Pending |
-| INFR-02 | TBD | Pending |
-| INFR-03 | TBD | Pending |
-| INFR-04 | TBD | Pending |
+| CLIP-01 | Phase 1 | Pending |
+| CLIP-02 | Phase 1 | Pending |
+| CLIP-03 | Phase 1 | Pending |
+| CLIP-04 | Phase 1 | Pending |
+| CLIP-05 | Phase 1 | Pending |
+| CLIP-06 | Phase 1 | Pending |
+| PNUI-01 | Phase 2 | Pending |
+| PNUI-02 | Phase 2 | Pending |
+| PNUI-03 | Phase 5 | Pending |
+| PNUI-04 | Phase 3 | Pending |
+| PNUI-05 | Phase 2 | Pending |
+| PNUI-06 | Phase 2 | Pending |
+| PNUI-07 | Phase 2 | Pending |
+| PNUI-08 | Phase 2 | Pending |
+| PNUI-09 | Phase 3 | Pending |
+| PNUI-10 | Phase 2 | Pending |
+| PAST-01 | Phase 3 | Pending |
+| PAST-02 | Phase 3 | Pending |
+| PAST-03 | Phase 3 | Pending |
+| ORGN-01 | Phase 4 | Pending |
+| ORGN-02 | Phase 4 | Pending |
+| ORGN-03 | Phase 4 | Pending |
+| ORGN-04 | Phase 4 | Pending |
+| ORGN-05 | Phase 4 | Pending |
+| ORGN-06 | Phase 4 | Pending |
+| INFR-01 | Phase 1 | Pending |
+| INFR-02 | Phase 5 | Pending |
+| INFR-03 | Phase 5 | Pending |
+| INFR-04 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 29 total
-- Mapped to phases: 0
-- Unmapped: 29
+- Mapped to phases: 29
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after initial definition*
+*Last updated: 2026-02-06 after roadmap creation*
