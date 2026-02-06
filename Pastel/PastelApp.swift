@@ -16,9 +16,10 @@ struct PastelApp: App {
         }
         self.modelContainer = container
 
-        // Initialize AppState and wire up the clipboard monitor
+        // Initialize AppState and wire up the clipboard monitor + panel
         let state = AppState()
         state.setup(modelContext: container.mainContext)
+        state.setupPanel(modelContainer: container)
         self._appState = State(initialValue: state)
     }
 

@@ -28,6 +28,21 @@ struct StatusPopoverView: View {
             .toggleStyle(.switch)
             .controlSize(.small)
 
+            // Show History panel button
+            Button(action: {
+                appState.togglePanel()
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "clipboard.fill")
+                    Text("Show History")
+                    Spacer()
+                    Text("\u{21E7}\u{2318}V")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
             Divider()
 
             // Quit button
