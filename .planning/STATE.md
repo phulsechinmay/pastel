@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 4 of 5 (Organization)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-02-06 -- Completed 04-02-PLAN.md
+Last activity: 2026-02-06 -- Completed 04-03-PLAN.md
 
-Progress: [███████░░░] 69% (9/13 plans estimated)
+Progress: [████████░░] 77% (10/13 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: 3min
-- Total execution time: 28min
+- Total execution time: 30min
 
 **By Phase:**
 
@@ -30,10 +30,10 @@ Progress: [███████░░░] 69% (9/13 plans estimated)
 | 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
 | 02-sliding-panel | 2/2 | 5min | 2.5min |
 | 03-paste-back-and-hotkeys | 2/2 | 5min | 2.5min |
-| 04-organization | 2/4 | 5min | 2.5min |
+| 04-organization | 3/4 | 7min | 2.3min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (3min), 03-02 (2min), 04-01 (3min), 04-02 (2min)
+- Last 5 plans: 03-02 (2min), 04-01 (3min), 04-02 (2min), 04-03 (2min)
 - Trend: stable, fast
 
 *Updated after each plan completion*
@@ -81,6 +81,10 @@ Recent decisions affecting current work:
 - [04-02]: Popover for label creation (not sheet) since menu-bar-only app has no main window
 - [04-02]: @Query for labels independently in ClipboardCardView (context menu) and PanelContentView (chip bar)
 - [04-02]: persistentModelID comparison for chip selection and context menu checkmark
+- [04-03]: Simpler delete approach: image cleanup in view, expiration timer no-ops via existing ExpirationService guard
+- [04-03]: Fetch all items before batch delete to collect image paths for disk cleanup
+- [04-03]: Labels preserved through clear-all (reusable organizational tools per CONTEXT.md)
+- [04-03]: confirmationDialog for clear-all (better macOS UX for destructive actions)
 
 ### Pending Todos
 
@@ -92,6 +96,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-06T20:01:54Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-02-06T20:05:46Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
