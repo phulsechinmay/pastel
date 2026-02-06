@@ -18,6 +18,9 @@ final class AppState {
     /// Controller managing the sliding clipboard history panel
     let panelController = PanelController()
 
+    /// Service for writing to pasteboard and simulating Cmd+V paste
+    let pasteService = PasteService()
+
     /// Total number of captured clipboard items (delegates to monitor)
     var itemCount: Int {
         clipboardMonitor?.itemCount ?? 0
@@ -41,6 +44,11 @@ final class AppState {
     func setupPanel(modelContainer: ModelContainer) {
         panelController.setModelContainer(modelContainer)
 
+        // Wire paste callback: SwiftUI -> PanelActions -> onPasteItem -> AppState.paste -> PasteService
+        panelController.onPasteItem = { [weak self] item in
+            self?.paste(item: item)
+        }
+
         // Register global hotkey for panel toggle
         KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in
             MainActor.assumeIsolated {
@@ -52,5 +60,14 @@ final class AppState {
     /// Toggle the sliding panel open/closed.
     func togglePanel() {
         panelController.toggle()
+    }
+
+    /// Paste a clipboard item into the frontmost app.
+    ///
+    /// Delegates to PasteService which handles: accessibility check, pasteboard write,
+    /// self-paste loop prevention, panel hide, and CGEvent Cmd+V simulation.
+    func paste(item: ClipboardItem) {
+        guard let clipboardMonitor else { return }
+        pasteService.paste(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
     }
 }

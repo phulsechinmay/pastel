@@ -3,6 +3,15 @@ import SwiftUI
 import SwiftData
 import OSLog
 
+/// Observable class that bridges paste actions from SwiftUI views to AppKit.
+///
+/// Passed into the SwiftUI environment so PanelContentView can trigger paste
+/// without coupling to AppKit or PanelController directly.
+@MainActor @Observable
+final class PanelActions {
+    var pasteItem: ((ClipboardItem) -> Void)?
+}
+
 /// Manages the lifecycle of the sliding clipboard panel: creation, show/hide
 /// animation, screen detection, and dismiss-on-click-outside / Escape monitors.
 @MainActor
@@ -20,12 +29,23 @@ final class PanelController {
     private var localKeyMonitor: Any?
     private var modelContainer: ModelContainer?
 
+    /// The app that was frontmost before the panel was shown.
+    /// Captured in show() so paste-back targets the correct app.
+    private var previousApp: NSRunningApplication?
+
+    /// Observable actions bridge for SwiftUI views.
+    let panelActions = PanelActions()
+
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "app.pastel.Pastel",
         category: "PanelController"
     )
 
     // MARK: - Public API
+
+    /// Callback invoked when a SwiftUI view triggers a paste action.
+    /// Set by AppState during setupPanel() to wire into PasteService.
+    var onPasteItem: ((ClipboardItem) -> Void)?
 
     /// Whether the panel is currently visible on screen.
     var isVisible: Bool {
@@ -50,12 +70,20 @@ final class PanelController {
 
     /// Slide the panel in from the right edge of the screen containing the mouse cursor.
     func show() {
+        // Capture the frontmost app BEFORE showing the panel.
+        // Because the panel uses .nonactivatingPanel, Pastel never becomes frontmost,
+        // but we store this reference for edge cases and future use.
+        previousApp = NSWorkspace.shared.frontmostApplication
+
         let screen = screenWithMouse()
         let visibleFrame = screen.visibleFrame
 
         if panel == nil {
             createPanel()
         }
+
+        // Sync paste callback to panelActions (in case it was set after panel creation)
+        panelActions.pasteItem = onPasteItem
 
         guard let panel else { return }
 
@@ -110,6 +138,7 @@ final class PanelController {
         } completionHandler: { [weak self] in
             panel.orderOut(nil)
             self?.removeEventMonitors()
+            self?.previousApp = nil
         }
 
         logger.info("Panel hidden")
@@ -178,9 +207,13 @@ final class PanelController {
 
         slidingPanel.contentView = visualEffectView
 
+        // Sync paste callback into panelActions before creating SwiftUI view
+        panelActions.pasteItem = onPasteItem
+
         // Host SwiftUI content inside the visual effect view
         let contentView = PanelContentView()
             .environment(\.colorScheme, .dark)
+            .environment(panelActions)
 
         let hostingView: NSView
         if let container = modelContainer {
