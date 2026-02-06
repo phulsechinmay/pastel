@@ -95,10 +95,28 @@ struct ClipboardCardView: View {
             Divider()
 
             Button("Delete", role: .destructive) {
-                modelContext.delete(item)
-                try? modelContext.save()
+                deleteItem()
             }
         }
+    }
+
+    // MARK: - Actions
+
+    /// Delete the clipboard item with full cleanup:
+    /// 1. Remove image and thumbnail files from disk (if any)
+    /// 2. Delete the SwiftData model
+    ///
+    /// Pending expiration timers for concealed items are handled gracefully --
+    /// ExpirationService.performExpiration checks if the item still exists
+    /// via `modelContext.model(for:)` and no-ops if already deleted.
+    private func deleteItem() {
+        // Clean up disk images before removing the model
+        ImageStorageService.shared.deleteImage(
+            imagePath: item.imagePath,
+            thumbnailPath: item.thumbnailPath
+        )
+        modelContext.delete(item)
+        try? modelContext.save()
     }
 
     // MARK: - Private Views
