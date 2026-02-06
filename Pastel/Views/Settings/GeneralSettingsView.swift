@@ -2,19 +2,21 @@ import SwiftUI
 import LaunchAtLogin
 import KeyboardShortcuts
 
-/// General settings tab with all 4 user-configurable settings.
+/// General settings tab with all 5 user-configurable settings.
 ///
 /// Layout (top to bottom):
 /// 1. Launch at login toggle (LaunchAtLogin package)
 /// 2. Panel toggle hotkey recorder (KeyboardShortcuts package)
 /// 3. Panel position selector (ScreenEdgePicker bound to @AppStorage "panelEdge")
 /// 4. History retention dropdown (Picker bound to @AppStorage "historyRetention")
+/// 5. Paste behavior dropdown (Picker bound to @AppStorage "pasteBehavior")
 struct GeneralSettingsView: View {
 
     @Environment(AppState.self) private var appState
 
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("historyRetention") private var retentionDays: Int = 90
+    @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.paste.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -59,6 +61,25 @@ struct GeneralSettingsView: View {
                 }
                 .pickerStyle(.menu)
                 .frame(maxWidth: 200)
+            }
+
+            Divider()
+
+            // 5. Paste behavior
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Paste Behavior")
+                    .font(.headline)
+                Picker("When activating an item:", selection: $pasteBehaviorRaw) {
+                    ForEach(PasteBehavior.allCases, id: \.rawValue) { behavior in
+                        Text(behavior.displayName).tag(behavior.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 200)
+
+                Text("\"Paste\" writes to clipboard and pastes into the active app.\n\"Copy to Clipboard\" only writes to clipboard.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
