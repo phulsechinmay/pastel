@@ -105,6 +105,12 @@ Recent decisions affecting current work:
 
 - None. All builds verified with xcodebuild. All 13 plans executed successfully.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 001 | Fix code signing for TCC persistence | 2026-02-06 | 2106f94 | [001-fix-code-signing-for-tcc-persistence](./quick/001-fix-code-signing-for-tcc-persistence/) |
+
 ## Session Continuity
 
 Last session: 2026-02-06T23:52:00Z
