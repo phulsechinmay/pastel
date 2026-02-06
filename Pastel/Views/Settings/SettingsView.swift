@@ -22,7 +22,7 @@ private enum SettingsTab: String, CaseIterable {
 
 /// Root settings view with a custom horizontal tab bar.
 ///
-/// Two tabs: General (all 4 settings) and Labels (placeholder for Plan 02).
+/// Two tabs: General (all 4 settings) and Labels (CRUD label management).
 /// The tab bar uses a compact icon-above-text layout with accent highlighting.
 struct SettingsView: View {
 
@@ -68,10 +68,7 @@ struct SettingsView: View {
                 case .general:
                     GeneralSettingsView()
                 case .labels:
-                    Text("Labels")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    LabelSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
