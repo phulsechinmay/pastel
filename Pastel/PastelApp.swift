@@ -10,7 +10,7 @@ struct PastelApp: App {
         // Create the model container eagerly so we can pass its context to AppState
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: ClipboardItem.self)
+            container = try ModelContainer(for: ClipboardItem.self, Label.self)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

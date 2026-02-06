@@ -48,6 +48,9 @@ final class ClipboardItem {
     /// SHA256 hash of content for deduplication
     @Attribute(.unique) var contentHash: String
 
+    /// Optional label for organization/filtering
+    var label: Label?
+
     /// Computed property to convert between String storage and ContentType enum
     var type: ContentType {
         get {
