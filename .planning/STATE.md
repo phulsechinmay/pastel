@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 1 complete. Ready for Phase 2 - Sliding Panel.
+**Current focus:** Phase 2 in progress - Sliding Panel infrastructure built, card UI next.
 
 ## Current Position
 
-Phase: 1 of 5 (Clipboard Capture and Storage) -- COMPLETE
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-02-06 -- Completed 01-03-PLAN.md (image storage, expiration, pipeline completion)
+Phase: 2 of 5 (Sliding Panel)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-06 -- Completed 02-01-PLAN.md (panel infrastructure, animation, hotkey)
 
-Progress: [███░░░░░░░] 20% (1/5 phases)
+Progress: [████░░░░░░] 31% (4/13 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 4.3min
-- Total execution time: 13min
+- Total plans completed: 4
+- Average duration: 4min
+- Total execution time: 16min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
+| 02-sliding-panel | 1/2 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (6min), 01-02 (3min), 01-03 (4min)
+- Last 5 plans: 01-01 (6min), 01-02 (3min), 01-03 (4min), 02-01 (3min)
 - Trend: stable, fast
 
 *Updated after each plan completion*
@@ -58,6 +59,9 @@ Recent decisions affecting current work:
 - [01-03]: @MainActor @Sendable completion handler pattern for Swift 6 strict concurrency with GCD
 - [01-03]: ExpirationService integrated into ClipboardMonitor init (not standalone wiring)
 - [01-03]: Overdue concealed items cleaned up at ClipboardMonitor init time
+- [02-01]: NSVisualEffectView .sidebar material with .darkAqua appearance (deprecated .dark replaced)
+- [02-01]: NSHostingView typed as NSView to handle conditional modelContainer branch
+- [02-01]: KeyboardShortcuts.onKeyUp with MainActor.assumeIsolated for Swift 6 concurrency safety
 
 ### Pending Todos
 
@@ -65,10 +69,10 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- None. Xcode.app is now available and all builds verified with xcodebuild.
+- None. All builds verified with xcodebuild.
 
 ## Session Continuity
 
-Last session: 2026-02-06T09:25:06Z
-Stopped at: Completed 01-03-PLAN.md (image storage, expiration, pipeline completion) -- Phase 1 complete
+Last session: 2026-02-06T16:40:58Z
+Stopped at: Completed 02-01-PLAN.md (panel infrastructure, animation, hotkey)
 Resume file: None
