@@ -35,6 +35,7 @@
 		B936EBEE374527897FA897DE /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = A9A03DD46B1694F403E4ACF4 /* KeyboardShortcuts */; };
 		BAE74603B44F4338BBDCD644 /* ScreenEdgePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48C40766989658A71731EFD /* ScreenEdgePicker.swift */; };
 		C5DDC68198250D3A003DB9D7 /* PanelEdge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76EB886434FC096E9A770705 /* PanelEdge.swift */; };
+		D1A2B3C4E5F60718293A4B5C /* PasteBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* PasteBehavior.swift */; };
 		C9DA10258BC9D50AC228BA4C /* LabelSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E69FA6363380EEB64EF71E /* LabelSettingsView.swift */; };
 		CB24B8C2681CF4B5F1AB5DC9 /* NSWorkspace+AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00804B3DBC5EB02EA738DEC2 /* NSWorkspace+AppIcon.swift */; };
 		CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */; };
@@ -71,6 +72,7 @@
 		71138AD30E90615916853DD4 /* StatusPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPopoverView.swift; sourceTree = "<group>"; };
 		71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		76EB886434FC096E9A770705 /* PanelEdge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEdge.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* PasteBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteBehavior.swift; sourceTree = "<group>"; };
 		7B6FC5171BA6D8C3F714E834 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7CA38A9FD4344A6EBC84615B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
@@ -161,6 +163,7 @@
 				9C7F8E05C490820A909E5D51 /* Label.swift */,
 				61A1A38C2FA151019789426E /* LabelColor.swift */,
 				76EB886434FC096E9A770705 /* PanelEdge.swift */,
+				A1B2C3D4E5F60718293A4B5D /* PasteBehavior.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -349,6 +352,7 @@
 				97E8C96C50161A63AB0B871C /* PanelContentView.swift in Sources */,
 				35B2B78C88F753B2D19BB929 /* PanelController.swift in Sources */,
 				C5DDC68198250D3A003DB9D7 /* PanelEdge.swift in Sources */,
+				D1A2B3C4E5F60718293A4B5C /* PasteBehavior.swift in Sources */,
 				FC28C1E1511F71298087486A /* PasteService.swift in Sources */,
 				5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */,
 				2103A21B8C8E7C2FCD20019E /* RetentionService.swift in Sources */,

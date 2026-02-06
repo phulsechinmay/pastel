@@ -3,15 +3,22 @@ import Carbon
 import CoreGraphics
 import OSLog
 
-/// Writes clipboard item content to NSPasteboard and simulates Cmd+V via CGEvent.
+/// Writes clipboard item content to NSPasteboard and optionally simulates Cmd+V via CGEvent.
 ///
-/// This is the core paste-back service. All paste operations flow through here:
+/// This is the core paste-back service. Behavior depends on the user's paste preference:
+///
+/// **Paste / Copy + Paste mode:**
 /// 1. Check Accessibility permission (required for CGEvent)
 /// 2. Check secure input (fall back to copy-only if active)
 /// 3. Write item content to NSPasteboard.general
 /// 4. Set skipNextChange on ClipboardMonitor (self-paste loop prevention)
 /// 5. Hide the panel
 /// 6. After 50ms delay, simulate Cmd+V via CGEvent
+///
+/// **Copy mode:**
+/// 1. Write item content to NSPasteboard.general
+/// 2. Set skipNextChange on ClipboardMonitor (self-paste loop prevention)
+/// 3. Hide the panel
 ///
 /// Handles all 5 content types: text, richText, url, image, file.
 @MainActor
@@ -33,10 +40,24 @@ final class PasteService {
         clipboardMonitor: ClipboardMonitor,
         panelController: PanelController
     ) {
+        // Read user's paste behavior preference
+        let behaviorRaw = UserDefaults.standard.string(forKey: "pasteBehavior") ?? PasteBehavior.paste.rawValue
+        let behavior = PasteBehavior(rawValue: behaviorRaw) ?? .paste
+
+        // Copy-only mode: write to pasteboard and hide panel (no accessibility or CGEvent needed)
+        if behavior == .copy {
+            writeToPasteboard(item: item)
+            clipboardMonitor.skipNextChange = true
+            panelController.hide()
+            logger.info("Copy-only mode -- wrote to pasteboard, skipping Cmd+V simulation")
+            return
+        }
+
+        // Paste / Copy+Paste mode: full flow with Cmd+V simulation
+
         // 1. Check Accessibility permission (never cache -- can be revoked at any time)
         guard AccessibilityService.isGranted else {
-            AccessibilityService.requestPermission()
-            logger.warning("Accessibility permission not granted -- requesting")
+            logger.warning("Accessibility permission not granted -- paste blocked")
             return
         }
 
