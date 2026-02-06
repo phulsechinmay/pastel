@@ -30,12 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User copies a URL or file reference and it is captured as the correct content type
   4. User quits and relaunches the app and all previous clipboard history is still present
   5. User copies the same text twice consecutively and only one entry appears in history
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- Xcode project bootstrap, SwiftData model, menu bar app shell
+- [ ] 01-02-PLAN.md -- Clipboard monitoring, content classification, deduplication
+- [ ] 01-03-PLAN.md -- Image storage, concealed item handling, end-to-end verification
 
 ### Phase 2: Sliding Panel
 **Goal**: Users can visually browse their clipboard history in a screen-edge sliding panel with rich card previews for each content type, using an always-dark theme
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Clipboard Capture and Storage | 0/3 | Not started | - |
+| 1. Clipboard Capture and Storage | 0/3 | Planned | - |
 | 2. Sliding Panel | 0/3 | Not started | - |
 | 3. Paste-Back and Hotkeys | 0/3 | Not started | - |
 | 4. Organization | 0/3 | Not started | - |
