@@ -1,0 +1,155 @@
+import AppKit
+import Carbon
+import CoreGraphics
+import OSLog
+
+/// Writes clipboard item content to NSPasteboard and simulates Cmd+V via CGEvent.
+///
+/// This is the core paste-back service. All paste operations flow through here:
+/// 1. Check Accessibility permission (required for CGEvent)
+/// 2. Check secure input (fall back to copy-only if active)
+/// 3. Write item content to NSPasteboard.general
+/// 4. Set skipNextChange on ClipboardMonitor (self-paste loop prevention)
+/// 5. Hide the panel
+/// 6. After 50ms delay, simulate Cmd+V via CGEvent
+///
+/// Handles all 5 content types: text, richText, url, image, file.
+@MainActor
+final class PasteService {
+
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "app.pastel.Pastel",
+        category: "PasteService"
+    )
+
+    /// Paste a clipboard item into the frontmost app.
+    ///
+    /// - Parameters:
+    ///   - item: The clipboard item to paste.
+    ///   - clipboardMonitor: The monitor whose skipNextChange flag will be set.
+    ///   - panelController: The panel to hide before simulating paste.
+    func paste(
+        item: ClipboardItem,
+        clipboardMonitor: ClipboardMonitor,
+        panelController: PanelController
+    ) {
+        // 1. Check Accessibility permission (never cache -- can be revoked at any time)
+        guard AccessibilityService.isGranted else {
+            AccessibilityService.requestPermission()
+            logger.warning("Accessibility permission not granted -- requesting")
+            return
+        }
+
+        // 2. Check secure input (password fields, banking apps)
+        if IsSecureEventInputEnabled() {
+            logger.warning("Secure input is active -- writing to pasteboard only (user must Cmd+V manually)")
+            writeToPasteboard(item: item)
+            clipboardMonitor.skipNextChange = true
+            return
+        }
+
+        // 3. Write item content to pasteboard
+        writeToPasteboard(item: item)
+
+        // 4. Signal monitor to skip the next change (self-paste loop prevention)
+        clipboardMonitor.skipNextChange = true
+
+        // 5. Hide panel
+        panelController.hide()
+
+        // 6. Simulate Cmd+V after 50ms delay (mandatory: gives macOS time to route focus back)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            Self.simulatePaste()
+        }
+    }
+
+    // MARK: - Pasteboard Writing
+
+    /// Write the clipboard item's content to NSPasteboard.general, preserving all representations.
+    private func writeToPasteboard(item: ClipboardItem) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        switch item.type {
+        case .text:
+            if let text = item.textContent {
+                pasteboard.setString(text, forType: .string)
+            }
+            if let rtfData = item.rtfData {
+                pasteboard.setData(rtfData, forType: .rtf)
+            }
+            if let html = item.htmlContent {
+                pasteboard.setString(html, forType: .html)
+            }
+
+        case .richText:
+            // Write richest format first for maximum fidelity
+            if let rtfData = item.rtfData {
+                pasteboard.setData(rtfData, forType: .rtf)
+            }
+            if let html = item.htmlContent {
+                pasteboard.setString(html, forType: .html)
+            }
+            if let text = item.textContent {
+                pasteboard.setString(text, forType: .string)
+            }
+
+        case .url:
+            if let urlString = item.textContent {
+                pasteboard.setString(urlString, forType: .string)
+                // Also set as proper URL type for apps that support it
+                if let url = URL(string: urlString) {
+                    pasteboard.writeObjects([url as NSURL])
+                }
+            }
+
+        case .image:
+            if let imagePath = item.imagePath {
+                let imageURL = ImageStorageService.shared.resolveImageURL(imagePath)
+                if let imageData = try? Data(contentsOf: imageURL) {
+                    pasteboard.setData(imageData, forType: .png)
+                    // Also write TIFF for broader app compatibility
+                    if let nsImage = NSImage(data: imageData),
+                       let tiffData = nsImage.tiffRepresentation {
+                        pasteboard.setData(tiffData, forType: .tiff)
+                    }
+                }
+            }
+
+        case .file:
+            if let filePath = item.textContent {
+                let fileURL = URL(fileURLWithPath: filePath)
+                pasteboard.writeObjects([fileURL as NSURL])
+            }
+        }
+
+        logger.info("Wrote \(item.type.rawValue) content to pasteboard")
+    }
+
+    // MARK: - CGEvent Paste Simulation
+
+    /// Simulate Cmd+V keystroke via CGEvent.
+    ///
+    /// Uses virtual key code 0x09 (kVK_ANSI_V) which is layout-independent.
+    /// Posts to `.cgSessionEventTap` to reach the frontmost app.
+    private static func simulatePaste() {
+        let source = CGEventSource(stateID: .combinedSessionState)
+
+        // Suppress local keyboard events during paste to avoid interference
+        source?.setLocalEventsFilterDuringSuppressionState(
+            [.permitLocalMouseEvents, .permitSystemDefinedEvents],
+            state: .eventSuppressionStateSuppressionInterval
+        )
+
+        let vKeyCode: CGKeyCode = 0x09 // kVK_ANSI_V
+
+        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true)
+        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false)
+
+        keyDown?.flags = .maskCommand
+        keyUp?.flags = .maskCommand
+
+        keyDown?.post(tap: .cgSessionEventTap)
+        keyUp?.post(tap: .cgSessionEventTap)
+    }
+}
