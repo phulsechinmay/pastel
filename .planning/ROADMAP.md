@@ -63,12 +63,11 @@ Plans:
   3. User navigates cards with arrow keys and presses Enter to paste the selected item
   4. Panel does not steal focus from the active app (non-activating window)
   5. On first launch, user is guided through Accessibility permission with a clear explanation of why it is needed
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md -- PasteService (CGEvent paste simulation), AccessibilityService, sandbox removal, AppState/PanelController wiring
+- [ ] 03-02-PLAN.md -- Keyboard navigation (arrow keys + Enter), double-click paste, selection highlight, Accessibility onboarding prompt
 
 ### Phase 4: Organization
 **Goal**: Users can search, label, filter, and manage their clipboard history so it remains useful as it grows
@@ -109,6 +108,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Clipboard Capture and Storage | 3/3 | Complete | 2026-02-06 |
 | 2. Sliding Panel | 2/2 | Complete | 2026-02-06 |
-| 3. Paste-Back and Hotkeys | 0/3 | Not started | - |
+| 3. Paste-Back and Hotkeys | 0/2 | Not started | - |
 | 4. Organization | 0/3 | Not started | - |
 | 5. Settings and Polish | 0/2 | Not started | - |
