@@ -21,19 +21,19 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **PNUI-01**: Screen-edge sliding panel displays clipboard history as cards
 - [x] **PNUI-02**: Panel slides in/out with smooth animation
 - [ ] **PNUI-03**: Panel position configurable to top, left, right, or bottom edge
-- [ ] **PNUI-04**: Panel activated via global hotkey
+- [x] **PNUI-04**: Panel activated via global hotkey
 - [x] **PNUI-05**: Cards show image thumbnail for image items
 - [x] **PNUI-06**: Cards show URL text distinctly for URL items
 - [x] **PNUI-07**: Cards show text preview for text items
 - [x] **PNUI-08**: Cards show file name/path for file items
-- [ ] **PNUI-09**: User can navigate cards with arrow keys and paste with Enter
+- [x] **PNUI-09**: User can navigate cards with arrow keys and paste with Enter
 - [x] **PNUI-10**: Panel uses always-dark theme
 
 ### Paste
 
-- [ ] **PAST-01**: User can double-click a card to paste its content into the active app
-- [ ] **PAST-02**: App requests Accessibility permission on first launch with clear explanation
-- [ ] **PAST-03**: Panel does not steal focus from the active app (non-activating panel)
+- [x] **PAST-01**: User can double-click a card to paste its content into the active app
+- [x] **PAST-02**: App requests Accessibility permission on first launch with clear explanation
+- [x] **PAST-03**: Panel does not steal focus from the active app (non-activating panel)
 
 ### Organization
 
@@ -116,16 +116,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PNUI-01 | Phase 2 | Complete |
 | PNUI-02 | Phase 2 | Complete |
 | PNUI-03 | Phase 5 | Pending |
-| PNUI-04 | Phase 3 | Pending |
+| PNUI-04 | Phase 3 | Complete |
 | PNUI-05 | Phase 2 | Complete |
 | PNUI-06 | Phase 2 | Complete |
 | PNUI-07 | Phase 2 | Complete |
 | PNUI-08 | Phase 2 | Complete |
-| PNUI-09 | Phase 3 | Pending |
+| PNUI-09 | Phase 3 | Complete |
 | PNUI-10 | Phase 2 | Complete |
-| PAST-01 | Phase 3 | Pending |
-| PAST-02 | Phase 3 | Pending |
-| PAST-03 | Phase 3 | Pending |
+| PAST-01 | Phase 3 | Complete |
+| PAST-02 | Phase 3 | Complete |
+| PAST-03 | Phase 3 | Complete |
 | ORGN-01 | Phase 4 | Pending |
 | ORGN-02 | Phase 4 | Pending |
 | ORGN-03 | Phase 4 | Pending |
