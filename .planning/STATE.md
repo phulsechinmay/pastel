@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 3 complete -- Paste-Back and Hotkeys done. Phase 4 (Organization) next.
+**Current focus:** Phase 4 in progress -- Organization (search, labels, filtering, deletion).
 
 ## Current Position
 
-Phase: 3 of 5 (Paste-Back and Hotkeys)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-02-06 -- Completed 03-02-PLAN.md
+Phase: 4 of 5 (Organization)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-02-06 -- Completed 04-01-PLAN.md
 
-Progress: [██████░░░░] 54% (7/13 plans estimated)
+Progress: [██████░░░░] 62% (8/13 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 3min
-- Total execution time: 23min
+- Total execution time: 26min
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: [██████░░░░] 54% (7/13 plans estimated)
 | 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
 | 02-sliding-panel | 2/2 | 5min | 2.5min |
 | 03-paste-back-and-hotkeys | 2/2 | 5min | 2.5min |
+| 04-organization | 1/4 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (3min), 02-02 (2min), 03-01 (3min), 03-02 (2min)
+- Last 5 plans: 02-02 (2min), 03-01 (3min), 03-02 (2min), 04-01 (3min)
 - Trend: stable, fast
 
 *Updated after each plan completion*
@@ -73,6 +74,10 @@ Recent decisions affecting current work:
 - [03-02]: Timer.publish polling (1s) for Accessibility permission auto-dismiss (no callback API)
 - [03-02]: Standalone NSWindow for onboarding in menu-bar-only app (no main window for sheets)
 - [03-02]: Selection uses accentColor at two opacities (background + border) distinct from hover
+- [04-01]: Keyboard navigation moved into FilteredCardListView (direct items access for Enter-to-paste and arrow clamping)
+- [04-01]: localizedStandardContains for Unicode-aware case-insensitive search in #Predicate
+- [04-01]: persistentModelID comparison for label filtering in predicates (not direct entity comparison)
+- [04-01]: Dynamic @Query pattern: parent holds @State, child constructs @Query in init with predicate
 
 ### Pending Todos
 
@@ -84,6 +89,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-06T17:50:48Z
-Stopped at: Completed 03-02-PLAN.md (Phase 3 complete)
+Last session: 2026-02-06T19:56:55Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
