@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 3 in progress -- Paste-Back and Hotkeys. Plan 01 complete, Plan 02 next.
+**Current focus:** Phase 3 complete -- Paste-Back and Hotkeys done. Phase 4 (Organization) next.
 
 ## Current Position
 
 Phase: 3 of 5 (Paste-Back and Hotkeys)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-06 -- Completed 03-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-06 -- Completed 03-02-PLAN.md
 
-Progress: [██████░░░░] 46% (6/13 plans estimated)
+Progress: [██████░░░░] 54% (7/13 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 4min
-- Total execution time: 21min
+- Total plans completed: 7
+- Average duration: 3min
+- Total execution time: 23min
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [██████░░░░] 46% (6/13 plans estimated)
 |-------|-------|-------|----------|
 | 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
 | 02-sliding-panel | 2/2 | 5min | 2.5min |
-| 03-paste-back-and-hotkeys | 1/2 | 3min | 3min |
+| 03-paste-back-and-hotkeys | 2/2 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (4min), 02-01 (3min), 02-02 (2min), 03-01 (3min)
+- Last 5 plans: 02-01 (3min), 02-02 (2min), 03-01 (3min), 03-02 (2min)
 - Trend: stable, fast
 
 *Updated after each plan completion*
@@ -69,6 +69,10 @@ Recent decisions affecting current work:
 - [03-01]: String literal "AXTrustedCheckOptionPrompt" instead of kAXTrustedCheckOptionPrompt for Swift 6 concurrency safety
 - [03-01]: PanelActions @Observable class bridges SwiftUI paste callbacks via .environment()
 - [03-01]: Empty entitlements dict (no app-sandbox key at all) for non-sandboxed app
+- [03-02]: Double-tap gesture (count: 2) before single-tap (count: 1) for correct SwiftUI gesture priority
+- [03-02]: Timer.publish polling (1s) for Accessibility permission auto-dismiss (no callback API)
+- [03-02]: Standalone NSWindow for onboarding in menu-bar-only app (no main window for sheets)
+- [03-02]: Selection uses accentColor at two opacities (background + border) distinct from hover
 
 ### Pending Todos
 
@@ -80,6 +84,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-06T17:44:56Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-02-06T17:50:48Z
+Stopped at: Completed 03-02-PLAN.md (Phase 3 complete)
 Resume file: None

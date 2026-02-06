@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Clipboard Capture and Storage** - Silently capture all clipboard content and persist across restarts
 - [x] **Phase 2: Sliding Panel** - Browse clipboard history in a visually rich screen-edge panel
-- [ ] **Phase 3: Paste-Back and Hotkeys** - Instantly paste any item into the active app via hotkey and keyboard
+- [x] **Phase 3: Paste-Back and Hotkeys** - Instantly paste any item into the active app via hotkey and keyboard
 - [ ] **Phase 4: Organization** - Search, label, filter, and manage clipboard history
 - [ ] **Phase 5: Settings and Polish** - Configure panel position, launch behavior, and preferences
 
@@ -66,8 +66,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- PasteService (CGEvent paste simulation), AccessibilityService, sandbox removal, AppState/PanelController wiring
-- [ ] 03-02-PLAN.md -- Keyboard navigation (arrow keys + Enter), double-click paste, selection highlight, Accessibility onboarding prompt
+- [x] 03-01-PLAN.md -- PasteService (CGEvent paste simulation), AccessibilityService, sandbox removal, AppState/PanelController wiring
+- [x] 03-02-PLAN.md -- Keyboard navigation (arrow keys + Enter), double-click paste, selection highlight, Accessibility onboarding prompt
 
 ### Phase 4: Organization
 **Goal**: Users can search, label, filter, and manage their clipboard history so it remains useful as it grows
@@ -108,6 +108,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Clipboard Capture and Storage | 3/3 | Complete | 2026-02-06 |
 | 2. Sliding Panel | 2/2 | Complete | 2026-02-06 |
-| 3. Paste-Back and Hotkeys | 0/2 | Not started | - |
+| 3. Paste-Back and Hotkeys | 2/2 | Complete | 2026-02-06 |
 | 4. Organization | 0/3 | Not started | - |
 | 5. Settings and Polish | 0/2 | Not started | - |
