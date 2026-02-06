@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 1 - Clipboard Capture and Storage
+**Current focus:** Phase 1 complete. Ready for Phase 2 - Sliding Panel.
 
 ## Current Position
 
-Phase: 1 of 5 (Clipboard Capture and Storage)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-06 -- Completed 01-02-PLAN.md (clipboard monitoring service)
+Phase: 1 of 5 (Clipboard Capture and Storage) -- COMPLETE
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-02-06 -- Completed 01-03-PLAN.md (image storage, expiration, pipeline completion)
 
-Progress: [██░░░░░░░░] 14%
+Progress: [███░░░░░░░] 20% (1/5 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 4.5min
-- Total execution time: 9min
+- Total plans completed: 3
+- Average duration: 4.3min
+- Total execution time: 13min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-clipboard-capture-and-storage | 2/3 | 9min | 4.5min |
+| 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (6min), 01-02 (3min)
-- Trend: accelerating
+- Last 5 plans: 01-01 (6min), 01-02 (3min), 01-03 (4min)
+- Trend: stable, fast
 
 *Updated after each plan completion*
 
@@ -54,17 +54,21 @@ Recent decisions affecting current work:
 - [01-02]: Manual ModelContainer in PastelApp.init for eager monitor startup
 - [01-02]: modelContext.rollback() on save failure for @Attribute(.unique) conflict handling
 - [01-02]: OSLog Logger for structured logging
+- [01-03]: Image hash uses first 4KB of data via SHA256 for speed (not full image data)
+- [01-03]: @MainActor @Sendable completion handler pattern for Swift 6 strict concurrency with GCD
+- [01-03]: ExpirationService integrated into ClipboardMonitor init (not standalone wiring)
+- [01-03]: Overdue concealed items cleaned up at ClipboardMonitor init time
 
 ### Pending Todos
 
-None yet.
+- Phase 1 checkpoint verification: user should build and run the app to verify all 5 content types captured correctly (see 01-03-SUMMARY.md checkpoint notes)
 
 ### Blockers/Concerns
 
-- Xcode.app is downloading but not yet installed. Full `xcodebuild build` verification deferred until installation completes. Code is parse-verified and syntactically correct.
+- None. Xcode.app is now available and all builds verified with xcodebuild.
 
 ## Session Continuity
 
-Last session: 2026-02-06T09:06:22Z
-Stopped at: Completed 01-02-PLAN.md (clipboard monitoring service)
+Last session: 2026-02-06T09:25:06Z
+Stopped at: Completed 01-03-PLAN.md (image storage, expiration, pipeline completion) -- Phase 1 complete
 Resume file: None
