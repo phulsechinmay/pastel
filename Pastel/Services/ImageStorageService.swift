@@ -64,7 +64,7 @@ final class ImageStorageService: Sendable {
     ///   - data: Raw image data (read from pasteboard on the main thread).
     ///   - completion: Called on the **main thread** with (imageFilename, thumbnailFilename),
     ///     or (nil, nil) if saving failed.
-    func saveImage(data: Data, completion: @escaping @Sendable (String?, String?) -> Void) {
+    func saveImage(data: Data, completion: @escaping @MainActor @Sendable (String?, String?) -> Void) {
         backgroundQueue.async { [imagesDirectory] in
             let uuid = UUID().uuidString
 

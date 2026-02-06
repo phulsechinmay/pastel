@@ -32,6 +32,9 @@ final class ClipboardMonitor {
     private var modelContext: ModelContext
     private var wakeObserver: NSObjectProtocol?
 
+    /// Auto-expiration service for concealed clipboard items (password managers)
+    private let expirationService: ExpirationService
+
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "app.pastel.Pastel",
         category: "ClipboardMonitor"
@@ -41,6 +44,7 @@ final class ClipboardMonitor {
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
+        self.expirationService = ExpirationService(modelContext: modelContext)
 
         // Load initial item count from SwiftData
         do {
@@ -53,6 +57,9 @@ final class ClipboardMonitor {
 
         // Sync with current pasteboard state
         self.lastChangeCount = pasteboard.changeCount
+
+        // Clean up any concealed items that expired while the app was not running
+        expirationService.expireOverdueItems()
     }
 
     // No deinit needed: ClipboardMonitor lives for the app's lifetime.
@@ -142,9 +149,9 @@ final class ClipboardMonitor {
             return // Empty, transient, or auto-generated -- skip
         }
 
-        // Image capture deferred to Plan 01-03
+        // Image capture follows an async path (disk I/O on background queue)
         if contentType == .image {
-            Self.logger.info("Image capture deferred to Plan 01-03")
+            processImageContent(isConcealed: isConcealed)
             return
         }
 
@@ -177,7 +184,7 @@ final class ClipboardMonitor {
             primaryContent = result.filePath ?? ""
 
         case .image:
-            return // Already handled above, but needed for exhaustive switch
+            return // Handled above, but needed for exhaustive switch
         }
 
         // Skip if no content was actually read
@@ -194,21 +201,7 @@ final class ClipboardMonitor {
         let contentHash = digest.compactMap { String(format: "%02x", $0) }.joined()
 
         // Consecutive duplicate check: fetch most recent item
-        do {
-            var recentDescriptor = FetchDescriptor<ClipboardItem>(
-                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-            )
-            recentDescriptor.fetchLimit = 1
-            let recentItems = try modelContext.fetch(recentDescriptor)
-
-            if let lastItem = recentItems.first, lastItem.contentHash == contentHash {
-                Self.logger.debug("Consecutive duplicate detected, skipping")
-                return
-            }
-        } catch {
-            Self.logger.error("Failed to fetch recent item for dedup check: \(error.localizedDescription)")
-            // Continue with insertion -- better to have a duplicate than lose data
-        }
+        if isDuplicateOfMostRecent(contentHash: contentHash) { return }
 
         // Create and persist the clipboard item
         let item = ClipboardItem(
@@ -235,11 +228,108 @@ final class ClipboardMonitor {
             try modelContext.save()
             itemCount += 1
             Self.logger.info("Captured \(contentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes)")
+
+            // Schedule expiration for concealed items (password managers)
+            if isConcealed {
+                expirationService.scheduleExpiration(for: item)
+            }
         } catch {
             // Handle @Attribute(.unique) conflict gracefully -- non-consecutive duplicate
             Self.logger.warning("Failed to save clipboard item: \(error.localizedDescription)")
             // Rollback the insert to keep context consistent
             modelContext.rollback()
         }
+    }
+
+    // MARK: - Image Capture
+
+    /// Process image content from the pasteboard asynchronously.
+    ///
+    /// Image data is read on the main thread (NSPasteboard is NOT thread-safe),
+    /// then handed to ImageStorageService for background disk I/O. The ClipboardItem
+    /// is created in the completion handler back on the main thread.
+    private func processImageContent(isConcealed: Bool) {
+        // Read image data on the main thread (NSPasteboard is NOT thread-safe)
+        guard let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png) else {
+            Self.logger.warning("Image classified but no image data found on pasteboard")
+            return
+        }
+
+        // Compute hash for dedup (first 4KB for speed)
+        let contentHash = ImageStorageService.computeImageHash(data: imageData)
+
+        // Consecutive duplicate check
+        if isDuplicateOfMostRecent(contentHash: contentHash) { return }
+
+        // Capture source app (must be on main thread)
+        let sourceApp = NSWorkspace.shared.frontmostApplication
+        let sourceAppBundleID = sourceApp?.bundleIdentifier
+        let sourceAppName = sourceApp?.localizedName
+        let imageByteCount = imageData.count
+        let currentChangeCount = pasteboard.changeCount
+
+        // Save image to disk on background queue; completion fires on main thread
+        ImageStorageService.shared.saveImage(data: imageData) { [weak self] imagePath, thumbnailPath in
+            guard let self else { return }
+
+            let item = ClipboardItem(
+                textContent: nil,
+                htmlContent: nil,
+                rtfData: nil,
+                contentType: .image,
+                timestamp: .now,
+                sourceAppBundleID: sourceAppBundleID,
+                sourceAppName: sourceAppName,
+                characterCount: 0,
+                byteCount: imageByteCount,
+                changeCount: currentChangeCount,
+                imagePath: imagePath,
+                thumbnailPath: thumbnailPath,
+                isConcealed: isConcealed,
+                expiresAt: isConcealed ? Date.now.addingTimeInterval(60) : nil,
+                contentHash: contentHash
+            )
+
+            self.modelContext.insert(item)
+
+            do {
+                try self.modelContext.save()
+                self.itemCount += 1
+                Self.logger.info("Captured image from \(sourceAppName ?? "unknown") (\(imageByteCount) bytes, path: \(imagePath ?? "none"))")
+
+                // Schedule expiration for concealed items
+                if isConcealed {
+                    self.expirationService.scheduleExpiration(for: item)
+                }
+            } catch {
+                Self.logger.warning("Failed to save image clipboard item: \(error.localizedDescription)")
+                self.modelContext.rollback()
+            }
+        }
+    }
+
+    // MARK: - Deduplication
+
+    /// Check if the given content hash matches the most recent clipboard item.
+    ///
+    /// - Parameter contentHash: SHA256 hash of the content.
+    /// - Returns: `true` if this is a consecutive duplicate and should be skipped.
+    private func isDuplicateOfMostRecent(contentHash: String) -> Bool {
+        do {
+            var recentDescriptor = FetchDescriptor<ClipboardItem>(
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            recentDescriptor.fetchLimit = 1
+            let recentItems = try modelContext.fetch(recentDescriptor)
+
+            if let lastItem = recentItems.first, lastItem.contentHash == contentHash {
+                Self.logger.debug("Consecutive duplicate detected, skipping")
+                return true
+            }
+        } catch {
+            Self.logger.error("Failed to fetch recent item for dedup check: \(error.localizedDescription)")
+            // Continue with insertion -- better to have a duplicate than lose data
+        }
+        return false
     }
 }
