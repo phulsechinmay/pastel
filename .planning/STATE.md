@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 Phase: 5 of 5 (Settings and Polish)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-02-06 -- Completed 05-02-PLAN.md
+Last activity: 2026-02-06 -- Completed quick/001-PLAN.md (fix code signing for TCC persistence)
 
 Progress: [██████████] 100% (13/13 plans)
 
@@ -94,6 +94,7 @@ Recent decisions affecting current work:
 - [05-02]: @Bindable for direct TextField binding to SwiftData model in LabelRow
 - [05-02]: Fixed 260pt card width in horizontal mode for consistent sizing
 - [05-02]: Direction-aware key handlers return .ignored for non-matching axis
+- [quick-001]: Automatic code signing with DEVELOPMENT_TEAM in project.yml for stable TCC identity
 
 ### Pending Todos
 
@@ -106,6 +107,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-06T23:26:00Z
-Stopped at: Completed 05-02-PLAN.md (Labels CRUD and adaptive panel layout) -- ALL PHASES COMPLETE
+Last session: 2026-02-06T23:52:00Z
+Stopped at: Completed quick/001-PLAN.md (fix code signing for TCC persistence)
 Resume file: None
