@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 3 planned -- Paste-Back and Hotkeys. Ready for execution.
+**Current focus:** Phase 3 in progress -- Paste-Back and Hotkeys. Plan 01 complete, Plan 02 next.
 
 ## Current Position
 
 Phase: 3 of 5 (Paste-Back and Hotkeys)
-Plan: 0 of 2 in current phase
-Status: Planned, ready for execution
-Last activity: 2026-02-06 -- Planned Phase 3 (2 plans, 2 waves)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-06 -- Completed 03-01-PLAN.md
 
-Progress: [█████░░░░░] 38% (5/13 plans estimated)
+Progress: [██████░░░░] 46% (6/13 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: 4min
-- Total execution time: 18min
+- Total execution time: 21min
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: [█████░░░░░] 38% (5/13 plans estimated)
 |-------|-------|-------|----------|
 | 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
 | 02-sliding-panel | 2/2 | 5min | 2.5min |
+| 03-paste-back-and-hotkeys | 1/2 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (3min), 01-03 (4min), 02-01 (3min), 02-02 (2min)
+- Last 5 plans: 01-03 (4min), 02-01 (3min), 02-02 (2min), 03-01 (3min)
 - Trend: stable, fast
 
 *Updated after each plan completion*
@@ -65,6 +66,9 @@ Recent decisions affecting current work:
 - [02-02]: Card dispatcher pattern -- ClipboardCardView switches on item.type to route to subviews
 - [02-02]: Async thumbnail loading via .task(id:) with withCheckedContinuation for background I/O
 - [02-02]: NSWorkspace.urlForApplication for app icon resolution (nil-safe for uninstalled apps)
+- [03-01]: String literal "AXTrustedCheckOptionPrompt" instead of kAXTrustedCheckOptionPrompt for Swift 6 concurrency safety
+- [03-01]: PanelActions @Observable class bridges SwiftUI paste callbacks via .environment()
+- [03-01]: Empty entitlements dict (no app-sandbox key at all) for non-sandboxed app
 
 ### Pending Todos
 
@@ -76,6 +80,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-06
-Stopped at: Planned Phase 3 (Paste-Back and Hotkeys) -- 2 plans, ready for execution
+Last session: 2026-02-06T17:44:56Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
