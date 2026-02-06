@@ -11,8 +11,11 @@
 		4A72AB5E7A1E848B071EFD98 /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = B33BB73FF430F4D698304521 /* LaunchAtLogin */; };
 		5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C93A57CFC2C8E44180B970A /* PastelApp.swift */; };
 		61FC3644E015576CBEB288A7 /* StatusPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71138AD30E90615916853DD4 /* StatusPopoverView.swift */; };
+		8557CEFECB6460592724EA0E /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6234E0274B828B16C2A57EA /* NSImage+Thumbnail.swift */; };
 		B0CFC974AD1AC32A0A15644C /* ContentType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A06BBF36C8BBCBBB40C2522 /* ContentType.swift */; };
+		B2B95FF2ABFFE29D25EAD8D0 /* ImageStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */; };
 		B936EBEE374527897FA897DE /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = A9A03DD46B1694F403E4ACF4 /* KeyboardShortcuts */; };
+		CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */; };
 		D3022838FBC0C60D3B9FBCC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7CA38A9FD4344A6EBC84615B /* Assets.xcassets */; };
 		D784DF24180305D270E7DDED /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595BAEC04C890C9BF73C4F5D /* AppState.swift */; };
 		DDCF0FD1BB56BC1907EBF1D3 /* NSPasteboard+Reading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1317D22929AB0FAE7702656B /* NSPasteboard+Reading.swift */; };
@@ -27,9 +30,12 @@
 		3C93A57CFC2C8E44180B970A /* PastelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastelApp.swift; sourceTree = "<group>"; };
 		595BAEC04C890C9BF73C4F5D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		59995DCA4628743D59C35FFA /* ClipboardItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardItem.swift; sourceTree = "<group>"; };
+		5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpirationService.swift; sourceTree = "<group>"; };
 		71138AD30E90615916853DD4 /* StatusPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPopoverView.swift; sourceTree = "<group>"; };
 		7B6FC5171BA6D8C3F714E834 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7CA38A9FD4344A6EBC84615B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A6234E0274B828B16C2A57EA /* NSImage+Thumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+Thumbnail.swift"; sourceTree = "<group>"; };
+		C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStorageService.swift; sourceTree = "<group>"; };
 		DACD70AAF6888EBA275AC2BE /* Pastel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pastel.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -49,6 +55,7 @@
 		1BF3AC637CA16B404F16B997 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
+				A6234E0274B828B16C2A57EA /* NSImage+Thumbnail.swift */,
 				1317D22929AB0FAE7702656B /* NSPasteboard+Reading.swift */,
 			);
 			path = Extensions;
@@ -91,6 +98,8 @@
 			isa = PBXGroup;
 			children = (
 				03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */,
+				5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */,
+				C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -211,6 +220,9 @@
 				04769AF24E5670F5A628D811 /* ClipboardItem.swift in Sources */,
 				FF2C5CE75C36A126A3782DF2 /* ClipboardMonitor.swift in Sources */,
 				B0CFC974AD1AC32A0A15644C /* ContentType.swift in Sources */,
+				CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */,
+				B2B95FF2ABFFE29D25EAD8D0 /* ImageStorageService.swift in Sources */,
+				8557CEFECB6460592724EA0E /* NSImage+Thumbnail.swift in Sources */,
 				DDCF0FD1BB56BC1907EBF1D3 /* NSPasteboard+Reading.swift in Sources */,
 				5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */,
 				61FC3644E015576CBEB288A7 /* StatusPopoverView.swift in Sources */,
