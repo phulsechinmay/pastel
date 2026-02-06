@@ -4,8 +4,6 @@ struct StatusPopoverView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        @Bindable var appState = appState
-
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack(spacing: 8) {
@@ -22,10 +20,13 @@ struct StatusPopoverView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            // Monitoring toggle
-            Toggle("Monitoring", isOn: $appState.isMonitoring)
-                .toggleStyle(.switch)
-                .controlSize(.small)
+            // Monitoring toggle (bound through ClipboardMonitor)
+            Toggle("Monitoring", isOn: Binding(
+                get: { appState.clipboardMonitor?.isMonitoring ?? false },
+                set: { _ in appState.clipboardMonitor?.toggleMonitoring() }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.small)
 
             Divider()
 
