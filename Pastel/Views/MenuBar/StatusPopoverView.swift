@@ -47,6 +47,23 @@ struct StatusPopoverView: View {
             }
             .buttonStyle(.plain)
 
+            // Settings button
+            Button(action: {
+                if let container = appState.modelContainer {
+                    SettingsWindowController.shared.showSettings(
+                        modelContainer: container,
+                        appState: appState
+                    )
+                }
+            }) {
+                HStack {
+                    Image(systemName: "gearshape")
+                    Text("Settings...")
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+
             Divider()
 
             // Clear All History button (destructive action with confirmation)

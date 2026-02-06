@@ -20,6 +20,7 @@ struct PastelApp: App {
         let state = AppState()
         state.setup(modelContext: container.mainContext)
         state.setupPanel(modelContainer: container)
+        state.modelContainer = container
         state.checkAccessibilityOnLaunch()
         self._appState = State(initialValue: state)
     }
@@ -29,7 +30,7 @@ struct PastelApp: App {
             StatusPopoverView()
                 .environment(appState)
                 .modelContainer(modelContainer)
-                .frame(width: 260, height: 160)
+                .frame(width: 260, height: 200)
         } label: {
             Image(systemName: "clipboard")
         }

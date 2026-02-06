@@ -22,12 +22,25 @@ struct PanelContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Minimal header
+            // Header with settings gear
             HStack {
                 Text("Pastel")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button {
+                    if let container = appState.modelContainer {
+                        SettingsWindowController.shared.showSettings(
+                            modelContainer: container,
+                            appState: appState
+                        )
+                    }
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)

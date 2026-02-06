@@ -22,6 +22,12 @@ final class AppState {
     /// Service for writing to pasteboard and simulating Cmd+V paste
     let pasteService = PasteService()
 
+    /// History auto-purge service based on user-configured retention period
+    var retentionService: RetentionService?
+
+    /// The model container, stored so settings views can access SwiftData
+    var modelContainer: ModelContainer?
+
     /// Total number of captured clipboard items (delegates to monitor)
     var itemCount: Int {
         clipboardMonitor?.itemCount ?? 0
@@ -39,6 +45,10 @@ final class AppState {
         let monitor = ClipboardMonitor(modelContext: modelContext)
         monitor.start()
         self.clipboardMonitor = monitor
+
+        let retention = RetentionService(modelContext: modelContext)
+        retention.startPeriodicPurge()
+        self.retentionService = retention
     }
 
     /// Pass the model container to the panel controller so @Query works inside the panel.
