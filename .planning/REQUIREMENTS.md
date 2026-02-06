@@ -18,16 +18,16 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Panel UI
 
-- [ ] **PNUI-01**: Screen-edge sliding panel displays clipboard history as cards
-- [ ] **PNUI-02**: Panel slides in/out with smooth animation
+- [x] **PNUI-01**: Screen-edge sliding panel displays clipboard history as cards
+- [x] **PNUI-02**: Panel slides in/out with smooth animation
 - [ ] **PNUI-03**: Panel position configurable to top, left, right, or bottom edge
 - [ ] **PNUI-04**: Panel activated via global hotkey
-- [ ] **PNUI-05**: Cards show image thumbnail for image items
-- [ ] **PNUI-06**: Cards show URL text distinctly for URL items
-- [ ] **PNUI-07**: Cards show text preview for text items
-- [ ] **PNUI-08**: Cards show file name/path for file items
+- [x] **PNUI-05**: Cards show image thumbnail for image items
+- [x] **PNUI-06**: Cards show URL text distinctly for URL items
+- [x] **PNUI-07**: Cards show text preview for text items
+- [x] **PNUI-08**: Cards show file name/path for file items
 - [ ] **PNUI-09**: User can navigate cards with arrow keys and paste with Enter
-- [ ] **PNUI-10**: Panel uses always-dark theme
+- [x] **PNUI-10**: Panel uses always-dark theme
 
 ### Paste
 
@@ -113,16 +113,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLIP-04 | Phase 1 | Complete |
 | CLIP-05 | Phase 1 | Complete |
 | CLIP-06 | Phase 1 | Complete |
-| PNUI-01 | Phase 2 | Pending |
-| PNUI-02 | Phase 2 | Pending |
+| PNUI-01 | Phase 2 | Complete |
+| PNUI-02 | Phase 2 | Complete |
 | PNUI-03 | Phase 5 | Pending |
 | PNUI-04 | Phase 3 | Pending |
-| PNUI-05 | Phase 2 | Pending |
-| PNUI-06 | Phase 2 | Pending |
-| PNUI-07 | Phase 2 | Pending |
-| PNUI-08 | Phase 2 | Pending |
+| PNUI-05 | Phase 2 | Complete |
+| PNUI-06 | Phase 2 | Complete |
+| PNUI-07 | Phase 2 | Complete |
+| PNUI-08 | Phase 2 | Complete |
 | PNUI-09 | Phase 3 | Pending |
-| PNUI-10 | Phase 2 | Pending |
+| PNUI-10 | Phase 2 | Complete |
 | PAST-01 | Phase 3 | Pending |
 | PAST-02 | Phase 3 | Pending |
 | PAST-03 | Phase 3 | Pending |
