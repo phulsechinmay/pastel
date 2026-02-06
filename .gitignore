@@ -1,0 +1,20 @@
+# Build artifacts
+.build/
+DerivedData/
+Build/
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# SPM
+.swiftpm/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Environment
+.env
