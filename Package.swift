@@ -10,16 +10,14 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.4.0"),
-        .package(url: "https://github.com/sindresorhus/LaunchAtLogin-Modern", from: "1.1.0"),
+        // KeyboardShortcuts and LaunchAtLogin are in Pastel.xcodeproj for Phase 3/5.
+        // Excluded from Package.swift because #Preview macros in KeyboardShortcuts
+        // require full Xcode.app (fails with Command Line Tools only).
     ],
     targets: [
         .executableTarget(
             name: "Pastel",
-            dependencies: [
-                "KeyboardShortcuts",
-                .product(name: "LaunchAtLogin", package: "LaunchAtLogin-Modern"),
-            ],
+            dependencies: [],
             path: "Pastel",
             exclude: ["Resources"],
             swiftSettings: [
