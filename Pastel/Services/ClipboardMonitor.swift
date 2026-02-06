@@ -55,12 +55,9 @@ final class ClipboardMonitor {
         self.lastChangeCount = pasteboard.changeCount
     }
 
-    deinit {
-        timer?.invalidate()
-        if let observer = wakeObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-        }
-    }
+    // No deinit needed: ClipboardMonitor lives for the app's lifetime.
+    // Timer uses [weak self] so it won't retain the monitor.
+    // Call stop() explicitly if cleanup is ever needed.
 
     // MARK: - Public Methods
 
