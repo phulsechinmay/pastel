@@ -12,7 +12,7 @@ Pastel is a native macOS clipboard manager built with Swift and SwiftUI. The roa
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Clipboard Capture and Storage** - Silently capture all clipboard content and persist across restarts
+- [x] **Phase 1: Clipboard Capture and Storage** - Silently capture all clipboard content and persist across restarts
 - [ ] **Phase 2: Sliding Panel** - Browse clipboard history in a visually rich screen-edge panel
 - [ ] **Phase 3: Paste-Back and Hotkeys** - Instantly paste any item into the active app via hotkey and keyboard
 - [ ] **Phase 4: Organization** - Search, label, filter, and manage clipboard history
@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Xcode project bootstrap, SwiftData model, menu bar app shell
-- [ ] 01-02-PLAN.md -- Clipboard monitoring, content classification, deduplication
-- [ ] 01-03-PLAN.md -- Image storage, concealed item handling, end-to-end verification
+- [x] 01-01-PLAN.md -- Xcode project bootstrap, SwiftData model, menu bar app shell
+- [x] 01-02-PLAN.md -- Clipboard monitoring, content classification, deduplication
+- [x] 01-03-PLAN.md -- Image storage, concealed item handling, end-to-end verification
 
 ### Phase 2: Sliding Panel
 **Goal**: Users can visually browse their clipboard history in a screen-edge sliding panel with rich card previews for each content type, using an always-dark theme
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Clipboard Capture and Storage | 0/3 | Planned | - |
+| 1. Clipboard Capture and Storage | 3/3 | Complete | 2026-02-06 |
 | 2. Sliding Panel | 0/3 | Not started | - |
 | 3. Paste-Back and Hotkeys | 0/3 | Not started | - |
 | 4. Organization | 0/3 | Not started | - |

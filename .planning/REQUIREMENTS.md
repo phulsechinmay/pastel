@@ -9,12 +9,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Clipboard Monitoring
 
-- [ ] **CLIP-01**: App captures text copied to system clipboard
-- [ ] **CLIP-02**: App captures images copied to system clipboard
-- [ ] **CLIP-03**: App captures URLs copied to system clipboard
-- [ ] **CLIP-04**: App captures file references copied to system clipboard
-- [ ] **CLIP-05**: Clipboard history persists across app/system restarts
-- [ ] **CLIP-06**: Consecutive duplicate copies are not stored twice
+- [x] **CLIP-01**: App captures text copied to system clipboard
+- [x] **CLIP-02**: App captures images copied to system clipboard
+- [x] **CLIP-03**: App captures URLs copied to system clipboard
+- [x] **CLIP-04**: App captures file references copied to system clipboard
+- [x] **CLIP-05**: Clipboard history persists across app/system restarts
+- [x] **CLIP-06**: Consecutive duplicate copies are not stored twice
 
 ### Panel UI
 
@@ -46,10 +46,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### App Infrastructure
 
-- [ ] **INFR-01**: App lives in menu bar with no dock icon
+- [x] **INFR-01**: App lives in menu bar with no dock icon
 - [ ] **INFR-02**: App can be set to launch at login
 - [ ] **INFR-03**: Settings window accessible from menu bar
-- [ ] **INFR-04**: Images stored on disk with thumbnails, not in database
+- [x] **INFR-04**: Images stored on disk with thumbnails, not in database
 
 ## v2 Requirements
 
@@ -107,12 +107,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLIP-01 | Phase 1 | Pending |
-| CLIP-02 | Phase 1 | Pending |
-| CLIP-03 | Phase 1 | Pending |
-| CLIP-04 | Phase 1 | Pending |
-| CLIP-05 | Phase 1 | Pending |
-| CLIP-06 | Phase 1 | Pending |
+| CLIP-01 | Phase 1 | Complete |
+| CLIP-02 | Phase 1 | Complete |
+| CLIP-03 | Phase 1 | Complete |
+| CLIP-04 | Phase 1 | Complete |
+| CLIP-05 | Phase 1 | Complete |
+| CLIP-06 | Phase 1 | Complete |
 | PNUI-01 | Phase 2 | Pending |
 | PNUI-02 | Phase 2 | Pending |
 | PNUI-03 | Phase 5 | Pending |
@@ -132,10 +132,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ORGN-04 | Phase 4 | Pending |
 | ORGN-05 | Phase 4 | Pending |
 | ORGN-06 | Phase 4 | Pending |
-| INFR-01 | Phase 1 | Pending |
+| INFR-01 | Phase 1 | Complete |
 | INFR-02 | Phase 5 | Pending |
 | INFR-03 | Phase 5 | Pending |
-| INFR-04 | Phase 1 | Pending |
+| INFR-04 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 29 total
