@@ -5,7 +5,7 @@ import SwiftData
 ///
 /// Uses `@Query` to reactively display clipboard items sorted by most recent.
 /// Shows `EmptyStateView` when no items exist, otherwise a scrollable list
-/// with temporary placeholder rows (real card UI ships in Plan 02-02).
+/// of `ClipboardCardView` rows with type-specific content rendering.
 struct PanelContentView: View {
 
     @Query(sort: \ClipboardItem.timestamp, order: .reverse)
@@ -32,12 +32,7 @@ struct PanelContentView: View {
                 ScrollView {
                     LazyVStack(spacing: 6) {
                         ForEach(items) { item in
-                            Text(item.textContent ?? item.contentType)
-                                .lineLimit(2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 6)
-                                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                            ClipboardCardView(item: item)
                         }
                     }
                     .padding(.horizontal, 8)
