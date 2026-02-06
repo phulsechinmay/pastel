@@ -37,12 +37,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Organization
 
-- [ ] **ORGN-01**: User can search clipboard history by text content
-- [ ] **ORGN-02**: User can create labels
-- [ ] **ORGN-03**: User can assign labels to clipboard items
-- [ ] **ORGN-04**: Chip bar in panel allows filtering by label
-- [ ] **ORGN-05**: User can delete individual clipboard items
-- [ ] **ORGN-06**: User can clear all clipboard history
+- [x] **ORGN-01**: User can search clipboard history by text content
+- [x] **ORGN-02**: User can create labels
+- [x] **ORGN-03**: User can assign labels to clipboard items
+- [x] **ORGN-04**: Chip bar in panel allows filtering by label
+- [x] **ORGN-05**: User can delete individual clipboard items
+- [x] **ORGN-06**: User can clear all clipboard history
 
 ### App Infrastructure
 
@@ -126,12 +126,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PAST-01 | Phase 3 | Complete |
 | PAST-02 | Phase 3 | Complete |
 | PAST-03 | Phase 3 | Complete |
-| ORGN-01 | Phase 4 | Pending |
-| ORGN-02 | Phase 4 | Pending |
-| ORGN-03 | Phase 4 | Pending |
-| ORGN-04 | Phase 4 | Pending |
-| ORGN-05 | Phase 4 | Pending |
-| ORGN-06 | Phase 4 | Pending |
+| ORGN-01 | Phase 4 | Complete |
+| ORGN-02 | Phase 4 | Complete |
+| ORGN-03 | Phase 4 | Complete |
+| ORGN-04 | Phase 4 | Complete |
+| ORGN-05 | Phase 4 | Complete |
+| ORGN-06 | Phase 4 | Complete |
 | INFR-01 | Phase 1 | Complete |
 | INFR-02 | Phase 5 | Pending |
 | INFR-03 | Phase 5 | Pending |

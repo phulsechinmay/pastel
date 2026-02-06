@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Clipboard Capture and Storage** - Silently capture all clipboard content and persist across restarts
 - [x] **Phase 2: Sliding Panel** - Browse clipboard history in a visually rich screen-edge panel
 - [x] **Phase 3: Paste-Back and Hotkeys** - Instantly paste any item into the active app via hotkey and keyboard
-- [ ] **Phase 4: Organization** - Search, label, filter, and manage clipboard history
+- [x] **Phase 4: Organization** - Search, label, filter, and manage clipboard history
 - [ ] **Phase 5: Settings and Polish** - Configure panel position, launch behavior, and preferences
 
 ## Phase Details
@@ -81,9 +81,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Label model, search field, FilteredCardListView with dynamic @Query, PanelContentView restructure
-- [ ] 04-02-PLAN.md -- LabelColor enum, ChipBarView with label filtering, context menu with label assignment and delete
-- [ ] 04-03-PLAN.md -- Robust individual delete with image cleanup, clear all history with confirmation dialog
+- [x] 04-01-PLAN.md -- Label model, search field, FilteredCardListView with dynamic @Query, PanelContentView restructure
+- [x] 04-02-PLAN.md -- LabelColor enum, ChipBarView with label filtering, context menu with label assignment and delete
+- [x] 04-03-PLAN.md -- Robust individual delete with image cleanup, clear all history with confirmation dialog
 
 ### Phase 5: Settings and Polish
 **Goal**: Users can configure Pastel to fit their workflow -- panel position, launch at login, and all preferences accessible from a settings window
@@ -109,5 +109,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Clipboard Capture and Storage | 3/3 | Complete | 2026-02-06 |
 | 2. Sliding Panel | 2/2 | Complete | 2026-02-06 |
 | 3. Paste-Back and Hotkeys | 2/2 | Complete | 2026-02-06 |
-| 4. Organization | 0/3 | Not started | - |
+| 4. Organization | 3/3 | Complete | 2026-02-06 |
 | 5. Settings and Polish | 0/2 | Not started | - |
