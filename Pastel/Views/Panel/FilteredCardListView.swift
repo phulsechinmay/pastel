@@ -7,15 +7,25 @@ import SwiftData
 /// after view creation. When the parent passes new searchText or selectedLabelID values,
 /// SwiftUI recreates this view with a fresh @Query containing the updated predicate.
 ///
-/// Handles keyboard navigation (up/down arrows, Enter to paste) and mouse interaction
-/// (single-click to select, double-click to paste) since it has direct access to the
-/// queried items array.
+/// Handles keyboard navigation and mouse interaction (single-click to select,
+/// double-click to paste) since it has direct access to the queried items array.
+///
+/// Adapts layout based on panel edge: vertical edges (left/right) use LazyVStack
+/// with up/down arrow navigation; horizontal edges (top/bottom) use LazyHStack
+/// with left/right arrow navigation.
 struct FilteredCardListView: View {
 
     @Query private var items: [ClipboardItem]
+    @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
 
     @Binding var selectedIndex: Int?
     var onPaste: (ClipboardItem) -> Void
+
+    /// Whether the panel is on a horizontal edge (top/bottom), requiring horizontal card layout.
+    private var isHorizontal: Bool {
+        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
+        return !edge.isVertical
+    }
 
     init(
         searchText: String,
@@ -69,7 +79,39 @@ struct FilteredCardListView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if isHorizontal {
+                // Horizontal layout for top/bottom edges
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 8) {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                ClipboardCardView(
+                                    item: item,
+                                    isSelected: selectedIndex == index
+                                )
+                                .frame(width: 260)
+                                .id(index)
+                                .onTapGesture(count: 2) {
+                                    onPaste(item)
+                                }
+                                .onTapGesture(count: 1) {
+                                    selectedIndex = index
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                    }
+                    .onChange(of: selectedIndex) { _, newValue in
+                        if let newValue {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                proxy.scrollTo(newValue, anchor: .center)
+                            }
+                        }
+                    }
+                }
             } else {
+                // Vertical layout for left/right edges
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 8) {
@@ -103,12 +145,20 @@ struct FilteredCardListView: View {
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(.upArrow) {
-            moveSelection(by: -1)
-            return .handled
+            if !isHorizontal { moveSelection(by: -1) }
+            return isHorizontal ? .ignored : .handled
         }
         .onKeyPress(.downArrow) {
-            moveSelection(by: 1)
-            return .handled
+            if !isHorizontal { moveSelection(by: 1) }
+            return isHorizontal ? .ignored : .handled
+        }
+        .onKeyPress(.leftArrow) {
+            if isHorizontal { moveSelection(by: -1) }
+            return isHorizontal ? .handled : .ignored
+        }
+        .onKeyPress(.rightArrow) {
+            if isHorizontal { moveSelection(by: 1) }
+            return isHorizontal ? .handled : .ignored
         }
         .onKeyPress(.return) {
             if let index = selectedIndex, index < items.count {
