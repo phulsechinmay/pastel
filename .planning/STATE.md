@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 4 complete -- Organization done. Phase 5 (Settings and Polish) next.
+**Current focus:** Phase 5 in progress -- Settings and Polish. Plan 01 complete, Plan 02 next.
 
 ## Current Position
 
-Phase: 4 of 5 (Organization)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-02-06 -- Completed Phase 4 (all 3 plans)
+Phase: 5 of 5 (Settings and Polish)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-06 -- Completed 05-01-PLAN.md
 
-Progress: [████████░░] 77% (10/13 plans estimated)
+Progress: [████████░░] 85% (11/13 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 3min
-- Total execution time: 30min
+- Total plans completed: 11
+- Average duration: 3.1min
+- Total execution time: 34min
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [████████░░] 77% (10/13 plans estimated)
 | 02-sliding-panel | 2/2 | 5min | 2.5min |
 | 03-paste-back-and-hotkeys | 2/2 | 5min | 2.5min |
 | 04-organization | 3/3 | 7min | 2.3min |
+| 05-settings-and-polish | 1/2 | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (2min), 04-01 (3min), 04-02 (2min), 04-03 (2min)
-- Trend: stable, fast
+- Last 5 plans: 04-01 (3min), 04-02 (2min), 04-03 (2min), 05-01 (4min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -85,6 +86,10 @@ Recent decisions affecting current work:
 - [04-03]: Fetch all items before batch delete to collect image paths for disk cleanup
 - [04-03]: Labels preserved through clear-all (reusable organizational tools per CONTEXT.md)
 - [04-03]: confirmationDialog for clear-all (better macOS UX for destructive actions)
+- [05-01]: SettingsWindowController accepts both ModelContainer and AppState for full environment wiring
+- [05-01]: RetentionService uses stop() instead of deinit for Swift 6 strict concurrency compatibility
+- [05-01]: PanelController recreates panel on vertical<->horizontal orientation change
+- [05-01]: @AppStorage panelEdge defaults to "right", historyRetention defaults to 90 days
 
 ### Pending Todos
 
@@ -96,6 +101,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-06T20:15:00Z
-Stopped at: Phase 4 complete (all 3 plans executed, verified)
+Last session: 2026-02-06T22:09:00Z
+Stopped at: Completed 05-01-PLAN.md (Settings window and General tab)
 Resume file: None
