@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 2 in progress - Sliding Panel infrastructure built, card UI next.
+**Current focus:** Phase 2 complete -- Sliding Panel with card UI done. Ready for Phase 3.
 
 ## Current Position
 
 Phase: 2 of 5 (Sliding Panel)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-06 -- Completed 02-01-PLAN.md (panel infrastructure, animation, hotkey)
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-06 -- Completed 02-02-PLAN.md (clipboard card views)
 
-Progress: [████░░░░░░] 31% (4/13 plans estimated)
+Progress: [█████░░░░░] 38% (5/13 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: 4min
-- Total execution time: 16min
+- Total execution time: 18min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
-| 02-sliding-panel | 1/2 | 3min | 3min |
+| 02-sliding-panel | 2/2 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (6min), 01-02 (3min), 01-03 (4min), 02-01 (3min)
+- Last 5 plans: 01-02 (3min), 01-03 (4min), 02-01 (3min), 02-02 (2min)
 - Trend: stable, fast
 
 *Updated after each plan completion*
@@ -62,6 +62,9 @@ Recent decisions affecting current work:
 - [02-01]: NSVisualEffectView .sidebar material with .darkAqua appearance (deprecated .dark replaced)
 - [02-01]: NSHostingView typed as NSView to handle conditional modelContainer branch
 - [02-01]: KeyboardShortcuts.onKeyUp with MainActor.assumeIsolated for Swift 6 concurrency safety
+- [02-02]: Card dispatcher pattern -- ClipboardCardView switches on item.type to route to subviews
+- [02-02]: Async thumbnail loading via .task(id:) with withCheckedContinuation for background I/O
+- [02-02]: NSWorkspace.urlForApplication for app icon resolution (nil-safe for uninstalled apps)
 
 ### Pending Todos
 
@@ -73,6 +76,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-06T16:40:58Z
-Stopped at: Completed 02-01-PLAN.md (panel infrastructure, animation, hotkey)
+Last session: 2026-02-06T16:45:49Z
+Stopped at: Completed 02-02-PLAN.md (clipboard card views) -- Phase 2 complete
 Resume file: None
