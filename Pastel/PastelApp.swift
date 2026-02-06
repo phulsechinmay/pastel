@@ -20,6 +20,7 @@ struct PastelApp: App {
         let state = AppState()
         state.setup(modelContext: container.mainContext)
         state.setupPanel(modelContainer: container)
+        state.checkAccessibilityOnLaunch()
         self._appState = State(initialValue: state)
     }
 

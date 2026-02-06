@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppKit
 import KeyboardShortcuts
 
 // MARK: - Keyboard Shortcut Names
@@ -60,6 +61,44 @@ final class AppState {
     /// Toggle the sliding panel open/closed.
     func togglePanel() {
         panelController.toggle()
+    }
+
+    // MARK: - Accessibility Onboarding
+
+    /// NSWindow for the accessibility permission onboarding prompt.
+    private var accessibilityWindow: NSWindow?
+
+    /// Show accessibility permission onboarding if not already granted.
+    ///
+    /// Called once at app launch. If the user already granted permission,
+    /// this is a no-op. Otherwise, a centered dark-themed window explains
+    /// why the permission is needed and offers buttons to grant it.
+    func checkAccessibilityOnLaunch() {
+        guard !AccessibilityService.isGranted else { return }
+
+        let promptView = AccessibilityPromptView(onDismiss: { [weak self] in
+            self?.accessibilityWindow?.close()
+            self?.accessibilityWindow = nil
+        })
+        .preferredColorScheme(.dark)
+
+        let hostingView = NSHostingView(rootView: promptView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 400),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: true
+        )
+        window.contentView = hostingView
+        window.title = "Pastel"
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        self.accessibilityWindow = window
     }
 
     /// Paste a clipboard item into the frontmost app.
