@@ -78,12 +78,12 @@ Plans:
   2. User creates a label, assigns it to items, and can filter the panel view by that label using a chip bar
   3. User can delete an individual clipboard item and it disappears from history
   4. User can clear all clipboard history at once
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
+- [ ] 04-01-PLAN.md -- Label model, search field, FilteredCardListView with dynamic @Query, PanelContentView restructure
+- [ ] 04-02-PLAN.md -- LabelColor enum, ChipBarView with label filtering, context menu with label assignment and delete
+- [ ] 04-03-PLAN.md -- Robust individual delete with image cleanup, clear all history with confirmation dialog
 
 ### Phase 5: Settings and Polish
 **Goal**: Users can configure Pastel to fit their workflow -- panel position, launch at login, and all preferences accessible from a settings window
