@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Sliding Panel** - Browse clipboard history in a visually rich screen-edge panel
 - [x] **Phase 3: Paste-Back and Hotkeys** - Instantly paste any item into the active app via hotkey and keyboard
 - [x] **Phase 4: Organization** - Search, label, filter, and manage clipboard history
-- [ ] **Phase 5: Settings and Polish** - Configure panel position, launch behavior, and preferences
+- [x] **Phase 5: Settings and Polish** - Configure panel position, launch behavior, and preferences
 
 ## Phase Details
 
@@ -96,8 +96,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- Settings window infrastructure, General tab (launch at login, hotkey recorder, panel position picker, retention), PanelEdge enum, PanelController 4-edge refactor, RetentionService
-- [ ] 05-02-PLAN.md -- Labels tab with full CRUD, horizontal panel layout adaptation for top/bottom edges, keyboard nav direction swap
+- [x] 05-01-PLAN.md -- Settings window infrastructure, General tab (launch at login, hotkey recorder, panel position picker, retention), PanelEdge enum, PanelController 4-edge refactor, RetentionService
+- [x] 05-02-PLAN.md -- Labels tab with full CRUD, horizontal panel layout adaptation for top/bottom edges, keyboard nav direction swap
 
 ## Progress
 
@@ -110,4 +110,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Sliding Panel | 2/2 | Complete | 2026-02-06 |
 | 3. Paste-Back and Hotkeys | 2/2 | Complete | 2026-02-06 |
 | 4. Organization | 3/3 | Complete | 2026-02-06 |
-| 5. Settings and Polish | 0/2 | Not started | - |
+| 5. Settings and Polish | 2/2 | Complete | 2026-02-06 |

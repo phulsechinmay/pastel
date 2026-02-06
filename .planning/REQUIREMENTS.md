@@ -20,7 +20,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **PNUI-01**: Screen-edge sliding panel displays clipboard history as cards
 - [x] **PNUI-02**: Panel slides in/out with smooth animation
-- [ ] **PNUI-03**: Panel position configurable to top, left, right, or bottom edge
+- [x] **PNUI-03**: Panel position configurable to top, left, right, or bottom edge
 - [x] **PNUI-04**: Panel activated via global hotkey
 - [x] **PNUI-05**: Cards show image thumbnail for image items
 - [x] **PNUI-06**: Cards show URL text distinctly for URL items
@@ -47,8 +47,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### App Infrastructure
 
 - [x] **INFR-01**: App lives in menu bar with no dock icon
-- [ ] **INFR-02**: App can be set to launch at login
-- [ ] **INFR-03**: Settings window accessible from menu bar
+- [x] **INFR-02**: App can be set to launch at login
+- [x] **INFR-03**: Settings window accessible from menu bar
 - [x] **INFR-04**: Images stored on disk with thumbnails, not in database
 
 ## v2 Requirements
@@ -115,7 +115,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLIP-06 | Phase 1 | Complete |
 | PNUI-01 | Phase 2 | Complete |
 | PNUI-02 | Phase 2 | Complete |
-| PNUI-03 | Phase 5 | Pending |
+| PNUI-03 | Phase 5 | Complete |
 | PNUI-04 | Phase 3 | Complete |
 | PNUI-05 | Phase 2 | Complete |
 | PNUI-06 | Phase 2 | Complete |
@@ -133,8 +133,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ORGN-05 | Phase 4 | Complete |
 | ORGN-06 | Phase 4 | Complete |
 | INFR-01 | Phase 1 | Complete |
-| INFR-02 | Phase 5 | Pending |
-| INFR-03 | Phase 5 | Pending |
+| INFR-02 | Phase 5 | Complete |
+| INFR-03 | Phase 5 | Complete |
 | INFR-04 | Phase 1 | Complete |
 
 **Coverage:**
