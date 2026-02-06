@@ -101,6 +101,38 @@ final class AppState {
         self.accessibilityWindow = window
     }
 
+    /// Clear all clipboard history: delete all items, clean up image files, reset item count.
+    ///
+    /// Labels are preserved -- they are reusable organizational tools and should survive
+    /// a history clear. Pending expiration timers for concealed items will harmlessly no-op
+    /// when they fire (items already deleted).
+    ///
+    /// - Parameter modelContext: The SwiftData model context to delete from.
+    func clearAllHistory(modelContext: ModelContext) {
+        do {
+            // Fetch all items to collect image paths before batch delete
+            let descriptor = FetchDescriptor<ClipboardItem>()
+            let allItems = try modelContext.fetch(descriptor)
+
+            // Delete all image files from disk
+            for item in allItems {
+                ImageStorageService.shared.deleteImage(
+                    imagePath: item.imagePath,
+                    thumbnailPath: item.thumbnailPath
+                )
+            }
+
+            // Batch delete all clipboard items
+            try modelContext.delete(model: ClipboardItem.self)
+            try modelContext.save()
+
+            // Reset item count
+            clipboardMonitor?.itemCount = 0
+        } catch {
+            modelContext.rollback()
+        }
+    }
+
     /// Paste a clipboard item into the frontmost app.
     ///
     /// Delegates to PasteService which handles: accessibility check, pasteboard write,

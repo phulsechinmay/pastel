@@ -1,7 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct StatusPopoverView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var showingClearConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -42,6 +46,33 @@ struct StatusPopoverView: View {
                 }
             }
             .buttonStyle(.plain)
+
+            Divider()
+
+            // Clear All History button (destructive action with confirmation)
+            Button(role: .destructive) {
+                showingClearConfirmation = true
+            } label: {
+                HStack {
+                    Image(systemName: "trash")
+                    Text("Clear All History")
+                    Spacer()
+                }
+                .foregroundColor(.red)
+            }
+            .buttonStyle(.plain)
+            .confirmationDialog(
+                "Clear All History",
+                isPresented: $showingClearConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Clear All", role: .destructive) {
+                    appState.clearAllHistory(modelContext: modelContext)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete all clipboard items. This action cannot be undone.")
+            }
 
             Divider()
 
