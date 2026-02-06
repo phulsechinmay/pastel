@@ -7,10 +7,12 @@ import SwiftData
 /// `FilteredCardListView` which uses an init-based `@Query` predicate
 /// for dynamic search and label filtering.
 ///
-/// Layout: Header -> Divider -> SearchField -> FilteredCardList
+/// Layout: Header -> Divider -> SearchField -> ChipBar -> FilteredCardList
 struct PanelContentView: View {
 
     @Environment(PanelActions.self) private var panelActions
+
+    @Query(sort: \Label.sortOrder) private var labels: [Label]
 
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
@@ -33,6 +35,9 @@ struct PanelContentView: View {
 
             // Search field
             SearchFieldView(searchText: $searchText)
+
+            // Chip bar for label filtering
+            ChipBarView(labels: labels, selectedLabel: $selectedLabel)
 
             // Filtered content area with keyboard navigation
             FilteredCardListView(

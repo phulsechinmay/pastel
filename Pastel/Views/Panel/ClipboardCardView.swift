@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import AppKit
 
 /// Dispatcher card view that wraps each clipboard item in shared chrome
@@ -9,11 +10,16 @@ import AppKit
 /// Cards have rounded corners, subtle background, and a hover highlight.
 /// When selected (via keyboard navigation or single-click), the card shows
 /// an accent-colored background and border distinct from the hover state.
+///
+/// Provides a right-click context menu with label assignment submenu and delete action.
 struct ClipboardCardView: View {
 
     let item: ClipboardItem
     var isSelected: Bool
     var onPaste: (() -> Void)?
+
+    @Query(sort: \Label.sortOrder) private var labels: [Label]
+    @Environment(\.modelContext) private var modelContext
 
     @State private var isHovered = false
 
@@ -57,6 +63,42 @@ struct ClipboardCardView: View {
         }
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .contextMenu {
+            // Label assignment submenu
+            Menu("Label") {
+                ForEach(labels) { label in
+                    Button {
+                        item.label = label
+                        try? modelContext.save()
+                    } label: {
+                        HStack {
+                            Circle()
+                                .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                                .frame(width: 8, height: 8)
+                            Text(label.name)
+                            if item.label?.persistentModelID == label.persistentModelID {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+
+                if item.label != nil {
+                    Divider()
+                    Button("Remove Label") {
+                        item.label = nil
+                        try? modelContext.save()
+                    }
+                }
+            }
+
+            Divider()
+
+            Button("Delete", role: .destructive) {
+                modelContext.delete(item)
+                try? modelContext.save()
+            }
+        }
     }
 
     // MARK: - Private Views
