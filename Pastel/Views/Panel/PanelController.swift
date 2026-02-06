@@ -19,7 +19,6 @@ final class PanelController {
 
     // MARK: - Constants
 
-    private let panelWidth: CGFloat = 320
     private let animationDuration: TimeInterval = 0.2
 
     // MARK: - Private State
@@ -41,6 +40,11 @@ final class PanelController {
         subsystem: Bundle.main.bundleIdentifier ?? "app.pastel.Pastel",
         category: "PanelController"
     )
+
+    /// The currently configured panel edge, read from UserDefaults.
+    private var currentEdge: PanelEdge {
+        PanelEdge(rawValue: UserDefaults.standard.string(forKey: "panelEdge") ?? "right") ?? .right
+    }
 
     // MARK: - Public API
 
@@ -74,15 +78,25 @@ final class PanelController {
 
     // MARK: - Show / Hide
 
-    /// Slide the panel in from the right edge of the screen containing the mouse cursor.
+    /// Slide the panel in from the configured screen edge.
     func show() {
         // Capture the frontmost app BEFORE showing the panel.
         // Because the panel uses .nonactivatingPanel, Pastel never becomes frontmost,
         // but we store this reference for edge cases and future use.
         previousApp = NSWorkspace.shared.frontmostApplication
 
+        let edge = currentEdge
         let screen = screenWithMouse()
         let screenFrame = screen.frame
+
+        // If the panel exists but orientation changed (vertical<->horizontal), recreate it.
+        if let existingPanel = panel {
+            let existingIsVertical = existingPanel.frame.width < existingPanel.frame.height
+            if existingIsVertical != edge.isVertical {
+                existingPanel.orderOut(nil)
+                self.panel = nil
+            }
+        }
 
         if panel == nil {
             createPanel()
@@ -93,61 +107,60 @@ final class PanelController {
 
         guard let panel else { return }
 
-        // On-screen: right-aligned within the full screen frame (overlays Dock)
-        let onScreenFrame = NSRect(
-            x: screenFrame.maxX - panelWidth,
-            y: screenFrame.origin.y,
-            width: panelWidth,
-            height: screenFrame.height
-        )
+        let onScreen = edge.onScreenFrame(screenFrame: screenFrame)
+        let offScreen = edge.offScreenFrame(screenFrame: screenFrame)
 
-        // Off-screen: just beyond the right edge
-        let offScreenFrame = NSRect(
-            x: screenFrame.maxX,
-            y: screenFrame.origin.y,
-            width: panelWidth,
-            height: screenFrame.height
-        )
-
-        panel.setFrame(offScreenFrame, display: false)
+        panel.setFrame(offScreen, display: false)
         panel.orderFrontRegardless()
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = animationDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(onScreenFrame, display: true)
+            panel.animator().setFrame(onScreen, display: true)
         }
 
         installEventMonitors()
-        logger.info("Panel shown on screen: \(screen.localizedName)")
+        logger.info("Panel shown on \(edge.rawValue) edge of screen: \(screen.localizedName)")
     }
 
-    /// Slide the panel off-screen to the right and order it out.
+    /// Slide the panel off-screen in the direction of the configured edge and order it out.
     func hide() {
         guard let panel, panel.isVisible else { return }
 
+        let edge = currentEdge
         let screenFrame = panel.screen?.frame
             ?? NSScreen.main?.frame
             ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
 
-        let offScreenFrame = NSRect(
-            x: screenFrame.maxX,
-            y: panel.frame.origin.y,
-            width: panelWidth,
-            height: panel.frame.height
-        )
+        let offScreen = edge.offScreenFrame(screenFrame: screenFrame)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = animationDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            panel.animator().setFrame(offScreenFrame, display: true)
+            panel.animator().setFrame(offScreen, display: true)
         } completionHandler: { [weak self] in
             panel.orderOut(nil)
             self?.removeEventMonitors()
             self?.previousApp = nil
         }
 
-        logger.info("Panel hidden")
+        logger.info("Panel hidden from \(edge.rawValue) edge")
+    }
+
+    /// Handle a panel edge change from Settings.
+    ///
+    /// If the panel is visible, hide it immediately. Then destroy the panel
+    /// so it gets recreated with the correct orientation on next toggle.
+    func handleEdgeChange() {
+        if isVisible {
+            // Quick hide without animation
+            panel?.orderOut(nil)
+            removeEventMonitors()
+            previousApp = nil
+        }
+        panel = nil
+        let newEdge = currentEdge
+        logger.info("Panel edge changed to \(newEdge.rawValue), panel will recreate on next toggle")
     }
 
     // MARK: - Screen Detection

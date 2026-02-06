@@ -30,6 +30,7 @@
 		B2B95FF2ABFFE29D25EAD8D0 /* ImageStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */; };
 		B5985155933EAAF6A59D0F45 /* Label.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C7F8E05C490820A909E5D51 /* Label.swift */; };
 		B936EBEE374527897FA897DE /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = A9A03DD46B1694F403E4ACF4 /* KeyboardShortcuts */; };
+		C5DDC68198250D3A003DB9D7 /* PanelEdge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76EB886434FC096E9A770705 /* PanelEdge.swift */; };
 		CB24B8C2681CF4B5F1AB5DC9 /* NSWorkspace+AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00804B3DBC5EB02EA738DEC2 /* NSWorkspace+AppIcon.swift */; };
 		CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */; };
 		D3022838FBC0C60D3B9FBCC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7CA38A9FD4344A6EBC84615B /* Assets.xcassets */; };
@@ -61,6 +62,7 @@
 		61A1A38C2FA151019789426E /* LabelColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelColor.swift; sourceTree = "<group>"; };
 		71138AD30E90615916853DD4 /* StatusPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPopoverView.swift; sourceTree = "<group>"; };
 		71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
+		76EB886434FC096E9A770705 /* PanelEdge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEdge.swift; sourceTree = "<group>"; };
 		7B6FC5171BA6D8C3F714E834 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7CA38A9FD4344A6EBC84615B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C7F8E05C490820A909E5D51 /* Label.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Label.swift; sourceTree = "<group>"; };
@@ -114,6 +116,7 @@
 				EF7C09501060152172C163BE /* MenuBar */,
 				CDEBFEDA9AB23D03C164B86E /* Onboarding */,
 				9940209CA2508F6CCD37AC84 /* Panel */,
+				56B48783D74C66160C3B8AAC /* Settings */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -126,6 +129,13 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		56B48783D74C66160C3B8AAC /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
 		6E55F44C11228E5D5024D642 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -133,6 +143,7 @@
 				2A06BBF36C8BBCBBB40C2522 /* ContentType.swift */,
 				9C7F8E05C490820A909E5D51 /* Label.swift */,
 				61A1A38C2FA151019789426E /* LabelColor.swift */,
+				76EB886434FC096E9A770705 /* PanelEdge.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -311,6 +322,7 @@
 				CB24B8C2681CF4B5F1AB5DC9 /* NSWorkspace+AppIcon.swift in Sources */,
 				97E8C96C50161A63AB0B871C /* PanelContentView.swift in Sources */,
 				35B2B78C88F753B2D19BB929 /* PanelController.swift in Sources */,
+				C5DDC68198250D3A003DB9D7 /* PanelEdge.swift in Sources */,
 				FC28C1E1511F71298087486A /* PasteService.swift in Sources */,
 				5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */,
 				9860CE67423A7F0C7A769D5B /* SearchFieldView.swift in Sources */,
