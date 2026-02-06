@@ -47,12 +47,11 @@ Plans:
   3. Image items show a thumbnail preview in their card
   4. URL items are visually distinct from plain text items
   5. File items show the file name or path in their card
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md -- NSPanel infrastructure, PanelController, dark vibrancy, menu bar toggle, Cmd+Shift+V shortcut
+- [ ] 02-02-PLAN.md -- Card views for all content types (text, image, URL, file), async thumbnails, source app icons
 
 ### Phase 3: Paste-Back and Hotkeys
 **Goal**: Users can summon the panel with a global hotkey and paste any clipboard item into the currently active app without the panel stealing focus
@@ -109,7 +108,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Clipboard Capture and Storage | 3/3 | Complete | 2026-02-06 |
-| 2. Sliding Panel | 0/3 | Not started | - |
+| 2. Sliding Panel | 0/2 | Not started | - |
 | 3. Paste-Back and Hotkeys | 0/3 | Not started | - |
 | 4. Organization | 0/3 | Not started | - |
 | 5. Settings and Polish | 0/2 | Not started | - |
