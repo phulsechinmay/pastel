@@ -86,6 +86,7 @@ Recent decisions affecting current work:
 | 006 | Fix URL card banner centering | 2026-02-07 | 95dfa7c | [006-fix-url-card-banner-centering](./quick/006-fix-url-card-banner-centering/) |
 | 007 | Fix panel focus for quick paste hotkeys | 2026-02-07 | ecf5481 | [007-fix-panel-focus-for-quick-paste-hotkeys](./quick/007-fix-panel-focus-for-quick-paste-hotkeys/) |
 | 008 | Fix search focus stealing from hotkeys | 2026-02-07 | d00825f | [008-fix-search-focus-stealing-from-hotkeys](./quick/008-fix-search-focus-stealing-from-hotkeys/) |
+| 009 | Fix type-to-search cursor (NSViewRepresentable) | 2026-02-07 | 3b1dc2f | [009-fix-type-to-search-cursor](./quick/009-fix-type-to-search-cursor/) |
 | 010 | Card footer with metadata + dynamic shift badges | 2026-02-07 | 6f7e5f8 | [010-card-footer-and-dynamic-badges](./quick/010-card-footer-and-dynamic-badges/) |
 
 ### Blockers/Concerns
