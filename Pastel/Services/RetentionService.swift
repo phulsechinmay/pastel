@@ -70,6 +70,11 @@ final class RetentionService {
                     imagePath: item.imagePath,
                     thumbnailPath: item.thumbnailPath
                 )
+                // Clean up URL metadata cached images
+                ImageStorageService.shared.deleteImage(
+                    imagePath: item.urlFaviconPath,
+                    thumbnailPath: item.urlPreviewImagePath
+                )
             }
 
             // Delete expired items from SwiftData

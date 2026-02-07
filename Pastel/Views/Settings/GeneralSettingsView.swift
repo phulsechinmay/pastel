@@ -17,6 +17,7 @@ struct GeneralSettingsView: View {
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("historyRetention") private var retentionDays: Int = 90
     @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.paste.rawValue
+    @AppStorage("fetchURLMetadata") private var fetchURLMetadata: Bool = true
 
     var body: some View {
         ScrollView {
@@ -79,6 +80,19 @@ struct GeneralSettingsView: View {
                     .frame(maxWidth: 320)
 
                     Text("\"Paste\" writes to clipboard and pastes into the active app.\n\"Copy to Clipboard\" only writes to clipboard.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+
+                // 6. URL Previews
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("URL Previews")
+                        .font(.headline)
+                    Toggle("Fetch page title, favicon, and preview image for copied URLs", isOn: $fetchURLMetadata)
+                        .toggleStyle(.switch)
+                    Text("When disabled, URL cards show only the raw link text.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

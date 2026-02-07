@@ -144,6 +144,11 @@ struct ClipboardCardView: View {
             imagePath: item.imagePath,
             thumbnailPath: item.thumbnailPath
         )
+        // Clean up URL metadata cached images
+        ImageStorageService.shared.deleteImage(
+            imagePath: item.urlFaviconPath,
+            thumbnailPath: item.urlPreviewImagePath
+        )
         modelContext.delete(item)
         try? modelContext.save()
     }

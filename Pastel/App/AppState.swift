@@ -131,6 +131,11 @@ final class AppState {
                     imagePath: item.imagePath,
                     thumbnailPath: item.thumbnailPath
                 )
+                // Clean up URL metadata cached images
+                ImageStorageService.shared.deleteImage(
+                    imagePath: item.urlFaviconPath,
+                    thumbnailPath: item.urlPreviewImagePath
+                )
             }
 
             // Batch delete all clipboard items
