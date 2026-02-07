@@ -1,582 +1,333 @@
-# Domain Pitfalls: v1.1 Rich Content & Enhanced Paste
+# Pitfalls Research: v1.2 Storage & Security
 
-**Domain:** macOS clipboard manager -- adding rich content, enhanced paste, and label enrichment to existing v1.0
-**Researched:** 2026-02-06
-**Confidence:** MEDIUM (WebSearch and WebFetch unavailable; findings based on training knowledge of macOS APIs, SwiftUI, SwiftData, syntax highlighting libraries, and network I/O patterns. These are mature domains with stable patterns unlikely to have changed significantly since training cutoff.)
+**Domain:** macOS clipboard manager -- adding storage optimization (compression, deduplication, dashboard, purge) and sensitive item protection (manual marking, blur redaction, click-to-reveal, auto-expiry) to existing v1.0/v1.1 system
+**Researched:** 2026-02-07
+**Confidence:** MEDIUM-HIGH (verified against official SQLite docs, Apple developer forums, and existing codebase analysis; some macOS 15+ screenshot protection claims based on developer forum reports)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, broken core functionality, or significant regressions in the existing v1.0 system.
+Mistakes that cause data loss, broken paste-back, or false sense of security requiring rework.
 
-### Pitfall 1: Code Detection False Positives Flooding History with "Code" Cards
+### Pitfall 1: Lossy Image Compression Degrades Paste-Back Quality
 
 **What goes wrong:**
-Naive code detection heuristics misclassify ordinary text as code. Common false positives:
-1. **URLs with path components** -- `https://example.com/api/users/list?page=1` has slashes, dots, equals signs.
-2. **Structured data / config** -- key=value text, JSON snippets from logs, CSV data.
-3. **Terminal output** -- `ls -la` output, error messages with stack traces.
-4. **Prose with inline code** -- Slack/email messages containing backtick-wrapped snippets.
+Compressing stored images with lossy JPEG/HEIC to save disk space silently degrades paste-back fidelity. The user copies a pixel-perfect screenshot from Figma, Pastel compresses it to JPEG at 80% quality, and when the user pastes it back days later, the image has JPEG artifacts -- blurred text, color banding around sharp edges, and different dimensions. For developers and designers, this is a deal-breaker: a clipboard manager that corrupts images is worse than no clipboard manager.
 
-The result: the majority of text items get classified as "code" and shown with syntax highlighting, making the panel noisy and the code card type meaningless.
+The existing `ImageStorageService` stores images as PNG (lossless) after downscaling to 4K max. Switching to lossy compression changes a fundamental contract: what you copy is NOT what you paste back.
 
 **Why it happens:**
-Code detection is inherently ambiguous. There is no single reliable heuristic. Developers overfit detection to their own usage patterns (copying Swift code from Xcode) and do not test with non-code text.
+The storage savings from lossy compression are dramatic (PNG screenshot: 2MB, JPEG 80%: 200KB). Developers see a 10x reduction and ship it without checking paste-back quality with critical content types: screenshots with text, UI mockups, diagrams with thin lines, pixel art, and images with transparency.
 
 **Specific risk in Pastel's architecture:**
-Content classification happens in `NSPasteboard+Reading.swift` via `classifyContent()`. Currently, the type system is `text | richText | url | image | file`. Adding a `code` subtype means the classification function must distinguish code from plain text -- but both arrive as `.string` pasteboard type with no metadata from the source app indicating "this is code."
+- `ImageStorageService.saveImage()` currently stores as PNG via `pngData(from:)`. Changing this to JPEG would lose alpha channel (transparency) silently -- JPEG does not support alpha.
+- `PasteService.writeToPasteboard()` reads the stored file and writes it as `.png` and `.tiff` to the pasteboard. If the stored file is JPEG, the types would need to change, and some receiving apps may not handle JPEG pasteboard data correctly.
+- The `computeImageHash()` function hashes the first 4KB of raw image data. Compressing an image changes its bytes, so re-hashing after compression would produce different hashes than the original -- breaking deduplication across compress/non-compress boundaries.
 
-**Prevention:**
-- Do NOT add a `code` ContentType to the enum. Keep code as a **display enrichment** on text items, not a separate type. Store detected language as an optional field (e.g., `detectedLanguage: String?` on ClipboardItem), but the item remains `.text`.
-- Use **multiple signals combined**, not any single heuristic:
-  - Source app bundle ID: If from Xcode, VS Code, IntelliJ, Terminal, iTerm -- boost code likelihood.
-  - Structural patterns: Count of semicolons, braces, indentation consistency, keyword density.
-  - Length: Very short text (under 20 chars) is almost never a code snippet worth highlighting.
-  - Negative signal: If the text contains mostly natural language words (articles, prepositions), suppress code detection.
-- Set a **confidence threshold**. Only highlight if detection confidence exceeds 70%. When in doubt, render as plain text. False negatives (missing a code snippet) are far less annoying than false positives (highlighting prose as code).
-- Make code highlighting a visual treatment, not a classification. The card shows syntax highlighting ONLY in the preview area. The item is still searchable as text, still deletable, still pasteable as text.
+**How to avoid:**
+- **Keep originals as PNG (lossless). Compress only the display thumbnails.** The existing 200px thumbnails are already small. Add a medium-resolution "preview" thumbnail (e.g., 800px) compressed as JPEG for the panel card display, but keep the full-size PNG for paste-back. This gives storage savings on display while preserving paste fidelity.
+- **If lossy compression is truly needed for storage:** Make it opt-in per item (not global). Show a clear warning: "Compressed images may lose quality when pasted." Never auto-compress. Let the user choose which old images to compress.
+- **Never compress images with alpha channel.** Detect transparency before compression. If the image has alpha, keep it as PNG regardless of compression settings.
+- **Store the original format metadata.** Add `imageFormat: String?` to ClipboardItem so paste-back can write the correct pasteboard type.
 
 **Warning signs:**
-- During testing, copy a paragraph of English prose. If it renders with syntax highlighting, detection is too aggressive.
-- Copy a URL. If it renders as a "code" card instead of a URL card, the classification priority is wrong.
+- Paste a screenshot with text into a design tool. If the text looks fuzzy, compression is too aggressive.
+- Paste an image with transparency. If the background turns white/black, alpha channel was lost.
+- Users report "Pastel ruined my image" in feedback.
 
-**Detection phase:** This pitfall must be addressed during the code detection implementation phase. Build the detection heuristic with a test suite of diverse clipboard content (prose, URLs, config files, actual code in 5+ languages, mixed content).
+**Phase to address:** Image compression phase. Decide the compression strategy BEFORE writing any compression code. The preview-thumbnail approach avoids this pitfall entirely.
 
-**Confidence:** HIGH -- code detection false positives are a well-known problem in every editor and tool that attempts language detection on arbitrary text.
+**Confidence:** HIGH -- PNG vs JPEG quality differences and alpha channel loss are well-documented. Verified that current `ImageStorageService` uses PNG exclusively.
 
 ---
 
-### Pitfall 2: Syntax Highlighting Library Crashes or Blocks the Main Thread
+### Pitfall 2: Purge Operations Delete Disk Files But Crash Before Deleting SwiftData Records (or Vice Versa)
 
 **What goes wrong:**
-Syntax highlighting libraries process text through tokenizers and grammar engines. Common failures:
-1. **highlight.js-based libraries (Highlightr) use JavaScriptCore** -- JSContext initialization is expensive (50-200ms on first use). If initialized on the main thread during card rendering, the panel stutters visibly on first scroll past a code item.
-2. **Large code blocks cause long processing times** -- A 500-line code snippet can take 100-500ms to highlight. During this time, the UI is blocked if highlighting runs synchronously.
-3. **Memory pressure from attributed strings** -- Each highlighted code block becomes an `NSAttributedString` with font, color, and background attributes on every token. Hundreds of highlighted items in memory cause significant RAM growth.
-4. **Crash on malformed input** -- Some highlighting engines crash on inputs with unusual Unicode, extremely long lines (10K+ chars), or binary data that was misdetected as text.
+Purge operations (clear by category, clear by date range, compact storage) must delete both SwiftData records AND their associated disk files (images, thumbnails, favicons, preview images). If the operation deletes disk files first and then crashes before the SwiftData delete, the database has orphan records pointing to missing files. If SwiftData records are deleted first and the crash happens before disk cleanup, orphan files accumulate on disk consuming space invisibly.
+
+The existing `RetentionService.purgeExpiredItems()` and `AppState.clearAllHistory()` both exhibit this pattern: they iterate items, call `ImageStorageService.shared.deleteImage()` (which runs on a background queue), then delete from SwiftData. Since `deleteImage()` is fire-and-forget on `backgroundQueue.async`, the disk deletion and SwiftData deletion are NOT atomic -- they can partially complete.
 
 **Why it happens:**
-Developers test with small, well-formed code snippets during development. Production clipboard content includes giant log dumps, minified JavaScript (single line, 100K chars), binary-looking data, and mixed encodings.
+There is no transaction that spans both file system operations and SwiftData. File deletion is immediate and irreversible (`FileManager.removeItem`). SwiftData deletion requires `modelContext.save()` which can fail. These two systems have independent failure modes.
+
+For a small retention purge (deleting 5 expired items), partial failure is tolerable. For a bulk purge ("delete all images older than 30 days" -- potentially hundreds of items), partial failure means significant data inconsistency.
 
 **Specific risk in Pastel's architecture:**
-The card views (`TextCardView`, `ClipboardCardView`) render inside a `LazyVStack` / `LazyHStack` in `FilteredCardListView`. SwiftUI creates views on-demand during scroll. If highlighting runs synchronously in the view body, every scroll past a code item triggers a blocking highlight operation.
+- `ImageStorageService.deleteImage()` runs on `backgroundQueue` (`.utility` QoS). It's async and has no completion handler. The caller cannot know when or if disk deletion succeeded.
+- `RetentionService` deletes images in a loop, then deletes SwiftData records in another loop, then calls `modelContext.save()`. If `save()` throws, it rolls back the SwiftData deletes -- but the disk files are already gone.
+- Bulk purge of hundreds of items will be significantly slower than the current small-batch retention purge. SwiftData's `modelContext.delete(model:)` is a batch operation but does not support a `where:` predicate combined with pre-deletion hooks (to collect file paths).
 
-**Prevention:**
-- **Choose Splash (JohnSundell/Splash) over Highlightr if only Swift highlighting is needed.** Splash is pure Swift with no JavaScript dependency, fast, and lightweight. However, it only supports Swift syntax. If multi-language support is needed, use Highlightr but with the mitigations below.
-- **If using Highlightr (highlight.js wrapper):** Initialize the `Highlightr` instance ONCE at app startup on a background thread. Reuse that single instance. JSContext initialization is the expensive part -- do it once, not per-card.
-- **Highlight asynchronously.** Use a `.task` modifier on the card view to run highlighting on a background actor. Cache the resulting `AttributedString` on the ClipboardItem model (or in a separate in-memory cache keyed by contentHash). Never highlight the same content twice.
-- **Truncate before highlighting.** Cap the input to highlighting at ~2000 characters for card preview purposes. The user sees a preview, not the full content. This bounds worst-case highlighting time.
-- **Guard against crashes.** Wrap highlighting calls in a do-catch (or use optional returns). If highlighting fails, fall back to plain text rendering. Never let a highlighting failure crash the app or produce a blank card.
-- **Use `AttributedString` (SwiftUI native) not `NSAttributedString`.** SwiftUI's `Text` view accepts `AttributedString` directly. Converting from `NSAttributedString` to `AttributedString` is needed if using Highlightr, but the conversion should happen once during caching, not on every render.
-- **Limit concurrent highlighting.** If the user scrolls quickly through many code items, queue highlighting with a `TaskGroup` limited to 2-3 concurrent operations. Do not spawn unlimited background tasks.
+**How to avoid:**
+- **Delete SwiftData records FIRST, then disk files.** If SwiftData deletion fails, roll back and abort -- no disk files were touched. If SwiftData succeeds but disk cleanup fails, orphan files are a minor issue (wasted space) that can be cleaned up later by a separate reconciliation task. This order ensures the more critical data (records) stays consistent.
+- **Collect all file paths before deleting records.** Fetch items, extract `imagePath`, `thumbnailPath`, `urlFaviconPath`, `urlPreviewImagePath` into an array. Delete records from SwiftData and save. Only then iterate the file paths array for disk cleanup.
+- **Add an orphan file cleanup task.** On app launch (or periodically), scan the `~/Library/Application Support/Pastel/images/` directory. For each file, check if any ClipboardItem references it. Delete unreferenced files. This catches any previous partial failures.
+- **For bulk purges, batch the SwiftData operations.** Delete in batches of 50-100 items with `modelContext.save()` between batches. This prevents a single massive transaction that could timeout or OOM.
 
 **Warning signs:**
-- Panel stutters when scrolling past the first code item (JSContext init on main thread).
-- Memory grows linearly with the number of code items displayed (no caching, re-highlighting every render).
-- Crash logs showing JavaScriptCore or Highlightr in the stack trace.
+- Image cards show broken thumbnails (file deleted, record exists).
+- Storage dashboard shows X items but disk usage keeps growing (records deleted, files remain).
+- `modelContext.save()` throws during large purge operations.
 
-**Detection phase:** Must be addressed during syntax highlighting implementation. Build the caching + async pipeline first, then add the actual highlighting library.
+**Phase to address:** Storage management / purge phase. The orphan cleanup reconciliation should be implemented alongside purge operations.
 
-**Confidence:** MEDIUM -- Highlightr's JSContext overhead is based on training knowledge. Splash's pure-Swift approach is well-known. Specific performance numbers should be profiled during implementation.
+**Confidence:** HIGH -- verified by reading existing `RetentionService` and `AppState.clearAllHistory()` code. The non-atomic file+record deletion pattern is already present.
 
 ---
 
-### Pitfall 3: URL Metadata Fetching Blocks Clipboard Capture or Leaks Network Activity
+### Pitfall 3: "Mark as Sensitive" Creates False Sense of Security While Data Remains Plaintext on Disk
 
 **What goes wrong:**
-Auto-fetching Open Graph metadata (title, favicon, header image) when a URL is copied introduces network I/O into a previously offline pipeline. Failures:
-1. **Fetching on the main thread** blocks clipboard monitoring. If a URL points to a slow server (5s timeout), the polling timer stalls and subsequent clipboard changes are missed.
-2. **Fetching synchronously in the capture pipeline** means the ClipboardItem is not persisted until the fetch completes (or times out). The user copies a URL, and it does not appear in the panel for several seconds.
-3. **No timeout or cancellation** -- if the user copies 10 URLs in quick succession, 10 concurrent network requests fire. Some may never complete, holding URLSession connections open indefinitely.
-4. **Fetching from private/internal URLs** -- the user copies `http://192.168.1.1/admin` or `https://internal-dashboard.company.com`. The app attempts to fetch metadata from internal networks, which is unexpected behavior and a privacy concern.
-5. **Fetching from localhost** -- developers copy `http://localhost:3000/api/test`. The fetch hits their local dev server, potentially triggering side effects (webhooks, state changes) if the endpoint is not idempotent.
-6. **Storing fetched images in SwiftData** -- Open Graph images can be large. Storing them as Data blobs in the ClipboardItem model bloats the database (same problem as the v1.0 image-in-database pitfall).
+The user marks a clipboard item as "sensitive." Pastel blurs it in the panel and maybe auto-expires it. The user feels protected. But the actual content (`textContent`, `imagePath`) is stored in plaintext in the SwiftData SQLite database and as unencrypted files on disk. Anyone with access to `~/Library/Application Support/Pastel/` can read every "sensitive" item directly from the database file using `sqlite3` or by opening the image files.
+
+This is worse than no security feature at all, because the user *believes* their sensitive data is protected. They might mark API keys, passwords, private messages, or financial data as "sensitive" and feel safe. But the protection is purely visual -- a blur overlay in the UI. The underlying data is fully exposed.
 
 **Why it happens:**
-Developers test with well-known public URLs (github.com, apple.com) that respond quickly with rich metadata. Production usage includes private networks, slow servers, broken SSL, redirects to login pages, and URLs behind authentication.
+True encryption is hard. Encrypting individual SwiftData fields breaks `#Predicate` queries (you can't search encrypted text). Encrypting files on disk requires key management. The easy path is "just blur it in the UI" -- which looks like security but isn't.
+
+The project's own REQUIREMENTS.md has "Encrypted clipboard history" explicitly in Out of Scope with the rationale: "Degrades search performance, false sense of security." This is accurate for full-database encryption but does not address the scenario where users explicitly mark specific items as sensitive.
 
 **Specific risk in Pastel's architecture:**
-The current `processPasteboardContent()` in `ClipboardMonitor` is entirely synchronous (except for image disk I/O). Adding network fetching here would either block the capture pipeline or require significant restructuring of the data flow.
+- `textContent` is a plain `String?` in SwiftData. The SQLite file at `~/Library/Application Support/Pastel/default.store` contains this in cleartext.
+- No App Sandbox means the database and image files are readable by any process with the user's UID.
+- OSLog messages include content type and source app but not content itself -- this is good. However, adding logging for sensitive operations ("Marked item as sensitive") must not include the item's content.
+- The existing `isConcealed` field (for password manager items) auto-expires items after 60 seconds. "Mark as sensitive" is different -- the user wants to KEEP the item but redact it visually. If sensitive items use the same `expiresAt` mechanism, users will lose data they wanted to keep.
 
-**Prevention:**
-- **Decouple fetching from capture completely.** The capture pipeline must remain fast and offline. When a URL is captured:
-  1. Create the ClipboardItem immediately with `textContent = urlString` and `contentType = .url`. Persist it to SwiftData right away. The item appears in the panel instantly.
-  2. After persisting, enqueue a background metadata fetch task. When metadata arrives, update the existing ClipboardItem with title, favicon path, and OG image path.
-- **Store fetched assets on disk, not in SwiftData.** Follow the same pattern as image storage: save favicon and OG image as files in Application Support, store only the file paths in the model. Add `ogTitle: String?`, `ogImagePath: String?`, `faviconPath: String?` fields to ClipboardItem.
-- **Strict timeouts.** Set URLSession timeout to 5 seconds for metadata fetches. If the server does not respond in 5 seconds, give up and leave the URL card in its plain state. Users will not notice the missing metadata.
-- **Skip private/local URLs.** Before fetching, check the URL host:
-  - Skip `localhost`, `127.0.0.1`, `0.0.0.0`
-  - Skip private IP ranges (`10.x.x.x`, `172.16-31.x.x`, `192.168.x.x`)
-  - Skip `.local` domains
-  - Only fetch for URLs with public DNS-resolvable hosts
-- **Rate limit and deduplicate.** If the same URL is copied multiple times, do not fetch metadata again. Check if `ogTitle` is already populated before fetching. Limit concurrent metadata fetches to 2-3.
-- **Graceful degradation is the default.** The URL card must look good WITHOUT metadata. The current `URLCardView` shows a globe icon + URL text. That is the fallback. Metadata (title, favicon) is progressive enhancement -- nice when available, invisible when missing.
-- **Cancel on item deletion.** If the user deletes a ClipboardItem while its metadata fetch is in-flight, cancel the URLSession task. Otherwise, the completion handler tries to update a deleted model, causing a crash or orphaned files on disk.
+**How to avoid:**
+- **Be honest in the UI.** Do NOT call this feature "secure" or "encrypted." Call it "redacted" or "hidden from view." Use language like "This item is hidden in the panel. It is still stored on your Mac." A tooltip or info icon can explain: "For full disk protection, enable FileVault."
+- **Do NOT encrypt individual items.** It adds complexity without real security (the encryption key must live somewhere on the same machine). Instead, rely on macOS FileVault (full-disk encryption) for at-rest protection.
+- **Redact sensitive items from specific export/sharing operations.** When implementing export (v2), skip sensitive items entirely or require confirmation.
+- **Sanitize logs.** Any new logging related to sensitive items must use `OSLog` privacy markers: `\(item.textContent ?? "", privacy: .private)` so content is redacted in system logs unless Console.app has device unlocked.
+- **Separate `isSensitive` from `isConcealed`.** The existing `isConcealed` is automatically detected from password managers and auto-expires in 60 seconds. The new `isSensitive` is manually set by the user and should NOT auto-expire by default. These are different concepts with different lifecycles. Using the same field would conflate them.
 
 **Warning signs:**
-- URLs appear in the panel with a delay (fetching is blocking capture).
-- Console shows network errors for `192.168.x.x` or `localhost` addresses.
-- Memory grows when many URLs are copied (OG images stored in memory or in SwiftData).
-- Crash on metadata fetch completion after item was deleted.
+- Feature description or UI strings use words like "secure," "protected," or "encrypted."
+- User-marked sensitive items use the same `isConcealed` field (conflates auto-detected with manual).
+- Sensitive item content appears in OSLog or crash reports.
 
-**Detection phase:** Must be addressed during URL metadata fetching implementation. The decouple-from-capture architecture must be decided before writing any networking code.
+**Phase to address:** Sensitive item marking phase. The UI language and data model distinction (`isSensitive` vs `isConcealed`) must be decided before any implementation.
 
-**Confidence:** HIGH -- network I/O in clipboard capture is a well-understood integration challenge. The decouple-and-background pattern is standard.
+**Confidence:** HIGH -- verified that the database is unencrypted plaintext SQLite, no sandbox, and that `isConcealed` already serves a different purpose. Security claims verified against clipboard security analysis.
 
 ---
 
-### Pitfall 4: Cmd+1-9 Hotkeys Conflict with System and App Shortcuts
+### Pitfall 4: Content Deduplication Silently Drops Different Content That Hashes the Same
 
 **What goes wrong:**
-Registering Cmd+1-9 as global hotkeys (working system-wide, even when Pastel's panel is not open) causes conflicts:
-1. **Safari, Chrome, Firefox** use Cmd+1-9 to switch tabs. If Pastel registers these globally, browser tab switching breaks. Users will uninstall immediately.
-2. **Finder** uses Cmd+1-4 for view modes (icons, list, columns, gallery).
-3. **Terminal/iTerm** uses Cmd+1-9 for tab switching.
-4. **VS Code** and most editors use Cmd+1-9 for editor group switching.
-5. Even if Pastel only intercepts when the panel is open, Carbon hotkeys registered globally still fire -- you must unregister them when the panel is hidden.
+The deduplication system uses SHA256 content hashes with a `@Attribute(.unique)` constraint. If two different clipboard contents produce the same hash, the second one is silently dropped (the SwiftData insert fails with a unique constraint violation, and `modelContext.rollback()` discards it). The user copies something, it never appears in history, and there is no indication of why.
+
+The current system has TWO deduplication mechanisms:
+1. **Consecutive dedup** (`isDuplicateOfMostRecent`): Compares hash of new item to the most recent item. Skips if same.
+2. **Global dedup** (`@Attribute(.unique)` on `contentHash`): Any item with the same hash as ANY historical item is rejected.
+
+For v1.2 content deduplication, the question is whether to expand beyond consecutive dedup into true content-aware dedup (finding items with identical or near-identical content across the entire history).
 
 **Why it happens:**
-Developers think "Cmd+1-9 for quick paste" is intuitive (CopyLess 2 does it). But CopyLess 2 only activates these hotkeys when its own UI is visible. Registering them globally breaks the entire macOS ecosystem of keyboard shortcuts.
+SHA256 hash collisions are astronomically unlikely for genuinely different content. The real risk is not cryptographic collision but **implementation bugs in what gets hashed**:
+- Image hashing uses only the first 4KB of data (`ImageStorageService.computeImageHash`). Two different images with the same first 4KB (e.g., same EXIF header, different pixel data) would hash identically.
+- Text hashing uses `Data(primaryContent.utf8)`. If `primaryContent` is empty or nil, different empty items all hash to the same empty-string SHA256. (The current code guards against empty content, but new code paths might not.)
+- If compression changes image bytes, the same logical image has different hashes before and after compression.
 
 **Specific risk in Pastel's architecture:**
-The current hotkey system uses `KeyboardShortcuts` (sindresorhus) which wraps Carbon `RegisterEventHotKey`. These are inherently global -- they intercept the key combination system-wide. The existing `togglePanel` shortcut (Cmd+Shift+V) is fine because no major app uses that combination. Cmd+1-9 is a completely different story.
+- The current `@Attribute(.unique)` on `contentHash` means the global dedup is already live. Adding explicit dedup logic needs to interoperate with this constraint without causing confusing double-rejections.
+- The `isDuplicateOfMostRecent` function only checks the single most recent item. True dedup would need to check against all items, which is more expensive but also more correct.
+- The `modelContext.rollback()` in the catch block after failed `.save()` handles unique violations gracefully but invisibly. The user never knows an item was dropped.
 
-**Prevention:**
-- **Do NOT register Cmd+1-9 as global hotkeys.** This is the single most important decision.
-- **Two modes for Cmd+1-9:**
-  - **Mode A (Recommended): Panel-open only.** When the panel is visible, intercept Cmd+1-9 using `NSEvent.addLocalMonitorForEvents(matching: .keyDown)` (local monitor, only catches events when Pastel has focus) or SwiftUI `.onKeyPress`. When the panel is hidden, these shortcuts do nothing -- they pass through to whatever app is active.
-  - **Mode B: Global with modifier.** Use a distinct modifier like Ctrl+1-9 or Ctrl+Cmd+1-9 that does not conflict with standard apps. This allows pasting without opening the panel first, but requires an unusual key combination.
-- **If panel-open only (Mode A):** The panel currently uses `NSPanel` with `.nonactivatingPanel`, which means it does NOT become the key window. Local event monitors only work when the app is the key app. Since the panel is non-activating, the local monitor will not receive key events.
-  - **Solution:** Use the existing local key monitor in `PanelController.installEventMonitors()` which already intercepts Escape. Extend it to also intercept Cmd+1-9 when the panel is visible. This works because `NSEvent.addLocalMonitorForEvents` catches events delivered to the app (the panel receives them even though it is non-activating, because the monitor is installed on the app, not the window).
-  - **Alternative:** Register Cmd+1-9 as Carbon hotkeys via KeyboardShortcuts ONLY when `show()` is called, and unregister them in `hide()`. This makes them effectively panel-open-only. But registration/unregistration on every show/hide adds complexity and potential race conditions.
-- **Show number badges on cards.** When the panel is open, overlay "1", "2", ... "9" badges on the first 9 items. Without visual indicators, users cannot know which number corresponds to which item.
-- **Handle the edge case where items are fewer than 9.** If only 5 items exist, Cmd+6 through Cmd+9 should be no-ops, not crash.
+**How to avoid:**
+- **For text dedup: Hash the full content, not a prefix.** The current text hashing is already correct (full UTF-8 content). Keep this.
+- **For image dedup: Hash more than 4KB.** The first 4KB is often metadata/headers. Hash at least the first 64KB, or better, hash the entire file. For very large images, use a two-stage approach: fast prefix hash for initial comparison, full hash for confirmation.
+- **For near-duplicate detection (e.g., same text with trailing whitespace differences):** Normalize before hashing. Trim whitespace, normalize Unicode (NFC), then hash. But store the ORIGINAL content for paste-back -- only use normalized form for dedup comparison.
+- **When adding compression: compute and store the hash BEFORE compression.** The hash should represent the logical content, not the storage representation. This way, the same image hashed before and after compression produces the same dedup key.
+- **Consider whether global dedup (`@Attribute(.unique)`) is actually desired.** Currently, if you copy the same text, go do other things, and copy it again a week later, the second copy is silently dropped. For a clipboard manager, the user might WANT the second copy to appear (with a new timestamp). Consider relaxing the unique constraint and using only consecutive dedup plus explicit user-initiated dedup.
 
 **Warning signs:**
-- During testing, open Safari and press Cmd+1. If Pastel intercepts it instead of Safari switching to tab 1, the hotkeys are registered globally when they should not be.
-- Users report "my browser shortcuts stopped working."
+- User reports "I copied X but it doesn't appear in history" -- likely a hash collision with an older item.
+- After adding compression, previously-deduplicated images are no longer detected as duplicates (hash changed).
+- Two visually different images show the same hash in logs (4KB prefix collision).
 
-**Detection phase:** Must be addressed during Cmd+1-9 implementation. The scoping decision (global vs panel-open) must be made before any hotkey registration code is written.
+**Phase to address:** Deduplication phase. The hashing strategy and unique constraint policy must be decided before implementing any new dedup logic.
 
-**Confidence:** HIGH -- Cmd+1-9 conflicts with standard macOS app shortcuts are well-documented and universally experienced by developers who try to register these combinations globally.
+**Confidence:** HIGH -- verified the 4KB image prefix hashing in `ImageStorageService.computeImageHash()` and the `@Attribute(.unique)` constraint on `contentHash`.
 
 ---
 
-### Pitfall 5: SwiftData Schema Migration Fails or Loses Data When Adding New Fields
+### Pitfall 5: Database Compaction (VACUUM) Corrupts Data or Fails Under Active Use
 
 **What goes wrong:**
-Adding new optional fields to `ClipboardItem` (e.g., `detectedLanguage`, `ogTitle`, `ogImagePath`, `faviconPath`) requires a SwiftData schema migration. Common failures:
-1. **Adding a non-optional field without a default** crashes at launch. SwiftData cannot populate existing rows with a non-optional field that has no default value. The app crashes with a Core Data migration error (SwiftData wraps Core Data under the hood).
-2. **Renaming a field** (e.g., `imagePath` to `fullImagePath`) is interpreted by SwiftData as deleting one field and adding another. All existing data in the old field is lost.
-3. **Changing a field type** (e.g., `colorName: String` to `colorName: LabelColor` or `labelEmoji: String?` to `labelEmoji: Character?`) can fail migration silently, producing nil values for all existing rows.
-4. **Adding a new relationship** (e.g., adding a `URLMetadata` model related to ClipboardItem) requires careful migration planning. SwiftData's lightweight migration handles simple additions but not relationship restructuring.
+SQLite `VACUUM` creates a copy of the entire database, restructures it for optimal space, then replaces the original. During this process:
+1. It requires **twice the disk space** of the current database (original + copy).
+2. It **fails if there is an open transaction** on the same connection.
+3. It is a **write operation** that blocks all other writes during execution.
+4. If the app crashes or the user force-quits during VACUUM, the database can be left in an inconsistent state.
+5. It can **change ROWIDs** for tables without explicit INTEGER PRIMARY KEY (SwiftData uses its own ID scheme, which could be affected).
+
+For a clipboard manager that polls the pasteboard every 0.5 seconds and writes new items continuously, running VACUUM while the app is actively capturing clipboard changes creates a high-risk window where the capture write collides with the VACUUM write.
 
 **Why it happens:**
-SwiftData's automatic lightweight migration is convenient for simple additions but opaque when it fails. Developers add fields during development (where the database is fresh) and do not test migration from a v1.0 database to the v1.1 schema. The migration fails only for existing users upgrading the app.
+Developers add a "Compact Database" button to the storage dashboard. The user clicks it. The VACUUM runs on the same `ModelContext` that `ClipboardMonitor` uses for clipboard capture. The timer fires, a new clipboard item arrives, `modelContext.save()` is called -- and it fails or corrupts because VACUUM is in progress.
 
 **Specific risk in Pastel's architecture:**
-The ClipboardItem model already has 16 fields. v1.1 needs to add several more. The Label model needs `emoji: String?`. The `LabelColor` enum may need more cases (expanded palette). Each change is a potential migration issue.
+- There is ONE `ModelContext` shared by `ClipboardMonitor`, `RetentionService`, `ExpirationService`, and the SwiftUI views. All are `@MainActor`. A VACUUM on this context blocks the main thread and conflicts with the 0.5s polling timer.
+- SwiftData wraps Core Data which wraps SQLite. Accessing SQLite's VACUUM through SwiftData is not directly supported -- you would need to drop down to Core Data's `NSPersistentStoreCoordinator` or use raw SQLite access, both of which bypass SwiftData's change tracking and can leave the `ModelContext` in an inconsistent state.
+- The database uses WAL mode (SwiftData's default). VACUUM in WAL mode has specific constraints -- it can only change the `auto_vacuum` property, not other pragmas.
 
-**Prevention:**
-- **All new fields MUST be optional with nil default.** No exceptions. `var detectedLanguage: String? = nil`, `var ogTitle: String? = nil`, etc. SwiftData handles "add optional field with nil default" as a lightweight migration automatically.
-- **Never rename fields.** If you need a better name, add the new field and deprecate the old one. Migrating data from old to new field requires a manual migration step.
-- **Never change field types.** If `colorName` needs to become an enum, keep it as `String` in storage and use a computed property for the enum conversion (this pattern is already used for `contentType` / `type` in the current code).
-- **Test migration explicitly.** Before shipping v1.1:
-  1. Build v1.0 from the current main branch.
-  2. Run it, generate clipboard history (text, images, URLs, labeled items).
-  3. Switch to the v1.1 branch.
-  4. Run v1.1. Verify all existing data is present and the new fields are nil.
-  5. If the app crashes on launch, the migration failed.
-- **For the Label model:** Adding `emoji: String? = nil` is safe (optional, nil default). Expanding `LabelColor` enum cases is safe (the raw value is a String stored in `colorName`, and new enum cases just add new valid strings). Existing labels keep their existing `colorName` values.
-- **Keep URL metadata on ClipboardItem, not a separate model.** Adding a new related model (`URLMetadata`) introduces a relationship migration. Instead, add `ogTitle: String?`, `ogImagePath: String?`, `faviconPath: String?` directly to ClipboardItem. These are simple optional String fields -- safe migration.
+**How to avoid:**
+- **Do NOT implement VACUUM as a user-facing feature.** The risk-reward ratio is poor. SQLite databases for a clipboard manager are typically small (under 50MB even with thousands of items). The space savings from VACUUM are minimal and the corruption risk is real.
+- **If compaction is truly needed:** Use `VACUUM INTO` to create a compacted copy. This does not modify the original database. Then, shut down all database access (stop ClipboardMonitor, invalidate timers), swap the files, and restart. This is safer but complex.
+- **Prefer periodic cleanup over compaction.** Deleting old items via `RetentionService` and the orphan file cleanup (Pitfall 2) is sufficient for managing storage. The database file will have some wasted space from deletions, but SQLite reuses deleted pages for new insertions automatically.
+- **If implementing a storage dashboard:** Show the database file size and image directory size. Offer "Delete items older than X" and "Delete items by type" -- not "Compact Database." These achieve the user's goal (free up space) without VACUUM's risks.
 
 **Warning signs:**
-- The app crashes on launch for existing users but works fine on fresh installs (migration failure).
-- Existing labels show no color or default to gray after upgrade (color field migration issue).
-- Test suite passes in CI (fresh database) but the app breaks on a developer's machine with existing data.
+- The app freezes for several seconds when the user clicks "Compact" (VACUUM blocking main thread).
+- Clipboard monitoring stops capturing during compaction (timer fires can't write).
+- Crash reports with SQLite errors after compaction attempt.
 
-**Detection phase:** Must be validated at the END of v1.1 development, before any release. Build a migration test that opens a v1.0 database with the v1.1 schema.
+**Phase to address:** Storage dashboard / management phase. The decision to NOT implement VACUUM should be made during phase planning.
 
-**Confidence:** HIGH -- SwiftData migration behavior is well-documented for simple cases. The "all new fields must be optional" rule is a hard requirement documented by Apple.
+**Confidence:** HIGH -- verified against official SQLite VACUUM documentation. VACUUM failure conditions during active transactions are well-documented. SwiftData's lack of direct VACUUM API confirmed via developer community sources.
 
 ---
 
-## Moderate Pitfalls
+## Technical Debt Patterns
 
-Mistakes that cause delays, technical debt, or degraded UX but are recoverable without rewrites.
+Shortcuts that seem reasonable but create long-term problems.
 
-### Pitfall 6: Color Detection Regex is Too Greedy or Too Narrow
-
-**What goes wrong:**
-Color value detection (hex, rgb, hsl) uses regex patterns. Common over/under matching:
-1. **Too greedy:** The pattern `#[0-9a-fA-F]{3,8}` matches git commit hashes (`#a1b2c3d`), hex-encoded IDs, and CSS hex references that are not standalone color values. A commit message like "fixed in #abc123" gets a color swatch for a brownish color.
-2. **Too narrow:** Only matching `#RRGGBB` misses `#RGB` shorthand (`#fff`), `#RRGGBBAA` (8-digit with alpha), `rgb(255, 128, 0)`, `rgba(255, 128, 0, 0.5)`, `hsl(180, 50%, 50%)`, and CSS named colors.
-3. **Matching colors inside larger text.** The string `"background-color: #ff0000; font-size: 14px;"` contains a color, but should the entire CSS line be treated as a "color item"? Or should the swatch just appear inline?
-
-**Why it happens:**
-Color formats are diverse. Developers implement the simplest case (#RRGGBB) and ship it. Users copy colors from Figma (hex), CSS (rgb/hsl), Sketch (hex with alpha), and design tools (various formats).
-
-**Specific risk in Pastel's architecture:**
-Like code detection, color detection should NOT change the item's `contentType`. A text item containing a color value should remain `.text` with an additional visual enrichment (swatch). If color detection creates a separate `ContentType.color`, the classification logic in `classifyContent()` becomes fragile -- what if text contains both a URL and a color value?
-
-**Prevention:**
-- **Color detection is a display enrichment, not a content type.** Add `detectedColor: String?` (the normalized hex value) to ClipboardItem. The card view checks this field and optionally renders a swatch.
-- **Only detect colors when the entire clipboard content IS a color value** (with optional whitespace trimming). Do not scan for colors embedded in larger text. If the user copies `#ff5733`, show a swatch. If they copy `background: #ff5733;`, it is a text item (not a color item).
-- **Support the common formats:**
-  - `#RGB` (3 hex digits)
-  - `#RRGGBB` (6 hex digits)
-  - `#RRGGBBAA` (8 hex digits)
-  - `rgb(R, G, B)` with values 0-255
-  - `rgba(R, G, B, A)` with A as 0-1 or 0%-100%
-  - `hsl(H, S%, L%)` and `hsla(H, S%, L%, A)`
-- **Validate the match.** After regex extraction, verify the values are in valid ranges (R/G/B: 0-255, H: 0-360, S/L: 0-100%). Reject matches that fail validation.
-- **Normalize to hex.** Store the detected color as a normalized hex string (e.g., `#FF5733FF`) regardless of the input format. This makes swatch rendering consistent.
-
-**Warning signs:**
-- Git commit SHAs show color swatches in the panel.
-- CSS code blocks have color swatches on every line.
-- `rgb(300, 400, 500)` out-of-range values render as a swatch (validation failure).
-
-**Detection phase:** Address during color detection implementation. Build a test suite with edge cases: git hashes, CSS blocks, valid/invalid color strings, all supported formats.
-
-**Confidence:** HIGH -- color regex pitfalls are extensively documented in web development contexts (CSS parsers, design tool plugins).
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Reuse `isConcealed` for user-marked sensitive items | No new field, less migration | Conflates auto-detected (60s expiry) with user-chosen (persist). Users lose items they wanted to keep. | Never -- these are fundamentally different concepts |
+| JPEG compression for all stored images | Massive storage savings (5-10x) | Lossy paste-back, alpha channel loss, user trust erosion | Never for paste-back source; acceptable for display-only thumbnails |
+| Sync file deletion with SwiftData deletion in same operation | Simpler code, no orphan handling | Partial failures leave inconsistent state; no recovery path | Acceptable for single-item delete (low risk); never for bulk purge |
+| Calculate storage stats synchronously on every panel open | Simple implementation, always current | Panel open latency grows with history size; blocks main thread | Only if history is under 100 items. Cache stats and recalculate periodically for larger histories |
+| Store compression metadata only in filename (e.g., `.jpg` vs `.png`) | No schema change needed | Filename parsing is fragile; renaming files breaks detection; no room for quality parameters | Never -- use explicit model fields |
+| Use `blur(radius:)` alone for sensitive item redaction | Quick to implement, looks good in demo | VoiceOver reads the content behind the blur; blur can be circumvented by reading SwiftUI view hierarchy | Acceptable as visual layer but must be combined with content replacement in the view |
 
 ---
 
-### Pitfall 7: Emoji in Labels Breaks Layout or SwiftData Storage
+## Integration Gotchas
 
-**What goes wrong:**
-Adding emoji support to labels (replacing the color dot with an emoji) introduces Unicode complexity:
-1. **Multi-codepoint emoji break `String.count`.** The emoji "family" (e.g., various skin tone/gender combinations) can be 7+ Unicode scalars but `String.count` returns 1. If you truncate or validate by character count, behavior is inconsistent.
-2. **Emoji rendering width varies.** A flag emoji renders wider than a single letter. A country flag (e.g., flag emoji) renders as two characters on some systems. If the label chip has a fixed-width slot for the emoji, some emoji overflow and clip.
-3. **SwiftData stores emoji fine as UTF-8 String**, but if a `Character` type is used instead of `String`, SwiftData may have issues. `Character` is not a native SQLite type.
-4. **Emoji picker integration.** macOS has a built-in emoji picker (Ctrl+Cmd+Space or Edit > Emoji & Symbols), but activating it from a non-activating panel (NSPanel) is unreliable. The picker may not appear, or it may appear behind the panel.
-5. **Empty string vs nil.** When a label has no emoji, should the field be `nil` or `""` (empty string)? This affects the conditional rendering: "show emoji if set, otherwise show color dot."
+Mistakes specific to adding v1.2 features alongside the existing v1.0/v1.1 system.
 
-**Why it happens:**
-Emoji seems simple -- it is just a string. But Unicode emoji are complex, and SwiftUI rendering of emoji has edge cases on macOS that do not appear on iOS.
-
-**Specific risk in Pastel's architecture:**
-Labels currently use `colorName: String` for the color dot. The v1.1 plan says "emoji replaces color dot when set." The `LabelRow` in `LabelSettingsView` uses a `@Bindable` pattern for inline editing. Adding an emoji field and picker must work within this pattern, AND within the chip rendering in `ChipBarView`.
-
-**Prevention:**
-- **Store emoji as `String?` (not `Character?`).** Use `var emoji: String? = nil` on the Label model. String is SQLite-friendly and SwiftData handles it cleanly. Validate that the emoji field contains at most one grapheme cluster (one "visual" emoji) if needed, using `emoji.count == 1`.
-- **Use `nil` for "no emoji", not empty string.** The rendering logic becomes `if let emoji = label.emoji { Text(emoji) } else { Circle().fill(color) }`. Clear and unambiguous.
-- **Fixed-width emoji rendering.** In chip views, give the emoji slot a fixed frame (e.g., `frame(width: 20, height: 20)`) and use `.lineLimit(1)`. This handles varying emoji widths gracefully.
-- **Do not build a custom emoji picker.** Use a simple text field where the user can type or paste an emoji. The macOS system emoji picker (Ctrl+Cmd+Space) works in text fields. This avoids the complexity of building a custom picker UI.
-- **Alternatively, provide a curated emoji grid.** Show 20-30 common emoji (smile, star, fire, heart, folder, etc.) in a grid popover. This is simpler than a full picker and ensures consistent rendering.
-
-**Warning signs:**
-- Labels with flag emoji overflow their chip bounds.
-- The emoji picker does not appear when triggered from the settings window (focus issue with NSPanel).
-- Labels with emoji display empty squares on older macOS versions (emoji not in the system font).
-
-**Detection phase:** Address during label emoji implementation. Test with diverse emoji: simple (smile), compound (family), flags, and skin-tone variants.
-
-**Confidence:** MEDIUM -- emoji rendering in SwiftUI on macOS is generally reliable but edge cases exist. SwiftData String storage for emoji is standard and reliable.
+| Integration Point | Common Mistake | Correct Approach |
+|-------------------|----------------|------------------|
+| `isConcealed` vs `isSensitive` | Using the same Bool field for both auto-detected concealed items (password managers) and user-marked sensitive items | Add new `isSensitive: Bool? = nil` field. ExpirationService handles `isConcealed`; new SensitiveService handles `isSensitive`. Different expiry defaults, different UI treatment |
+| RetentionService purge + new purge-by-category | Adding category purge to RetentionService, making it do too much | Create a separate PurgeService for user-initiated purges. RetentionService remains automated-only. Both share the same file cleanup helper |
+| Image hash stability across compression | Compressing an image changes its bytes, changing its hash. If hash is recomputed after compression, dedup breaks for items that were identical pre-compression | Compute and store hash from ORIGINAL image data at capture time. Never recompute hash after compression. If compression is retroactive, preserve the original hash |
+| FilteredCardListView + sensitive blur | Adding blur to card views while maintaining keyboard navigation and paste-back | The blur is a visual overlay only. The item is still fully selectable, navigable, and pasteable. Click-to-reveal toggles the blur state on the view, NOT on the data model. The underlying `ClipboardItem.textContent` is never modified |
+| ExpirationService + sensitive auto-expiry | Reusing ExpirationService (designed for 60s concealed items) for configurable sensitive expiry (hours/days) | ExpirationService uses `DispatchWorkItem` timers, which are not suitable for long-duration expiries (survive app restarts poorly). For sensitive auto-expiry, use the same approach as RetentionService: periodic polling with date comparison. Add `sensitiveExpiresAt: Date?` field |
+| Storage dashboard + ImageStorageService | Calculating image directory size by iterating all files on every dashboard open | Cache the total image directory size. Update it incrementally when images are added/deleted. Recalculate fully only on first launch or user request |
 
 ---
 
-### Pitfall 8: URL Metadata Fetch Fires for Every URL Re-copy, Wasting Bandwidth
+## Performance Traps
 
-**What goes wrong:**
-The current deduplication in `ClipboardMonitor` checks the content hash of the most recent item. If the user copies the same URL twice with different items in between (non-consecutive), a new ClipboardItem is created (the `@Attribute(.unique)` on contentHash prevents true duplicates, but the rollback+skip means the item is not stored again). However, if the user copies the same URL and a new item IS created (perhaps the URL string differs slightly due to tracking parameters), a metadata fetch fires again for the same page.
+Patterns that work at small scale but fail as usage grows.
 
-Additionally, the user may copy URLs rapidly while browsing. If each copy triggers an immediate fetch, there is a burst of network requests that mostly duplicate each other or fetch pages the user will never look at again.
-
-**Why it happens:**
-The fetch-on-copy pattern seems correct ("enrich the card as soon as possible") but does not account for bursty copy behavior or redundant fetches.
-
-**Prevention:**
-- **Deduplicate fetches by URL hostname + path** (strip query parameters and fragments). If a fetch for the same normalized URL completed in the last 24 hours, reuse the cached metadata instead of fetching again.
-- **Debounce fetches.** After a URL is captured, wait 1-2 seconds before initiating the fetch. If the user copies another URL within that window, cancel the previous fetch and start a new one for the latest URL. This handles the "rapid copy while browsing" pattern.
-- **Limit total concurrent fetches** to 2. Queue additional fetches. If the queue exceeds 10, drop the oldest unfetched URLs (they are likely already scrolled past).
-- **Cache metadata independently.** Consider a simple dictionary cache `[normalizedURL: (title, faviconPath, ogImagePath)]` persisted to disk (or as a separate SwiftData model). When a URL is copied, check the cache before fetching. This also handles the case where the user copies the same URL days later.
-
-**Warning signs:**
-- Network activity spikes when the user copies multiple URLs quickly.
-- The same OG image is downloaded and stored multiple times for the same URL.
-- Console shows many concurrent URLSession tasks.
-
-**Detection phase:** Address during URL metadata fetching implementation, specifically in the fetch scheduling logic.
-
-**Confidence:** MEDIUM -- fetch deduplication and debouncing are standard patterns, but the specific interaction with Pastel's copy pipeline needs testing.
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Scanning entire images directory for storage stats | Dashboard takes 2+ seconds to open, main thread blocked | Cache directory size at launch. Update incrementally on add/delete. Use `FileManager.enumerator(at:includingPropertiesForKeys:[.fileSizeKey])` with prefetched keys | ~500+ images on disk (common after months of use) |
+| Fetching ALL ClipboardItems to calculate per-type counts | Memory spike loading thousands of items into memory | Use separate `FetchDescriptor` with `fetchCount` for each content type, using `#Predicate` to filter. No items loaded into memory | ~5,000+ items (months of heavy use) |
+| Dedup scan comparing new item against entire history | O(n) hash comparison on every clipboard capture, slowing the 0.5s poll loop | Use `@Attribute(.unique)` (already in place) instead of manual iteration. For near-duplicate detection, use SwiftData `#Predicate` with `contentHash` field, not in-memory comparison | ~10,000+ items |
+| Rendering blur effect on every card in a lazy list | GPU overhead from multiple simultaneous `blur(radius:)` modifiers during scroll | Only apply blur to VISIBLE sensitive cards. Use a boolean `isRevealed` state per card, not a global toggle. LazyVStack already handles view lifecycle, but blur calculation adds per-frame cost | ~20+ sensitive items visible in a scroll session |
+| Full-database size calculation via `FileManager.attributesOfItem` on the SQLite file | Inaccurate (doesn't include WAL and SHM files), potentially misleading | Sum sizes of `.store`, `.store-wal`, and `.store-shm` files for accurate database size. Or use `NSSQLiteStoreFileProtectionKey` metadata | Immediately inaccurate if only checking main file |
 
 ---
 
-### Pitfall 9: Highlighted Code Preview Recomputed on Every Scroll
+## Security Mistakes
 
-**What goes wrong:**
-SwiftUI's `LazyVStack`/`LazyHStack` creates and destroys views as they scroll in and out of the visible area. If the syntax highlighting result is not cached, each time a code card scrolls into view, the highlighting computation runs again. This causes:
-1. **Visible delay** -- the card appears with plain text, then flashes to highlighted text (100-300ms later).
-2. **CPU waste** -- the same content is highlighted repeatedly.
-3. **Scroll jank** -- if highlighting is triggered synchronously in the view body, each code card causes a frame drop during scrolling.
+Domain-specific security issues for a clipboard manager with sensitive item features.
 
-**Why it happens:**
-Developers implement highlighting inside the view (e.g., in a `.task` modifier) without caching the result. SwiftUI's view lifecycle means `.task` runs every time the view appears, and the view appears every time it scrolls into the visible area.
-
-**Specific risk in Pastel's architecture:**
-`FilteredCardListView` uses `LazyVStack` with `ForEach(Array(items.enumerated()), ...)`. Each `ClipboardCardView` is recreated when it scrolls into view. If highlighting is done inside the card view, it runs every time the card appears.
-
-**Prevention:**
-- **Cache highlighted output on the model.** Add a transient (non-persisted) cache: `@Transient var highlightedPreview: AttributedString?` on ClipboardItem. Compute highlighting once, store in this property. On subsequent renders, use the cached value.
-- **Note: `@Transient` means the property is not persisted to SwiftData.** It exists only in memory for the current app session. This is correct for cached renders -- they can be recomputed if needed.
-- **Alternative: Use a separate in-memory cache.** A `[String: AttributedString]` dictionary keyed by content hash. This avoids modifying the SwiftData model. The cache lives in a service object injected via SwiftUI environment.
-- **Prefetch on capture.** When a new code item is captured and the language is detected, immediately queue a background highlighting task. By the time the user opens the panel, the highlight is already cached.
-- **Avoid `.task` for highlighting.** Use `.task(id: item.contentHash)` so it only runs once per unique content. But still cache the result to survive view recreation.
-
-**Warning signs:**
-- Code cards flash from plain text to highlighted on every scroll.
-- CPU usage spikes during panel scrolling.
-- Instruments shows repeated calls to the highlighting engine for the same content.
-
-**Detection phase:** Address during syntax highlighting card rendering. Build the caching layer first, then integrate the highlighting library.
-
-**Confidence:** HIGH -- LazyVStack view lifecycle behavior and the need for caching is well-documented in SwiftUI.
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Logging sensitive item content in OSLog | Sensitive text appears in Console.app / system log, readable by any process | Use OSLog privacy markers: `\(text, privacy: .private)`. Log only item ID, type, and timestamp -- never content. Review ALL new log statements for content leakage |
+| Blur without replacing accessible text | VoiceOver reads the full text content behind the blur. Screen readers bypass visual redaction entirely | Set `.accessibilityLabel("Sensitive item")` on blurred cards. Use `.accessibilityHidden(true)` on the actual text content when blurred. Replace readable content, not just overlay it |
+| Sensitive content in pasteboard after paste-back | User marks item as sensitive, then pastes it. The content is now on `NSPasteboard.general`, visible to all apps monitoring the clipboard | After paste-back of a sensitive item, optionally clear the pasteboard after a configurable delay (e.g., 30 seconds). Warn the user that pasting places content on the system clipboard |
+| Screenshot captures sensitive content through blur | macOS screenshots (`Cmd+Shift+4`) and screen recording capture the composited window, including any blur overlays. However, `NSWindow.sharingType = .none` no longer prevents capture on macOS 15+ (ScreenCaptureKit ignores it) | Accept that screenshot protection is not possible on macOS 15+. Document this honestly. The blur is a casual-viewing deterrent, NOT a screenshot-proof mechanism. Do not claim screenshot protection |
+| Sensitive items survive in SwiftData journal/WAL | Even after deleting a sensitive item from SwiftData, the SQLite WAL file may contain the deleted content until the next checkpoint | Accept this as a limitation of SQLite. For users requiring true data destruction, recommend FileVault and point them to the "Clear All History" feature. Do not promise "secure deletion" |
+| Auto-expiry deletes items the user wanted to keep | User marks item sensitive with auto-expiry enabled. Days later, wonders where their important API key went. No undo, no recovery | Auto-expiry for sensitive items should be OFF by default (opt-in). When enabled, show a clear countdown or expiry date on the card. Provide a Settings option, not a per-item toggle, to avoid complexity |
 
 ---
 
-### Pitfall 10: Cmd+1-9 Paste Targets Wrong Item After Search/Filter
+## UX Pitfalls
 
-**What goes wrong:**
-Cmd+1-9 is intended to paste the Nth most recent item. But if the user has an active search query or label filter, the visible list is a filtered subset. The question becomes: does Cmd+1 paste the 1st item in the FILTERED list or the 1st item in the UNFILTERED history?
+Common user experience mistakes when adding storage and security features.
 
-If Cmd+1-9 always maps to the unfiltered list:
-- The user filters by label "Work", sees 3 items. Presses Cmd+1. Gets a completely different item from the unfiltered list. Confusion and data loss (pasted wrong content into the target app).
-
-If Cmd+1-9 maps to the filtered list:
-- The user switches filters. The same Cmd+N number now refers to a different item. Inconsistent behavior.
-
-**Why it happens:**
-The mapping between "position number" and "item" seems obvious until filtering is introduced. Most implementations do not consider this interaction.
-
-**Specific risk in Pastel's architecture:**
-`FilteredCardListView` receives items from `@Query` with a predicate based on `searchText` and `selectedLabelID`. The visible items change based on filters. The number badges (1-9) must reflect what the user sees, but the paste-back mechanism (`PasteService.paste`) needs the actual `ClipboardItem` reference.
-
-**Prevention:**
-- **Always map Cmd+1-9 to the VISIBLE list.** Whatever items are currently displayed in the panel (filtered or not), Cmd+1 pastes the first visible item, Cmd+2 the second, etc. This matches what the user sees.
-- **Update number badges when filters change.** The badges "1" through "9" are overlaid on the first 9 visible items. When the filter changes, the badges shift to the new first 9.
-- **When the panel is closed and hotkeys are panel-open-only (Mode A), this is a non-issue.** The user must open the panel, see the items, and then press Cmd+N. The visible list is always what they see.
-- **If implementing global Cmd+1-9 (Mode B -- not recommended), always paste from the unfiltered list.** The user cannot see the panel, so there is no visual mismatch. Cmd+1 always means "most recent item in history." But this mode is not recommended due to hotkey conflicts (Pitfall 4).
-
-**Warning signs:**
-- User filters by a label, presses Cmd+1, and gets an item not visible in the panel.
-- Number badges do not update when search text changes.
-
-**Detection phase:** Address during Cmd+1-9 implementation. Decide the mapping rule (visible vs unfiltered) before writing any code.
-
-**Confidence:** HIGH -- this is a fundamental UX design decision, not a technical uncertainty.
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Storage dashboard shows bytes only (e.g., "142,387,456 bytes") | Numbers are meaningless to users. Cannot compare or act on them | Show human-readable sizes ("135.7 MB") with breakdown by type: "Images: 120 MB (312 items), Text: 8 MB (4,201 items), URLs: 7 MB (890 items)" |
+| "Compact Database" button with no progress indicator | User clicks, app freezes, user force-quits (the worst outcome during compaction) | If offering any long operation, show a progress indicator. Better: don't offer VACUUM (see Pitfall 5) |
+| Mark-as-sensitive requires two-step confirmation | Every mark action: right-click, "Mark Sensitive," confirm dialog. Friction discourages use | Single action with undo support. Right-click, "Mark Sensitive," done. Show a brief toast "Marked as sensitive. Undo?" for 3 seconds |
+| Blur radius is too low (partially readable) or too high (obliterates card shape) | Too low: text is guessable. Too high: user cannot distinguish between sensitive items | Use `blur(radius: 10)` (tested: sufficient to make text unreadable at callout font size). Overlay a lock icon or "Sensitive" label so the card is identifiable without revealing content |
+| Click-to-reveal has no auto-re-hide | User reveals sensitive content, walks away from desk. Content remains visible indefinitely | Auto-re-hide after 10 seconds of no interaction. Or re-hide when the panel closes. Configurable in Settings |
+| Purge operations have no undo | User accidentally purges "all images." Hundreds of screenshots gone. No recovery | Show a confirmation dialog listing what will be deleted ("This will permanently delete 312 images (120 MB). This cannot be undone."). For single-item delete, the existing immediate delete is fine (low impact) |
+| Deduplication runs silently with no user feedback | User copies something, it doesn't appear. They don't know why. They copy it again. Still doesn't appear | When a non-consecutive duplicate is detected, update the existing item's timestamp to bring it to the top of the list. This way, the item "reappears" at the top without creating a true duplicate |
 
 ---
 
-## Minor Pitfalls
+## "Looks Done But Isn't" Checklist
 
-Mistakes that cause annoyance but are straightforward to fix.
+Things that appear complete but are missing critical pieces.
 
-### Pitfall 11: Expanded Color Palette Breaks Existing Labels
-
-**What goes wrong:**
-v1.0 has 8 label colors (`LabelColor` enum: red, orange, yellow, green, blue, purple, pink, gray). v1.1 adds more colors (e.g., teal, indigo, brown, mint). If the new colors are added to the enum but existing labels reference old `colorName` values, there is no issue. However, if the enum is restructured (e.g., changing raw values or reordering), existing labels may lose their color association.
-
-Additionally, if the settings UI uses `LabelColor.allCases` to render the color picker grid, the grid layout changes with more colors. The 8-color grid that fit in one row may now need two rows or a different layout.
-
-**Prevention:**
-- **Only add new cases to `LabelColor`. Never remove, rename, or reorder existing cases.** Raw values are strings stored in the database -- they must remain stable.
-- **Test that existing labels with `colorName = "blue"` still resolve after adding new cases.** The `LabelColor(rawValue:)` initializer must continue to work for all existing values.
-- **Adjust the color picker layout** in `LabelRow` to handle 12+ colors. Consider a 4-column grid instead of a single-row menu.
-
-**Warning signs:**
-- Existing labels show as gray after upgrade (color resolution failed).
-- Color picker grid is too wide for the settings window.
-
-**Detection phase:** Address during label color palette expansion. Quick test: create labels with each existing color, add new colors, verify existing labels still show correctly.
-
-**Confidence:** HIGH -- enum expansion is straightforward; the risk is only if someone changes existing raw values.
+- [ ] **Image compression:** Looks done when screenshots compress smaller -- but verify paste-back quality with text-heavy screenshots, transparent PNGs, and pixel art. Test in Figma, Photoshop, and Preview.
+- [ ] **Deduplication:** Looks done when identical text is deduplicated -- but verify with near-duplicates (trailing newline, different whitespace), and verify images with different content but same 4KB prefix are NOT falsely deduplicated.
+- [ ] **Storage dashboard:** Looks done when showing total size -- but verify it includes WAL/SHM files, image directory size (not just database), and that it updates after purge operations.
+- [ ] **Blur redaction:** Looks done when text is visually blurred -- but test with VoiceOver (does it read the content?), test with screenshot (is content captured?), test with large text (is it still readable at any angle?).
+- [ ] **Click-to-reveal:** Looks done when click toggles blur -- but verify state resets when panel closes, verify reveal does not persist across app restarts (it's a transient view state, not a model property), verify keyboard navigation still works on revealed items.
+- [ ] **Sensitive auto-expiry:** Looks done when items expire -- but verify expiry survives app restart (uses date comparison, not in-memory timer), verify the user understands the item will be deleted (not just hidden), verify expiry does not affect non-sensitive items using the same `expiresAt` field.
+- [ ] **Purge by category:** Looks done when items are removed from the list -- but verify disk files are cleaned up (check images directory manually), verify the database size decreases (may need WAL checkpoint), verify item count updates correctly.
+- [ ] **New SwiftData fields:** Looks done when the app runs on a fresh database -- but verify migration from v1.1 database with existing items. All new fields must be `Optional` with `nil` default.
 
 ---
-
-### Pitfall 12: OG Image Fetching for Non-HTML URLs
-
-**What goes wrong:**
-Not all URLs point to HTML pages with Open Graph tags. The metadata fetcher receives:
-1. **Direct image URLs** (`https://example.com/photo.png`) -- fetching this returns raw image data, not HTML. Parsing it as HTML produces nothing.
-2. **PDF URLs** (`https://example.com/document.pdf`) -- returns PDF binary data.
-3. **API endpoints** (`https://api.example.com/v1/users`) -- returns JSON, not HTML.
-4. **Redirect chains** -- URL redirects through multiple 301/302 hops before landing on the final page. The initial fetch may timeout during redirects.
-5. **Login walls** -- the page returns a login form instead of the actual content. The OG tags on the login page are generic ("Sign In | Example.com").
-
-**Prevention:**
-- **Check Content-Type header before parsing.** Only parse `text/html` responses for OG tags. For `image/*` responses, use the URL itself as the preview. For other types, skip metadata fetching.
-- **Follow redirects up to a limit (3 hops).** URLSession follows redirects by default, but set a maximum to avoid redirect loops.
-- **Parse only the `<head>` section.** Do not download the entire HTML body. Read the first 16KB of the response -- OG tags are always in `<head>`, which is near the top of the document. This saves bandwidth and avoids downloading multi-megabyte pages.
-- **Handle common meta patterns:** Open Graph (`og:title`, `og:image`, `og:description`), Twitter Cards (`twitter:title`, `twitter:image`), and standard HTML (`<title>`, `<link rel="icon">`).
-
-**Warning signs:**
-- Image URLs show a blank preview instead of the image.
-- API endpoints show "Sign In" as the title.
-- Metadata fetch downloads the entire page (multi-MB response bodies).
-
-**Detection phase:** Address during URL metadata parser implementation.
-
-**Confidence:** MEDIUM -- OG parsing patterns are well-known from web scraping, but the specific interaction with various URL types needs testing.
-
----
-
-### Pitfall 13: Number Badges Overlap with Label Chips on Cards
-
-**What goes wrong:**
-Adding Cmd+1-9 number badges to the first 9 cards introduces a visual element that must coexist with the existing card layout: source app icon, timestamp, content preview, and (for labeled items) the label chip. If the badge is placed in a corner, it may overlap with:
-- The source app icon (top-left).
-- The timestamp (top-right).
-- The content preview area (center).
-- The label indicator (if shown on the card).
-
-In horizontal mode (top/bottom edges), the fixed 260pt card width means even less space.
-
-**Prevention:**
-- **Place the badge in a consistent position that does not conflict.** Top-left corner over the source app icon area, or as a subtle inline number before the content preview.
-- **Only show badges when the panel is open and Cmd+1-9 is active.** Do not always show numbers -- it adds clutter. Show them on hover of the number key area, or always show for the first 9 items.
-- **Use small, semi-transparent circular badges** (12-14pt) that do not dominate the card visual hierarchy.
-- **Test in both vertical and horizontal modes.** The badge position must work in both layouts.
-
-**Warning signs:**
-- Badges overlap timestamps in horizontal mode.
-- Badges are not visible against certain card backgrounds (dark badge on dark card).
-
-**Detection phase:** Address during card UI update for number badges.
-
-**Confidence:** HIGH -- layout overlaps are straightforward to identify during development.
-
----
-
-## Integration Pitfalls with Existing v1.0 System
-
-Mistakes specific to adding v1.1 features alongside the existing, working v1.0 architecture.
-
-### Integration Pitfall A: New Optional Fields on ClipboardItem Break Existing @Query Predicates
-
-**What goes wrong:**
-The current `FilteredCardListView` uses `#Predicate<ClipboardItem>` with `textContent?.localizedStandardContains(search)`. Adding new fields (like `ogTitle`, `detectedLanguage`) means search should potentially also match against these new fields. If the predicate is updated to include `ogTitle?.localizedStandardContains(search)` but `ogTitle` is nil for existing items, the predicate must handle the optional correctly.
-
-The existing code already handles this with the `?.method() == true` pattern (documented in quick-003 decision). But new developers adding fields may not follow this pattern, causing predicate crashes.
-
-**Prevention:**
-- **Follow the established optional pattern:** `item.ogTitle?.localizedStandardContains(search) == true`. Never use `!` or `??` in SwiftData predicates (documented in STATE.md decisions).
-- **Update the search predicate to include new searchable fields** (ogTitle) but only after the field is added to the model and migration is tested.
-- **The `.id()` on FilteredCardListView must include all inputs** (documented in quick-003). If new filter dimensions are added, update the `.id()`.
-
-**Warning signs:**
-- Search crashes when a new field is included in the predicate but some items have nil values.
-- Search does not match URL titles (new field not included in predicate).
-
-**Confidence:** HIGH -- the codebase already has patterns and documented decisions for handling this.
-
----
-
-### Integration Pitfall B: Background Metadata Fetching Updates SwiftData from Wrong Thread
-
-**What goes wrong:**
-URL metadata fetching runs on a background thread (URLSession completion handler). When the fetch completes, the code attempts to update the ClipboardItem's `ogTitle` and `ogImagePath` fields. But the `ModelContext` used by `ClipboardMonitor` is `@MainActor` isolated. Updating SwiftData from a background thread causes:
-1. Silent data corruption (writes not visible to the main context).
-2. Crashes with "ModelContext is not thread-safe" assertions.
-3. The UI does not update even though the model was "updated" on the background thread.
-
-**Why it happens:**
-URLSession completionHandlers run on background queues by default. Developers write `item.ogTitle = fetchedTitle` in the completion handler without dispatching to the main thread.
-
-**Specific risk in Pastel's architecture:**
-The `ClipboardMonitor` is `@MainActor @Observable` and uses a `ModelContext` that was created on the main thread. All SwiftData writes must happen on the main actor. The existing image capture already handles this correctly (see `processImageContent` which uses `@MainActor @Sendable` completion handler). URL metadata fetching must follow the same pattern.
-
-**Prevention:**
-- **Dispatch all SwiftData updates to `@MainActor`.** Use `Task { @MainActor in ... }` or `DispatchQueue.main.async { ... }` in the URLSession completion handler.
-- **Follow the existing pattern** from `ImageStorageService.saveImage(data:completion:)` which takes a `@MainActor @Sendable` completion handler.
-- **Alternatively, use Swift concurrency with `async/await` URLSession API** and ensure the SwiftData update happens in a `@MainActor` context:
-  ```swift
-  Task.detached {
-      let metadata = await MetadataFetcher.fetch(url: urlString)
-      await MainActor.run {
-          item.ogTitle = metadata.title
-          try? modelContext.save()
-      }
-  }
-  ```
-
-**Warning signs:**
-- URL cards never show metadata even though fetch logs show success (background thread update invisible to main context).
-- Crash with "ModelContext accessed from wrong thread/actor."
-
-**Confidence:** HIGH -- Swift concurrency and SwiftData threading rules are well-documented. The existing codebase already demonstrates the correct pattern.
-
----
-
-### Integration Pitfall C: Syntax Highlighting Library Adds Significant Binary Size
-
-**What goes wrong:**
-Highlightr bundles highlight.js JavaScript files for ~190 languages. Even though most users only copy code in 3-5 languages, the entire highlight.js bundle is included in the app binary. This can add 2-5 MB to the app size.
-
-For Splash (pure Swift), the binary size impact is minimal (~200KB), but it only supports Swift syntax.
-
-**Prevention:**
-- **If using Highlightr:** Check if the library supports selective language inclusion. Some highlight.js builds allow choosing only specific languages. If not, accept the size increase.
-- **If using Splash:** Accept the limitation to Swift-only highlighting. For a macOS developer tool, this may be sufficient.
-- **Consider a hybrid approach:** Use Splash for Swift, and a lightweight custom highlighter (regex-based token coloring) for 4-5 other common languages (Python, JavaScript, HTML, CSS, JSON). This avoids the full highlight.js bundle while covering the most common languages.
-- **Profile the actual size impact** during implementation. If 2-5 MB is acceptable for the app, Highlightr is the easiest path. For a clipboard manager, binary size is unlikely to be a user concern.
-
-**Warning signs:**
-- App binary size jumps from ~5MB to ~10MB after adding highlighting library.
-- If distributing directly (not App Store), this is less of a concern. If App Store, size impacts download/update speed.
-
-**Confidence:** MEDIUM -- Highlightr's bundle size is based on training knowledge. The actual impact should be measured during implementation.
-
----
-
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation | Severity |
-|---|---|---|---|
-| Code detection heuristic | False positives on non-code text (Pitfall 1) | Use multi-signal detection, high confidence threshold, keep as display enrichment not content type | HIGH |
-| Syntax highlighting integration | Main thread blocking, JSContext init cost (Pitfall 2) | Async highlighting with caching, truncate input, single instance init at startup | HIGH |
-| URL metadata fetching | Blocking clipboard capture, private URL leaks (Pitfall 3) | Decouple from capture pipeline, background fetch with timeout, skip private IPs | HIGH |
-| Cmd+1-9 hotkeys | Global conflict with browser/app shortcuts (Pitfall 4) | Panel-open only via local event monitor, not global Carbon registration | CRITICAL |
-| SwiftData schema changes | Migration failure for existing users (Pitfall 5) | All new fields optional with nil default, test migration from v1.0 database | HIGH |
-| Color detection regex | Matches git hashes, non-color hex strings (Pitfall 6) | Only detect when entire content is a color value, validate ranges | MEDIUM |
-| Label emoji storage | Unicode complexity, fixed-width layout issues (Pitfall 7) | Store as String?, fixed frame for emoji slot, curated picker | MEDIUM |
-| URL metadata deduplication | Redundant fetches for same URL (Pitfall 8) | Debounce, deduplicate by normalized URL, cache results | MEDIUM |
-| Highlighting cache invalidation | Recomputed on every scroll in LazyVStack (Pitfall 9) | Cache AttributedString by content hash, prefetch on capture | MEDIUM |
-| Number-to-item mapping with filters | Cmd+N pastes wrong item when filtered (Pitfall 10) | Always map to visible (filtered) list, update badges on filter change | MEDIUM |
 
 ## Recovery Strategies
 
-If pitfalls occur despite prevention, how to recover.
+When pitfalls occur despite prevention, how to recover.
 
 | Pitfall | Recovery Cost | Recovery Steps |
-|---|---|---|
-| Code detection false positives (1) | LOW | Tighten heuristic, reprocess existing items. No data loss since code is a display enrichment, not a content type change. |
-| Highlighting crashes (2) | LOW | Wrap in try-catch, fall back to plain text. No data loss. Fix crash cause and re-ship. |
-| Metadata fetching blocks capture (3) | MEDIUM | Refactor to decouple fetch from capture. Existing items unaffected. New items need metadata backfill. |
-| Global hotkey conflicts (4) | MEDIUM | Switch from global to panel-open-only. Requires rewriting hotkey registration but no data loss. |
-| SwiftData migration failure (5) | HIGH | If shipped to users with a broken migration, recovery requires providing a migration fix or database reset tool. Test before shipping. |
-| Color regex too greedy (6) | LOW | Tighten regex. Reprocess existing items. Only display is affected. |
-| Emoji layout breakage (7) | LOW | Fix frame sizing. No data loss. |
-| URL fetch deduplication (8) | LOW | Add cache/dedup layer. Delete redundant cached files. |
-| Highlighting recomputation (9) | LOW | Add caching layer. No data loss. Performance improves immediately. |
-| Wrong item paste with filters (10) | LOW | Fix mapping to use visible list. No data loss (wrong content may have been pasted, but clipboard history is intact). |
+|---------|---------------|----------------|
+| Lossy compression damaged stored images | HIGH | No recovery for already-compressed images. Revert to PNG storage for new captures. Communicate to users that previously compressed images cannot be restored |
+| Purge left orphan files on disk | LOW | Run orphan file cleanup: scan images directory, cross-reference with SwiftData records, delete unreferenced files. Automate as periodic task |
+| Purge left orphan SwiftData records | MEDIUM | Scan all ClipboardItems with non-nil `imagePath`. Check if file exists. Delete records where file is missing. Show "Image unavailable" placeholder while cleanup runs |
+| Sensitive item content leaked in logs | LOW | Remove logging of content. Cannot recall already-written logs. File rotation will eventually clear old entries. No user-facing impact unless logs were exfiltrated |
+| VoiceOver reads blurred content | LOW | Add accessibility label override. Fix in next update. No data loss |
+| VACUUM corrupted database | HIGH | If app crashes during VACUUM: check if the database is recoverable. If not, restore from Time Machine or start fresh. This is why VACUUM should not be offered (Pitfall 5) |
+| `isConcealed` and `isSensitive` conflated | MEDIUM | Add new `isSensitive` field via migration. Write a one-time migration script to move user-marked items from `isConcealed` to `isSensitive`. Reset `expiresAt` for items that should not auto-expire |
+| Hash instability after compression | MEDIUM | Recompute hashes for all items from their stored content. Update `contentHash` field. Run dedup pass to find any duplicates that slipped through |
+| Auto-expiry deleted items user wanted | HIGH | No recovery -- items are permanently deleted. This is why auto-expiry should be opt-in with clear UI warning. Consider a "recently deleted" holding area (like Photos) for future versions |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+How roadmap phases should address these pitfalls.
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Lossy image compression (1) | Image compression phase | Paste-back test: copy screenshot with text + transparency, compress, paste into Figma/Preview, verify pixel-perfect match |
+| Non-atomic purge operations (2) | Storage management / purge phase | Kill app during bulk purge (force quit). Restart. Verify no orphan files AND no orphan records. Run orphan cleanup |
+| False security from "Mark Sensitive" (3) | Sensitive item marking phase | Review all UI strings for security claims. Open SQLite database directly and verify sensitive content is readable (confirming honest UI language) |
+| Dedup hash collision / instability (4) | Deduplication phase | Create two images with same EXIF but different pixels. Verify both are stored. Change compression settings. Verify existing hashes unchanged |
+| VACUUM corruption risk (5) | Storage dashboard phase | Decision: do NOT implement VACUUM. Verify storage management achieves user goals without compaction |
+| Blur bypassed by VoiceOver (Security) | Blur redaction phase | Enable VoiceOver. Navigate to a blurred sensitive card. Verify VoiceOver reads "Sensitive item" not the actual content |
+| Click-to-reveal state persistence (UX) | Click-to-reveal phase | Reveal a sensitive item. Close panel. Reopen panel. Verify item is re-blurred. Quit app. Relaunch. Verify still blurred |
+| Auto-expiry data loss (UX) | Auto-expiry phase | Mark item sensitive with auto-expiry. Quit app. Wait past expiry time. Relaunch. Verify item is deleted. Verify the UI warned about expiry before it happened |
 
 ---
 
 ## Sources
 
-- Training knowledge of macOS APIs: NSPasteboard, SwiftData migration, NSPanel, Carbon hotkeys, URLSession (HIGH confidence -- these are mature, stable Apple APIs)
-- Training knowledge of Highlightr (highlight.js wrapper for Swift): JSContext initialization patterns, bundle size (MEDIUM confidence -- verify current version and performance characteristics)
-- Training knowledge of Splash (JohnSundell): Pure Swift syntax highlighting, Swift-only language support (MEDIUM confidence -- verify current maintenance status)
-- Training knowledge of SwiftUI LazyVStack lifecycle, view recreation patterns (HIGH confidence -- well-documented by Apple)
-- Training knowledge of Open Graph protocol and metadata fetching patterns (HIGH confidence -- OG is a stable web standard)
-- Training knowledge of Unicode emoji handling in Swift (HIGH confidence -- Swift's String/Character model is well-documented)
-- Patterns from existing Pastel codebase: ClipboardMonitor, PasteService, PanelController, FilteredCardListView (HIGH confidence -- direct code inspection)
-
-**Note on confidence:** WebSearch and WebFetch were unavailable during this research session. All findings are based on training knowledge of well-established macOS APIs, common integration patterns, and direct analysis of the existing Pastel codebase. Library-specific claims (Highlightr performance, Splash capabilities) should be verified against current documentation before implementation. The core pitfalls (hotkey conflicts, migration failures, threading issues, false positive detection) are based on fundamental patterns that are highly unlikely to have changed.
+- [SQLite VACUUM documentation](https://sqlite.org/lang_vacuum.html) -- VACUUM failure conditions, disk space requirements, WAL interaction (HIGH confidence)
+- [SwiftData pitfalls -- Wade Tregaskis](https://wadetregaskis.com/swiftdata-pitfalls/) -- auto-save failure, relationship corruption (MEDIUM confidence -- opinionated blog, but findings verified against Apple Forums)
+- [Key Considerations Before Using SwiftData -- Fat Bob Man](https://fatbobman.com/en/posts/key-considerations-before-using-swiftdata/) -- batch operation limitations, performance hierarchy (MEDIUM confidence)
+- [Apple Developer Forums: macOS 15 NSWindow.sharingType](https://developer.apple.com/forums/thread/792152) -- ScreenCaptureKit ignores sharingType on macOS 15+ (HIGH confidence -- Apple Forums, multiple confirmations)
+- [Clipboard security -- Ctrl Blog](https://www.ctrl.blog/entry/clipboard-security.html) -- clipboard manager security fundamentals, plaintext storage risks (HIGH confidence)
+- [OSLog privacy documentation](https://developer.apple.com/documentation/os/oslogprivacy) -- log privacy markers for sensitive data (HIGH confidence -- official Apple docs)
+- [Hash collision risks in deduplication](https://backupcentral.com/de-dupe-hash-collisions/) -- silent data loss from false positive matches (HIGH confidence)
+- [SQLite forum: Does VACUUM ever result in data loss](https://sqlite.org/forum/info/3bd787a793af66aaaa41898374160bceee7fca52c995c2351279b642162f662d) -- VACUUM safety during concurrent access (HIGH confidence -- official SQLite forum)
+- [Prevent screenshot capture of sensitive SwiftUI views](https://www.createwithswift.com/prevent-screenshot-capture-of-sensitive-swiftui-views/) -- iOS-only UITextField technique, not applicable to macOS (MEDIUM confidence)
+- [SwiftData batch delete -- Fat Bob Man](https://fatbobman.com/en/snippet/how-to-batch-delete-data-in-swiftdata/) -- batch delete API, save requirement (MEDIUM confidence)
+- Direct analysis of Pastel codebase: `ImageStorageService.swift`, `RetentionService.swift`, `ClipboardMonitor.swift`, `ExpirationService.swift`, `ClipboardItem.swift`, `PasteService.swift`, `ClipboardCardView.swift` (HIGH confidence -- source code inspection)
 
 ---
-*Pitfalls research for: Pastel v1.1 Rich Content & Enhanced Paste*
-*Researched: 2026-02-06*
+*Pitfalls research for: Pastel v1.2 Storage & Security*
+*Researched: 2026-02-07*

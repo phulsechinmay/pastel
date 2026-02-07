@@ -1,243 +1,301 @@
 # Project Research Summary
 
-**Project:** Pastel v1.1 -- Rich Content & Enhanced Paste
-**Domain:** Native macOS Clipboard Manager (enrichment layer on shipped v1.0)
+**Project:** Pastel v1.2 Storage & Security
+**Domain:** macOS Clipboard Manager (storage optimization and sensitive content protection)
 **Researched:** 2026-02-07
-**Confidence:** MEDIUM-HIGH
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Pastel v1.1 adds five feature areas to a stable v1.0 foundation: code snippet detection with syntax highlighting, color value detection with swatches, URL preview cards with auto-fetched Open Graph metadata, Cmd+1-9 direct paste hotkeys, and label emoji with an expanded color palette. All four research streams agree on the core approach: v1.1 is an enrichment layer that adds new optional metadata fields to the existing ClipboardItem model and introduces three new detection/fetch services, with no changes to the existing content ingestion pipeline's control flow. The v1.0 architecture is well-suited for these additions -- ClipboardMonitor is the single ingestion point, ContentType drives card routing, and SwiftData lightweight migration handles new optional fields cleanly.
+Pastel v1.2 adds storage optimization and sensitive item protection to an established macOS clipboard manager. The storage problem is acute: users copying 20 screenshots per day accumulate 1.2-4.8 GB over the default 3-month retention without compression. Research confirms JPEG compression at quality 0.85 provides 5-10x storage savings with negligible visual degradation for clipboard previews. All features are implementable using zero new third-party dependencies — exclusively Apple frameworks already imported (ImageIO, SwiftUI, SwiftData, Foundation).
 
-The recommended approach minimizes new dependencies. Only one new third-party library is needed: Highlightr for syntax highlighting (190+ language grammars with auto-detection). Everything else uses Apple frameworks (LinkPresentation for URL metadata), the already-installed KeyboardShortcuts library (for Cmd+1-9 hotkeys), or pure Swift (color detection regex, emoji input). There is a key disagreement between researchers on two topics -- whether to add `.code`/`.color` as new ContentType enum cases vs. treating them as display enrichments on `.text`, and whether to use Highlightr vs. a custom regex-based highlighter. These are resolved below with clear recommendations.
+The recommended architecture extends existing patterns cleanly: ImageStorageService gains JPEG compression, RetentionService adds a sensitive-item purge pass, and ClipboardCardView adds blur redaction with click-to-reveal. The critical design decision is maintaining paste-back fidelity: recent images (under 24 hours) should preserve original quality, with compression applied only to older items for display purposes. For sensitive items, blur-based visual redaction without encryption is honest and appropriate — the database is already plaintext on disk, protected by macOS FileVault.
 
-The three highest risks are: (1) Cmd+1-9 global hotkey conflicts with browsers and other apps -- this is the single decision most likely to cause user frustration if handled incorrectly; (2) URL metadata fetching introducing network I/O into a previously offline capture pipeline -- must be fully decoupled from clipboard capture; (3) SwiftData schema migration when adding new fields -- all fields must be optional with nil defaults, tested against a v1.0 database before shipping. The label emoji and color detection features are low risk and should be built first.
+Key risks center on lossy compression degrading paste-back quality (especially transparent PNGs and text-heavy screenshots) and non-atomic purge operations leaving orphan files or records. Both are avoidable: compression must preserve originals for paste-back or use very conservative quality settings (0.85+), and purge operations must delete SwiftData records first, then clean up disk files with reconciliation tasks for partial failures. The storage dashboard is genuinely novel — no surveyed competitor offers visual storage breakdowns or category-based purge tools.
 
 ## Key Findings
 
 ### Recommended Stack
 
-v1.1 requires only one new third-party dependency. The existing stack (Swift 6, SwiftUI+AppKit hybrid, SwiftData, KeyboardShortcuts 2.4.0, LaunchAtLogin-Modern 1.1.0) is unchanged and validated.
+All v1.2 capabilities use Apple first-party frameworks already available on macOS 14+. Zero new third-party dependencies are required. The existing Pastel stack (Swift 6.0, SwiftUI + AppKit hybrid, SwiftData, ImageIO, CryptoKit) handles all new features.
 
-**New and reused technologies:**
+**Core technologies:**
+- **ImageIO (CGImageDestination)**: JPEG compression at configurable quality (0.7-1.0, default 0.85) — 5-10x storage savings vs current PNG storage, universally compatible paste-back, hardware-accelerated encoding
+- **SwiftUI (.blur modifier)**: Sensitive content redaction with Gaussian blur (radius 10) plus lock icon overlay — more intuitive than .redacted(reason:) gray boxes, works with images and text, available since SwiftUI 1.0
+- **SwiftData (Optional fields)**: isSensitive flag, isCompressed flag, originalByteCount metadata — automatic lightweight migration handles additive fields with nil defaults
+- **FileManager (URLResourceValues)**: Storage dashboard disk usage calculation via directory enumeration with totalFileAllocatedSize — accurate filesystem space accounting
+- **CryptoKit (SHA256)**: Extend existing contentHash deduplication to bubble re-copied items to top — same infrastructure as v1.0, behavior change not stack change
+- **ByteCountFormatter**: Human-readable storage sizes for dashboard ("2.3 MB" not "2415919 bytes") — Foundation utility since macOS 10.8
 
-- **Highlightr** (`from: "2.2.0"`, VERIFY): Syntax highlighting via highlight.js -- 190+ languages, auto-detection, dark themes. The only new SPM dependency. MEDIUM confidence (verify current version, Swift 6 compatibility, maintenance status on GitHub before adding).
-- **LinkPresentation (LPMetadataProvider)**: Apple first-party framework for URL metadata extraction -- title, favicon, og:image. Ships with macOS 10.15+, zero dependencies. HIGH confidence.
-- **KeyboardShortcuts (existing, v2.4.0)**: Already installed. Supports `.one` through `.nine` key constants, `Shortcut` construction, `enable/disable` API. Verified against checked-out source. HIGH confidence.
-- **Pure Swift regex**: Color detection (hex/rgb/hsl patterns) and code detection heuristic. No library needed. HIGH confidence.
-- **SwiftUI native colors**: `.teal`, `.indigo`, `.brown`, `.mint` available on macOS 14+ for expanded label palette. HIGH confidence.
-
-**Stack items explicitly rejected:**
-- Splash (Swift-only highlighting -- insufficient for a clipboard manager that captures all languages)
-- TreeSitter (heavyweight grammar binaries, overkill for preview cards)
-- WKWebView for code rendering (performance disaster in scrolling lists)
-- SwiftSoup/Kanna for HTML parsing (LPMetadataProvider handles this)
-- Raw Carbon RegisterEventHotKey (duplicates KeyboardShortcuts, more error-prone)
+**What NOT to use:**
+- HEIC compression (2x slower decode vs JPEG, paste compatibility issues)
+- .redacted(reason: .privacy) (looks like loading skeleton, not hidden content)
+- SwiftData #Expression aggregate queries (macOS 15+ only, limited sum/avg support)
+- Direct SQLite VACUUM (risky with active SwiftData context, corruption potential)
 
 ### Expected Features
 
-**Must have (table stakes):**
-- Monospaced, syntax-highlighted code previews with auto language detection
-- Color swatch rendering for hex and rgb values alongside original text
-- URL cards showing page title and domain (fetched from page metadata)
-- Non-blocking URL metadata fetch with graceful fallback to plain URL card
-- Cmd+Shift+1-9 hotkeys to paste Nth item without opening panel
-- Enable/disable toggle for quick paste hotkeys in Settings
-- Expanded label color palette (8 to 12 colors)
-- Optional emoji per label replacing color dot when set
-- Backward-compatible SwiftData migration for all model changes
+Research confirms strong user expectations around storage visibility and sensitive content protection. No surveyed competitor (Maccy, PastePal, Paste 2, CopyClip) offers a storage dashboard or visual breakdown by content type.
 
-**Should have (differentiators):**
-- Language badge on code cards ("Swift", "Python")
-- Favicon display on URL cards
-- og:image header on URL cards (progressive enhancement)
-- Position number badges (1-9) on panel cards when hotkeys active
-- Alternate color format display (copy hex, see rgb and vice versa)
-- System emoji picker access via Ctrl+Cmd+Space in label settings
+**Must have (table stakes):**
+- Image compression for storage savings (images are the #1 disk consumer)
+- Duplicate bubble-up on re-copy (every major clipboard manager does this)
+- Total storage usage display (users need to know app footprint)
+- Mark item as sensitive (manual, not auto-detect)
+- Blur/redact sensitive items in panel
+- Click-to-reveal for sensitive content
+- Purge all items (already exists in v1.0)
+
+**Should have (competitive advantage):**
+- Storage dashboard with visual breakdown by content type (donut chart or progress bars)
+- Purge by content type (targeted cleanup without losing everything)
+- Configurable sensitive item expiry (1h, 4h, 24h, same as global)
+- Auto-re-blur after timed reveal (security-conscious re-hiding after 10s)
+- Item count by type in dashboard
+- Database compaction button (optional, see pitfall concerns)
 
 **Defer (v2+):**
-- Full webpage screenshot thumbnails
-- TreeSitter-grade syntax accuracy
-- User-selectable language per code item
-- Custom hex color input for labels
-- Per-slot custom hotkey assignment (snippet/template territory)
-- Configurable modifier key for quick paste hotkeys
-- HUD overlay showing paste preview near cursor
+- HEIC compression (wait for decode performance improvements)
+- Perceptual image deduplication (pHash is overkill for clipboard use case)
+- Auto-detect sensitive content (regex for CC#/SSN has false positive risk)
+- Encrypted database (complexity without real security gain given FileVault)
+- Purge by age within type (compound filter, stretch goal)
 
 ### Architecture Approach
 
-The v1.0 architecture has clean separation and well-defined extension points. v1.1 adds three new services (CodeDetectionService, ColorDetectionService, URLMetadataService), two new card views (CodeCardView, ColorCardView/ColorSwatchView), and enhances the existing URLCardView. All detection runs at capture time in ClipboardMonitor, and results are stored as optional fields on ClipboardItem. Card routing in ClipboardCardView dispatches to type-specific subviews based on ContentType and the presence of new metadata fields.
+The existing architecture provides clean integration points for all v1.2 features. No major structural changes needed — services remain singleton or @MainActor-bound, SwiftData continues with automatic lightweight migration, and view-layer changes are contained to existing card components.
 
-**New services:**
-1. **CodeDetectionService** -- Heuristic code detection (shebang, keywords, structural patterns, indentation). Pure function, no dependencies.
-2. **ColorDetectionService** -- Regex-based color parsing (hex/rgb/hsl). Pure function, no dependencies.
-3. **URLMetadataService** -- Async LPMetadataProvider fetch with 5s timeout. Fire-and-forget after item insertion. Disk caching for favicon/og:image via existing ImageStorageService.
+**Major components:**
 
-**New views:**
-1. **CodeCardView** -- Syntax-highlighted preview via Highlightr, language badge, monospaced font.
-2. **ColorSwatchView** -- Rounded rectangle swatch + original text value.
+1. **ImageStorageService (modified)**: Add JPEG compression in saveImage() method — change from PNG output to JPEG at configurable quality (0.85 default), preserve thumbnails as PNG (already small), add directory size calculation for storage dashboard, add bulk PNG-to-JPEG migration on first v1.2 launch
 
-**Model additions (all optional, nil default):**
-- ClipboardItem: `detectedLanguage`, `detectedColorHex`, `urlTitle`, `urlFaviconPath`, `urlPreviewImagePath`, `urlMetadataFetched`
-- Label: `emoji`
-- LabelColor enum: 4 new cases (teal, indigo, brown, mint)
-- ContentType enum: 2 new cases (.code, .color)
+2. **StorageStatsService (new)**: Compute storage statistics on demand for dashboard — calculate total disk usage via FileManager enumeration, fetch item counts by type using SwiftData fetchCount with predicates, cache results briefly (30s) to avoid re-scanning on every dashboard view
+
+3. **SensitiveContentDetector (new)**: Heuristic detection at capture time — check source app bundle ID against known password managers (1Password, Bitwarden, Keychain Access), pattern match API keys (sk-, Bearer, ghp-), conservative approach to avoid false positives, struct with static methods (no state)
+
+4. **RetentionService (modified)**: Add sensitive-item purge pass — extend existing hourly purge with second pass for isSensitive items using configurable sensitiveRetention hours, reuse existing disk cleanup pattern, runs sequentially after normal retention purge
+
+5. **ClipboardCardView (modified)**: Add blur redaction and click-to-reveal — @State private var isRevealed for ephemeral reveal state (resets on panel close), conditional rendering of sensitiveContentPlaceholder vs actual content, auto-hide timer after 10s reveal, context menu "Mark as Sensitive" toggle
+
+6. **StorageSettingsView (new)**: New Settings tab for storage dashboard — donut chart or progress bars showing breakdown by type, purge-by-category buttons with confirmation, image compression quality slider, sensitive retention picker, displays human-readable sizes via ByteCountFormatter
+
+**Data flow changes:**
+- Capture pipeline: Add SensitiveContentDetector.detect() call after content classification, set isSensitive flag before modelContext.insert()
+- Rendering pipeline: ClipboardCardView checks isSensitive && !isRevealed to render placeholder instead of actual content
+- Retention pipeline: RetentionService runs two passes (normal retention, then sensitive retention with shorter window)
+- Deduplication: Replace isDuplicateOfMostRecent check with findExistingItem(contentHash:) for full-history dedup with timestamp bump
 
 ### Critical Pitfalls
 
-1. **Cmd+1-9 global hotkey conflicts (CRITICAL)** -- Cmd+1-9 are used by Safari, Chrome, Finder, Terminal, and most editors for tab/view switching. Registering them globally via Carbon breaks basic functionality in those apps. **Prevention:** Use Cmd+Shift+1-9 as the default modifier. Provide a Settings toggle to enable/disable.
+Research identified five critical pitfalls that would cause data loss, broken paste-back, or false security claims requiring major rework. Each has clear prevention strategies.
 
-2. **URL metadata fetching must be decoupled from capture (HIGH)** -- The clipboard capture pipeline is synchronous and offline. Network I/O must never block it. **Prevention:** Insert ClipboardItem immediately, fire async metadata fetch afterward. Update model when metadata arrives. Skip private/local URLs. 5-second timeout. Rate limit to 2-3 concurrent fetches.
+1. **Lossy image compression degrades paste-back quality** — Users copy pixel-perfect screenshots, Pastel compresses to JPEG, paste-back has artifacts. JPEG does not support alpha channel (transparency loss). Prevention: Keep originals as PNG for paste-back, compress only display thumbnails. OR use very conservative quality (0.85+) and never compress images with alpha. Never auto-compress all images globally without user awareness.
 
-3. **SwiftData migration must use optional fields only (HIGH)** -- Adding non-optional fields without defaults crashes on existing databases. **Prevention:** Every new field is `String?` or `Bool` with default. Test migration against a v1.0 database before shipping.
+2. **Purge operations delete disk files but crash before deleting SwiftData records (or vice versa)** — Non-atomic deletion leaves orphan records (broken thumbnails) or orphan files (invisible disk usage). Prevention: Delete SwiftData records FIRST, then clean up disk files. If SwiftData fails, rollback and abort. Collect file paths before deletion. Add orphan file cleanup reconciliation task to catch partial failures.
 
-4. **Code detection false positives (HIGH)** -- Naive heuristics misclassify URLs, config text, and prose as code. **Prevention:** Multi-signal scoring with high threshold (3+), minimum line count, negative signals for natural language. Test with diverse non-code clipboard content.
+3. **"Mark as Sensitive" creates false sense of security while data remains plaintext on disk** — Users mark API keys as "sensitive," feel protected, but content is plaintext in SQLite database readable with sqlite3 command. Prevention: Be honest in UI — use "redacted" or "hidden from view" language, NOT "secure" or "encrypted." Add tooltip: "This item is hidden in the panel. It is still stored on your Mac." Rely on macOS FileVault for at-rest encryption. Separate isSensitive (user-marked, persists) from isConcealed (auto-detected, 60s expiry).
 
-5. **Syntax highlighting performance (MEDIUM)** -- Highlightr uses JavaScriptCore with ~100ms cold start. **Prevention:** Initialize once at app launch, highlight asynchronously, cache results by content hash. Truncate input to ~2000 chars for preview cards. Never highlight synchronously in view body.
+4. **Content deduplication silently drops different content that hashes the same** — Image hashing uses only first 4KB (header collision risk for different images with same EXIF). If compression changes image bytes, same logical image has different hash before/after. Prevention: Hash more than 4KB for images (at least 64KB or full file), compute hash from ORIGINAL data before compression and never recompute after compression, consider whether @Attribute(.unique) global dedup is desired vs consecutive-only dedup.
 
-## Key Disagreements Resolved
-
-### ContentType Enum: New Cases vs. Display Enrichment
-
-**STACK.md and FEATURES.md** recommend adding `.code` and `.color` cases to ContentType. **ARCHITECTURE.md and PITFALLS.md** recommend keeping these as display enrichments (optional metadata fields) on `.text` items, with no new enum cases.
-
-**Resolution: Add `.code` and `.color` to ContentType.** ContentType is stored as a raw String and new enum cases are additive -- they do not break existing predicates. New items get the new types; existing items remain `.text`. The benefit is cleaner card routing (switch on type rather than checking nullable fields) and clearer semantics in the data model. The detection priority order (URL > color > code > text) prevents ambiguity. Ensure all existing `switch` statements on ContentType gain the new cases.
-
-### Syntax Highlighting: Highlightr vs. Custom Regex
-
-**STACK.md and FEATURES.md** recommend Highlightr for its 190+ language coverage and auto-detection. **ARCHITECTURE.md** recommends a custom regex-based highlighter to avoid the JavaScript dependency. **PITFALLS.md** notes Highlightr's JSContext overhead and suggests Splash as an alternative.
-
-**Resolution: Use Highlightr.** A clipboard manager captures code from every language. A custom regex highlighter covering 5-10 languages provides a degraded experience for users copying Python, Ruby, SQL, YAML, or shell scripts. Highlightr's auto-detection is the key value -- it eliminates the need for language-specific detection heuristics. The ~2MB bundle size is negligible for a desktop app. The JSContext cold start (~100ms) is mitigated by initializing once at app launch. If Highlightr proves unmaintained or incompatible with Swift 6, fall back to the custom regex approach as a contingency.
-
-### Hotkey Default Modifier
-
-**STACK.md** recommends Cmd+1-9 defaulting to DISABLED. **FEATURES.md** recommends Ctrl+1-9 as default. **ARCHITECTURE.md** recommends Cmd+Shift+1-9. **PITFALLS.md** recommends panel-open-only via local event monitor.
-
-**Resolution: Cmd+Shift+1-9, globally registered, enabled by default, with Settings toggle.** Cmd+Shift+1-9 conflicts with nothing in standard macOS apps. Global registration (not panel-open-only) provides the core value -- pasting without opening the panel. A Settings toggle allows users to disable if needed. This avoids the NSPanel local event monitor complexity flagged by the pitfalls researcher while keeping the feature accessible out of the box.
+5. **Database compaction (VACUUM) corrupts data or fails under active use** — VACUUM requires 2x disk space, fails if transaction is open, blocks writes, can corrupt if app crashes during operation. ClipboardMonitor polls every 0.5s creating high collision risk. Prevention: Do NOT implement VACUUM as user-facing feature. SQLite auto-reuses deleted pages. Offer "Delete by type" and "Delete by age" instead of compaction. If compaction is truly needed, use VACUUM INTO (creates copy without modifying original).
 
 ## Implications for Roadmap
 
-Based on combined research, the five feature areas should be organized into 4 phases, ordered by dependency depth, risk level, and feature completeness.
+Based on dependency analysis and risk mitigation priorities, the recommended phase structure separates storage optimization from sensitive content protection, with foundational work first and UI/management last.
 
-### Phase 1: Data Model + Label Enhancements
+### Phase 1: Image Compression Foundation
+**Rationale:** Immediately reduces storage growth rate with minimal risk. No model changes. Isolated to ImageStorageService. Zero impact on existing features. Delivers tangible storage savings before any other v1.2 work.
 
-**Rationale:** Schema changes must come first because every subsequent phase depends on the new model fields. Label enhancements are the lowest-risk feature and can ship alongside the schema changes to provide immediate visual value.
+**Delivers:** JPEG compression at quality 0.85 for stored images, 5-10x storage reduction vs current PNG storage, compression quality slider in Settings
 
-**Delivers:**
-- New optional fields on ClipboardItem (detectedLanguage, detectedColorHex, urlTitle, urlFaviconPath, urlPreviewImagePath, urlMetadataFetched)
-- New `.code` and `.color` ContentType cases
-- New `emoji: String?` on Label model
-- Expanded LabelColor enum (teal, indigo, brown, mint)
-- Emoji-or-dot rendering in ChipBarView and context menu
-- Emoji input in LabelSettingsView
-- SwiftData migration validation against v1.0 database
+**Addresses features:**
+- Image compression for storage savings (table stakes)
+- Settings integration (quality slider)
 
-**Features addressed:** Label emoji, expanded color palette
-**Pitfalls addressed:** SwiftData migration (Pitfall 5), emoji storage/layout (Pitfall 7), color palette backward compatibility (Pitfall 11)
+**Avoids pitfalls:**
+- Pitfall 1 (lossy compression): Use conservative 0.85 quality, add alpha channel detection to skip compression for transparent images
+- Verify paste-back quality with text-heavy screenshots and transparent PNGs before declaring phase complete
 
-### Phase 2: Code + Color Detection and Card Views
+**Research flags:** None. JPEG compression via CGImageDestination is well-documented Apple API. Skip phase-specific research.
 
-**Rationale:** Code and color detection are pure-function services with no external dependencies (detection only -- highlighting is also included since it pairs directly with the code card). Building detection and card rendering together provides a complete "rich text cards" experience. Color detection is trivially simple; code detection needs careful threshold tuning.
+### Phase 2: Sensitive Item Model + Detection
+**Rationale:** Adds isSensitive field that rendering and retention depend on. Small model migration. Detection is additive to capture pipeline. Must come before UI redaction but can be built in parallel with Phase 1.
 
-**Delivers:**
-- CodeDetectionService with multi-signal heuristic
-- ColorDetectionService with hex/rgb/hsl regex parsing
-- Detection wired into ClipboardMonitor.processPasteboardContent()
-- CodeCardView with Highlightr syntax highlighting (singleton init, async caching)
-- ColorSwatchView / ColorCardView
-- Updated ClipboardCardView routing for .code and .color types
-- Highlightr SPM dependency added to project.yml
+**Delivers:** isSensitive Bool field on ClipboardItem, SensitiveContentDetector service, "Mark as Sensitive" context menu, auto-detection from password manager apps
 
-**Features addressed:** Code snippet highlighting, color swatches, language badges
-**Pitfalls addressed:** False positive detection (Pitfall 1), highlighting performance (Pitfall 2), scroll caching (Pitfall 9), regex greedy matching (Pitfall 6)
-**Uses:** Highlightr (new SPM dependency)
+**Uses stack:**
+- SwiftData Optional field migration (automatic lightweight)
+- Bundle ID pattern matching (Foundation)
 
-### Phase 3: URL Preview Cards
+**Addresses features:**
+- Mark item as sensitive (table stakes)
+- Foundation for blur redaction and expiry
 
-**Rationale:** URL metadata fetching is the highest-risk feature due to network I/O, async complexity, and edge cases (private URLs, slow servers, non-HTML responses). Build it after the simpler detection features are stable. The existing URLCardView provides a working fallback.
+**Avoids pitfalls:**
+- Pitfall 3 (false security): Use "hidden" language not "secure," separate isSensitive from isConcealed, add tooltip explaining plaintext storage
+- Verify migration from v1.1 database — all new fields must be Optional with nil default
 
-**Delivers:**
-- URLMetadataService with LPMetadataProvider
-- Async fire-and-forget metadata fetch triggered after URL item insertion
-- Enhanced URLCardView showing title + favicon + og:image when available
-- Fallback to globe + URL text on fetch failure
-- Favicon and og:image disk caching via ImageStorageService
-- Image cleanup extension in RetentionService and clearAllHistory
-- Skip logic for private/local URLs
-- Settings toggle to disable URL fetching
+**Research flags:** None. Pattern matching and model migration follow established v1.1 patterns.
 
-**Features addressed:** URL preview cards, favicon display, og:image headers
-**Pitfalls addressed:** Blocking capture pipeline (Pitfall 3), redundant fetches (Pitfall 8), non-HTML URLs (Pitfall 12), background thread SwiftData updates (Integration Pitfall B)
-**Uses:** LinkPresentation framework (Apple, zero dependency)
+### Phase 3: Blur Redaction + Click-to-Reveal
+**Rationale:** Depends on isSensitive field from Phase 2. Pure view-layer change. No data model or service dependencies. Delivers the most visible user-facing feature of v1.2.
 
-### Phase 4: Quick Paste Hotkeys (Cmd+Shift+1-9)
+**Delivers:** Blur overlay for sensitive items (radius 10), lock icon placeholder, click-to-reveal interaction, auto-re-hide after 10s, state management via @State (ephemeral)
 
-**Rationale:** Functionally independent of the card enrichment features. Building it last means the paste pipeline is stable and all card types are rendering correctly. This phase needs Accessibility permission (already granted from v1.0) and careful testing of the hotkey-to-paste flow.
+**Uses stack:**
+- SwiftUI .blur() modifier (macOS 10.15+)
+- DispatchQueue.main.asyncAfter for auto-hide timer
 
-**Delivers:**
-- 9 KeyboardShortcuts.Name definitions (quickPaste1-9, Cmd+Shift+1-9)
-- quickPaste(index:) method on AppState
-- pasteWithoutPanel flow in PasteService (writeToPasteboard + skip monitor + CGEvent)
-- Settings toggle in GeneralSettingsView ("Quick Paste Shortcuts" section)
-- Position number badges (1-9) on first 9 panel cards
-- Correct mapping to visible (filtered) list when panel is open
+**Addresses features:**
+- Blur/redact sensitive items (table stakes)
+- Click-to-reveal (table stakes)
+- Auto-re-blur after reveal (competitive)
 
-**Features addressed:** Cmd+Shift+1-9 direct paste, number badges, settings toggle
-**Pitfalls addressed:** Global hotkey conflicts (Pitfall 4), filter mapping confusion (Pitfall 10), number badge layout overlap (Pitfall 13)
-**Uses:** KeyboardShortcuts (existing, v2.4.0)
+**Avoids pitfalls:**
+- Pitfall 3 (false security): Visual redaction only, no encryption claims
+- Verify VoiceOver reads "Sensitive item" not actual content (accessibility label override)
+- Verify reveal state resets when panel closes (ephemeral @State, not persisted)
+
+**Research flags:** None. SwiftUI blur and state management are standard patterns.
+
+### Phase 4: Sensitive Item Retention
+**Rationale:** Depends on isSensitive field. Extends existing RetentionService. Needs Settings UI from Phase 5 but can ship standalone with hardcoded retention values initially.
+
+**Delivers:** Sensitive-item purge pass in RetentionService (hourly), sensitiveRetention preference (1h/4h/24h/same as global), Settings picker for retention duration
+
+**Uses stack:**
+- SwiftData #Predicate filtering on isSensitive
+- @AppStorage for preference
+- Foundation Timer (existing hourly retention timer)
+
+**Addresses features:**
+- Configurable sensitive item expiry (competitive)
+
+**Avoids pitfalls:**
+- Pitfall 2 (non-atomic purge): Delete SwiftData first, then disk cleanup
+- Auto-expiry should be opt-in (default: same as global) to avoid data loss
+- Clear UI warning that sensitive items will be deleted
+
+**Research flags:** None. Extends existing RetentionService pattern.
+
+### Phase 5: Deduplication Enhancement
+**Rationale:** Improves existing behavior without adding new features. Low risk. Can be done independently but placed here to avoid disrupting capture pipeline while Phases 2-4 are active.
+
+**Delivers:** Bubble-to-top dedup (replace isDuplicateOfMostRecent with findExistingItem), timestamp update on re-copy, existing @Attribute(.unique) remains as safety net
+
+**Uses stack:**
+- SwiftData fetch with contentHash predicate
+- Existing CryptoKit SHA256 hashing
+
+**Addresses features:**
+- Duplicate bubble-up on re-copy (table stakes)
+
+**Avoids pitfalls:**
+- Pitfall 4 (hash instability): Compute hash from original data before compression, never recompute hash after compression
+- Verify image hash covers more than 4KB to avoid false collisions
+
+**Research flags:** None. Extends existing deduplication infrastructure.
+
+### Phase 6: Storage Dashboard + Purge-by-Category
+**Rationale:** Reporting and management feature that benefits from all other features being in place. Dashboard shows data from Phases 1-5. No dependencies block this, but it delivers more value after storage optimizations are live.
+
+**Delivers:** StorageStatsService, new Settings "Storage" tab, donut chart or progress bars by content type, item counts, disk usage (images + database), purge-by-category buttons with confirmation, ByteCountFormatter for human-readable sizes
+
+**Uses stack:**
+- FileManager directory enumeration (totalFileAllocatedSize)
+- SwiftData fetchCount with predicates
+- SwiftUI progress bars (simpler than Swift Charts)
+- ByteCountFormatter (Foundation)
+
+**Addresses features:**
+- Storage dashboard with breakdown (competitive)
+- Purge by content type (competitive)
+- Item count by type (table stakes)
+
+**Avoids pitfalls:**
+- Pitfall 2 (non-atomic purge): Delete SwiftData first, disk cleanup second, add orphan file reconciliation
+- Pitfall 5 (VACUUM risk): Do NOT implement database compaction button — offer targeted purge instead
+- Cache storage stats (30s), calculate on dashboard open not continuously
+
+**Research flags:** None. FileManager enumeration and SwiftData batch delete are established patterns.
 
 ### Phase Ordering Rationale
 
-- **Phase 1 first** because every other phase adds fields to the models that Phase 1 defines. The label enhancements ride along as a low-risk quick win with immediate visual payoff.
-- **Phase 2 second** because code and color detection are pure functions with no network dependency and can be unit tested in isolation. Highlightr is the only new library and should be validated early.
-- **Phase 3 third** because URL metadata fetching introduces network I/O and async complexity. Building it after Phase 2 means the card rendering pipeline is already proven for the simpler cases.
-- **Phase 4 last** because hotkeys are architecturally independent -- they bypass the panel entirely. They also benefit from all card types being complete (the number badges make more sense when cards show rich content).
-- This ordering matches risk escalation: Phase 1 is near-zero risk, Phase 2 is low risk with one library to validate, Phase 3 is medium risk with network I/O, Phase 4 is medium risk with global hotkey conflict surface.
+- **Phase 1 first**: Compression delivers immediate storage relief with zero risk to existing features. Can ship independently.
+- **Phases 2-4 sequential**: Sensitive item support requires model (P2), then UI (P3), then lifecycle (P4). Clear dependency chain.
+- **Phase 5 standalone**: Deduplication improvement is independent but placed after sensitive features to avoid churn in capture pipeline.
+- **Phase 6 last**: Dashboard benefits from all features being live. Shows compression savings, sensitive item counts, etc.
+
+**Parallel work opportunities:**
+- Phase 1 (compression) and Phase 2 (sensitive model) can be built in parallel — no shared code paths
+- Phase 3 (blur UI) and Phase 4 (retention) can be built in parallel after Phase 2 completes
 
 ### Research Flags
 
 **Phases needing deeper research during planning:**
-- **Phase 2:** Verify Highlightr's current version, Swift 6 compatibility, and macOS 14 support on GitHub before implementation. Test `highlightAuto()` with diverse language samples. If Highlightr is unmaintained or broken, fall back to custom regex highlighter.
-- **Phase 3:** Test LPMetadataProvider with 10+ diverse URLs (news sites, GitHub, social media, API endpoints, redirect chains) to calibrate timeout, error handling, and edge cases. Verify Content-Type header checking for non-HTML responses.
+- None. All phases use well-documented Apple APIs and extend existing Pastel patterns.
 
-**Phases with standard patterns (skip deep research):**
-- **Phase 1:** SwiftData optional field addition and enum expansion are well-documented patterns. Just test migration.
-- **Phase 4:** KeyboardShortcuts API is verified against the checked-out source code. Registration, enable/disable, and handler patterns are confirmed.
+**Phases with standard patterns (skip research-phase):**
+- All phases. SwiftData migration, ImageIO compression, SwiftUI blur, FileManager enumeration, and batch delete are solved problems with official documentation.
+
+**Validation checkpoints:**
+- Phase 1: Paste-back quality testing with text screenshots and transparent PNGs
+- Phase 2: Migration from v1.1 database with existing items
+- Phase 3: VoiceOver accessibility testing
+- Phase 4: Auto-expiry behavior across app restarts
+- Phase 6: Orphan file reconciliation after bulk purge
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM-HIGH | All Apple frameworks are HIGH. Highlightr is MEDIUM (verify version and Swift 6 compat). Everything else is validated or zero-dependency. |
-| Features | MEDIUM-HIGH | Feature scope is well-defined from PROJECT.md. Detection heuristics need tuning during implementation. URL metadata edge cases need real-world testing. |
-| Architecture | HIGH | Based on direct source code analysis of all 40+ Pastel files. Integration points are concrete and verified against the codebase. |
-| Pitfalls | HIGH | Pitfalls are based on well-understood patterns (hotkey conflicts, SwiftData migration, threading, regex). No novel risks. |
+| Stack | HIGH | All technologies are Apple first-party frameworks already imported and in use. JPEG compression via CGImageDestination verified in official docs. SwiftUI blur is basic API since 1.0. |
+| Features | MEDIUM-HIGH | Storage dashboard is novel (no competitor offers it, so feature expectations are inferred). Sensitive item protection expectations are validated against password manager behaviors and clipboard security research. |
+| Architecture | HIGH | Based on direct source code analysis of all 44 Swift files in Pastel codebase. Integration points verified against existing service patterns, SwiftData usage, and view-layer structure. |
+| Pitfalls | MEDIUM-HIGH | Lossy compression risks and non-atomic purge issues verified through codebase analysis and official SQLite docs. Security pitfall concerns validated against clipboard security fundamentals. macOS 15+ screenshot protection limitations based on developer forum reports. |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Highlightr verification**: Current version, SPM target name, Swift 6 strict concurrency compatibility, and macOS 14 support must be checked on GitHub before adding the dependency. If unavailable or broken, the custom regex highlighter is the fallback (covers fewer languages but works).
-- **LPMetadataProvider real-world behavior**: Rate limiting, behavior with paywalled sites, and non-HTML URLs need empirical testing. The manual URLSession+regex fallback is documented but should only be needed if LPMetadataProvider proves unreliable.
-- **KeyboardShortcuts Cmd+Shift+1-9**: While `.one` through `.nine` key constants and modifier support are confirmed in the library source, the specific combination Cmd+Shift+1-9 should be tested for conflicts with any standard macOS system shortcut (none are expected, but verify).
-- **SwiftData migration with 6+ new fields**: Adding multiple optional fields simultaneously should be safe for lightweight migration, but test on a populated v1.0 database to confirm. If it fails, fields may need to be added in stages across multiple schema versions.
+The following areas require validation during implementation, not additional research:
+
+- **JPEG quality threshold for paste-back fidelity**: Research recommends 0.85 quality, but optimal value must be verified with real clipboard content (screenshots with text, UI mockups, diagrams). Test in Figma, Photoshop, and Preview to confirm no visible artifacts.
+
+- **Image hash stability across compression**: The existing 4KB prefix hash is flagged as potentially collision-prone. During Phase 5, measure actual collision rate in production usage and decide whether to expand hash coverage to 64KB or full file.
+
+- **Storage dashboard UI pattern**: Research suggests SwiftUI progress bars over Swift Charts for simplicity. During Phase 6, prototype both approaches and verify dark-mode compatibility and visual fit with Pastel's aesthetic.
+
+- **Sensitive auto-expiry default**: Research recommends opt-in (default: same as global retention) to avoid accidental data loss. During Phase 4, validate with beta users whether default should be "same as global" or "24 hours" based on actual usage patterns.
+
+- **Orphan file cleanup frequency**: Research recommends reconciliation after bulk purges. During Phase 6, decide whether to also run periodic cleanup (e.g., on app launch) or only on-demand to avoid unnecessary disk I/O.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Pastel v1.0 source code -- all 40+ Swift files inspected for integration points and architecture analysis
-- KeyboardShortcuts v2.4.0 checked-out source -- Key.swift (.one-.nine), Shortcut constructor, enable/disable API, CarbonKeyboardShortcuts wrapping
-- Package.resolved -- confirmed dependency versions (KeyboardShortcuts 2.4.0, LaunchAtLogin-Modern 1.1.0)
-- Apple Developer Documentation (training knowledge) -- LPMetadataProvider, LinkPresentation, SwiftData migration, SwiftUI Color constants
+- Direct source code analysis of Pastel codebase (44 Swift files across Models, Services, Views) — integration points, existing patterns, data flow
+- Apple Documentation: kCGImageDestinationLossyCompressionQuality — JPEG compression API
+- Apple Documentation: URLResourceValues.totalFileAllocatedSize — disk size calculation
+- Apple Documentation: SwiftUI blur(radius:opaque:) — blur modifier
+- Apple Documentation: ByteCountFormatter — human-readable sizes
+- SQLite VACUUM documentation — database compaction mechanics and risks
+- OSLog privacy documentation — log privacy markers for sensitive data
 
 ### Secondary (MEDIUM confidence)
-- Highlightr library (github.com/raspu/Highlightr) -- training knowledge of highlight.js wrapper, 190+ languages, auto-detection. Version and current maintenance need verification.
-- Open Graph Protocol (ogp.me) -- stable web standard, unlikely to have changed
-- PastePal and CopyLess 2 feature sets -- competitive reference for feature expectations
+- HEIC vs JPEG comparison (Adobe, Cloudinary) — compression ratios and decode performance
+- SwiftData batch delete API (Fat Bob Man, Apple docs) — batch operations with predicates
+- SwiftUI redacted modifier (Swift with Majid) — redaction approaches
+- FileManager directory size patterns (Nikolai Ruhe gist, MacPaw) — disk size calculation best practices
+- SwiftData Expressions (Use Your Loaf) — aggregate query limitations in macOS 14/15
+- Core Data VACUUM approach (Marco Eidinger) — SQLite compaction from Swift
+- macOS Tahoe clipboard privacy (9to5Mac, MacWorld) — 8-hour retention, privacy prompts
+- Clipboard security fundamentals (Ctrl Blog) — plaintext storage risks
+- Hash collision risks in deduplication (BackupCentral) — false positive implications
 
 ### Tertiary (LOW confidence)
-- Highlightr Swift 6 compatibility -- unverified, needs testing
-- LPMetadataProvider rate limiting behavior -- undocumented by Apple, needs empirical testing
+- Competitor feature analysis (PastePal, Maccy, Paste 2) — inferred from app descriptions and GitHub, not direct testing
+- macOS 15+ screenshot protection (Apple Developer Forums) — ScreenCaptureKit ignoring sharingType based on forum reports, not official documentation
+- Password manager clipboard behavior (1Password community, Bitwarden GitHub) — ConcealedType reliability issues based on user reports
 
 ---
 *Research completed: 2026-02-07*
