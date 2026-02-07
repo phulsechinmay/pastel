@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import ImageIO
 
 /// Dispatcher card view that wraps each clipboard item in shared chrome
 /// (source app icon, content preview, relative timestamp) and routes to
@@ -22,6 +23,7 @@ struct ClipboardCardView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var isHovered = false
+    @State private var imageDimensions: String?
 
     /// Whether this card is a color item (entire card uses the detected color).
     private var isColorCard: Bool { item.type == .color }
@@ -90,6 +92,22 @@ struct ClipboardCardView: View {
 
             // Content preview (full-width)
             contentPreview
+
+            // Footer row: metadata text (left) + badge (right)
+            if footerMetadataText != nil || badgePosition != nil {
+                HStack(spacing: 4) {
+                    if let metadata = footerMetadataText {
+                        Text(metadata)
+                            .font(.caption2)
+                            .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.5) : .secondary.opacity(0.7))
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    if let badgePosition {
+                        KeycapBadge(number: badgePosition, isShiftHeld: isShiftHeld)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -101,11 +119,14 @@ struct ClipboardCardView: View {
                 .strokeBorder(cardBorderColor, lineWidth: 1.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(alignment: .bottomTrailing) {
-            if let badgePosition {
-                KeycapBadge(number: badgePosition)
-                    .padding(6)
-            }
+        .task {
+            guard item.type == .image, let path = item.imagePath else { return }
+            let fileURL = ImageStorageService.shared.resolveImageURL(path)
+            guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
+                  let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+                  let width = properties[kCGImagePropertyPixelWidth] as? Int,
+                  let height = properties[kCGImagePropertyPixelHeight] as? Int else { return }
+            imageDimensions = "\(width) \u{00D7} \(height)"
         }
         .onHover { hovering in
             isHovered = hovering
@@ -254,32 +275,54 @@ struct ClipboardCardView: View {
             return 80
         }
     }
+
+    /// Type-appropriate metadata text for the card footer.
+    private var footerMetadataText: String? {
+        switch item.type {
+        case .text, .richText:
+            let count = item.characterCount > 0 ? item.characterCount : (item.textContent?.count ?? 0)
+            return count > 0 ? "\(count) chars" : nil
+        case .url:
+            guard let text = item.textContent,
+                  let url = URL(string: text),
+                  var host = url.host else { return nil }
+            if host.hasPrefix("www.") {
+                host = String(host.dropFirst(4))
+            }
+            return host
+        case .image:
+            return imageDimensions
+        case .code:
+            let count = item.characterCount > 0 ? item.characterCount : (item.textContent?.count ?? 0)
+            guard count > 0 else { return nil }
+            var result = "\(count) chars"
+            if let lang = item.detectedLanguage, !lang.isEmpty {
+                result += " \u{00B7} \(lang.capitalized)"
+            }
+            return result
+        case .color, .file:
+            return nil
+        }
+    }
 }
 
 // MARK: - KeycapBadge
 
-/// Keyboard key-style badge showing a quick paste shortcut (e.g., "\u{2318} 1").
-/// Mimics a physical keycap with rounded rect background and subtle border.
+/// Text-only badge showing a quick paste shortcut (e.g., "\u{2318}1" or "\u{2318}\u{21E7}1").
+/// Dynamically shows the Shift symbol when the Shift key is held.
 struct KeycapBadge: View {
     let number: Int  // 1-9
+    var isShiftHeld: Bool = false
 
     var body: some View {
-        HStack(spacing: 2) {
-            Text("\u{2318}")  // ⌘ symbol
-                .font(.system(size: 9, weight: .medium))
+        HStack(spacing: 1) {
+            Text("\u{2318}")
+            if isShiftHeld {
+                Text("\u{21E7}")
+            }
             Text("\(number)")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
         }
-        .foregroundStyle(.white.opacity(0.7))
-        .padding(.horizontal, 5)
-        .padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(.white.opacity(0.15))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
-        )
+        .font(.system(size: 10, weight: .medium, design: .rounded))
+        .foregroundStyle(.white.opacity(0.5))
     }
 }
