@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:pastel}",
+            "name": "Debug Pastel",
+            "target": "Pastel",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug Pastel"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:pastel}",
+            "name": "Release Pastel",
+            "target": "Pastel",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release Pastel"
+        }
+    ]
+}

@@ -19,11 +19,6 @@ struct StatusPopoverView: View {
                 Spacer()
             }
 
-            // Item count
-            Text("\(appState.itemCount) items captured")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
             // Monitoring toggle (bound through ClipboardMonitor)
             Toggle("Monitoring", isOn: Binding(
                 get: { appState.clipboardMonitor?.isMonitoring ?? false },
@@ -63,8 +58,6 @@ struct StatusPopoverView: View {
                 }
             }
             .buttonStyle(.plain)
-
-            Divider()
 
             // Clear All History button (destructive action with confirmation)
             Button(role: .destructive) {

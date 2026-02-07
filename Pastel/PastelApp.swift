@@ -30,7 +30,7 @@ struct PastelApp: App {
             StatusPopoverView()
                 .environment(appState)
                 .modelContainer(modelContainer)
-                .frame(width: 260, height: 200)
+                .frame(width: 260)
         } label: {
             Image(systemName: "clipboard")
         }

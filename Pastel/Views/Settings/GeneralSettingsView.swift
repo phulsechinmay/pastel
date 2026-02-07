@@ -19,73 +19,73 @@ struct GeneralSettingsView: View {
     @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.paste.rawValue
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            // 1. Launch at login
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Startup")
-                    .font(.headline)
-                LaunchAtLogin.Toggle("Launch at login")
-                    .toggleStyle(.switch)
-            }
-
-            Divider()
-
-            // 2. Panel toggle hotkey
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Hotkey")
-                    .font(.headline)
-                KeyboardShortcuts.Recorder("Panel Toggle Hotkey:", name: .togglePanel)
-            }
-
-            Divider()
-
-            // 3. Panel position
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Panel Position")
-                    .font(.headline)
-                ScreenEdgePicker(selectedEdge: $panelEdgeRaw)
-            }
-
-            Divider()
-
-            // 4. History retention
-            VStack(alignment: .leading, spacing: 6) {
-                Text("History Retention")
-                    .font(.headline)
-                Picker("Keep history for:", selection: $retentionDays) {
-                    Text("1 Week").tag(7)
-                    Text("1 Month").tag(30)
-                    Text("3 Months").tag(90)
-                    Text("1 Year").tag(365)
-                    Text("Forever").tag(0)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // 1. Launch at login
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Startup")
+                        .font(.headline)
+                    LaunchAtLogin.Toggle("Launch at login")
+                        .toggleStyle(.switch)
                 }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 200)
-            }
 
-            Divider()
+                Divider()
 
-            // 5. Paste behavior
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Paste Behavior")
-                    .font(.headline)
-                Picker("When activating an item:", selection: $pasteBehaviorRaw) {
-                    ForEach(PasteBehavior.allCases, id: \.rawValue) { behavior in
-                        Text(behavior.displayName).tag(behavior.rawValue)
+                // 2. Panel toggle hotkey
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Hotkey")
+                        .font(.headline)
+                    KeyboardShortcuts.Recorder("Panel Toggle Hotkey:", name: .togglePanel)
+                }
+
+                Divider()
+
+                // 3. Panel position
+                HStack(spacing: 16) {
+                    Text("Panel Position")
+                        .font(.headline)
+                    ScreenEdgePicker(selectedEdge: $panelEdgeRaw)
+                }
+
+                Divider()
+
+                // 4. History retention
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("History Retention")
+                        .font(.headline)
+                    Picker("Keep history for:", selection: $retentionDays) {
+                        Text("1 Week").tag(7)
+                        Text("1 Month").tag(30)
+                        Text("3 Months").tag(90)
+                        Text("1 Year").tag(365)
+                        Text("Forever").tag(0)
                     }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 200)
                 }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 200)
 
-                Text("\"Paste\" writes to clipboard and pastes into the active app.\n\"Copy to Clipboard\" only writes to clipboard.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Divider()
+
+                // 5. Paste behavior
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Paste Behavior")
+                        .font(.headline)
+                    Picker("When activating an item:", selection: $pasteBehaviorRaw) {
+                        ForEach(PasteBehavior.allCases, id: \.rawValue) { behavior in
+                            Text(behavior.displayName).tag(behavior.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 200)
+
+                    Text("\"Paste\" writes to clipboard and pastes into the active app.\n\"Copy to Clipboard\" only writes to clipboard.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-
-            Spacer()
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .onChange(of: panelEdgeRaw) {
             appState.panelController.handleEdgeChange()
         }
