@@ -277,6 +277,20 @@ final class ClipboardMonitor {
                     Self.logger.debug("Detected language '\(result.language)' (relevance: \(result.relevance)) for code item")
                 }
             }
+
+            // Fire-and-forget async URL metadata fetch for URL items
+            if detectedContentType == .url {
+                let itemID = item.persistentModelID
+                let urlString = primaryContent
+                let ctx = self.modelContext
+                Task {
+                    await URLMetadataService.fetchMetadata(
+                        for: urlString,
+                        itemID: itemID,
+                        modelContext: ctx
+                    )
+                }
+            }
         } catch {
             // Handle @Attribute(.unique) conflict gracefully -- non-consecutive duplicate
             Self.logger.warning("Failed to save clipboard item: \(error.localizedDescription)")
