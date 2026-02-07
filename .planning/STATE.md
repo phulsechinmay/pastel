@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.1 -- Complete
+**Current focus:** Milestone v1.1 -- Phase 8 remaining (08-02)
 
 ## Current Position
 
-Phase: 9 of 9 (Quick Paste Hotkeys)
-Plan: 2 of 2 in current phase
-Status: Phase complete (all v1.1 phases delivered)
-Last activity: 2026-02-07 -- Completed 09-02-PLAN.md (Quick Paste Badges)
+Phase: 9 of 9 (Quick Paste Hotkeys) -- Complete
+Remaining: Phase 8 plan 2 of 2 (08-02 URLCardView enhancement)
+Status: Phase 9 complete, Phase 8 has 1 plan remaining
+Last activity: 2026-02-07 -- Completed Phase 9 (09-01 + 09-02)
 
-Progress: [######################] 100% (22/22 plans across all milestones)
+Progress: [####################░] 95% (21/22 plans across all milestones)
 
 ## Previous Milestone: v1.0
 
@@ -77,5 +77,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 09-02-PLAN.md (Quick Paste Badges) -- Phase 9 complete, all v1.1 milestones delivered
+Stopped at: Completed Phase 9 (Quick Paste Hotkeys). Phase 8 plan 08-02 still pending.
 Resume file: None

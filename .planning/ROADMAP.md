@@ -124,7 +124,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md -- URLMetadataService (LPMetadataProvider, 5s timeout, async fire-and-forget), favicon/og:image disk caching via ImageStorageService, skip logic for private/local URLs
+- [x] 08-01-PLAN.md -- URLMetadataService (LPMetadataProvider, 5s timeout, async fire-and-forget), favicon/og:image disk caching via ImageStorageService, skip logic for private/local URLs
 - [ ] 08-02-PLAN.md -- Enhanced URLCardView (source app + timestamp header, og:image preview, favicon + title footer), Settings toggle to disable fetching, image cleanup in RetentionService
 
 ### Phase 9: Quick Paste Hotkeys
@@ -157,5 +157,5 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 5. Settings and Polish | v1.0 | 2/2 | Complete | 2026-02-06 |
 | 6. Data Model and Label Enhancements | v1.1 | 2/2 | Complete | 2026-02-07 |
 | 7. Code and Color Detection | v1.1 | 3/3 | Complete | 2026-02-07 |
-| 8. URL Preview Cards | v1.1 | 0/2 | Not started | - |
+| 8. URL Preview Cards | v1.1 | 1/2 | In progress | - |
 | 9. Quick Paste Hotkeys | v1.1 | 2/2 | Complete | 2026-02-07 |
