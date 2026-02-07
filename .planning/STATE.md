@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.1 -- Phase 9: Quick Paste Hotkeys
+**Current focus:** Milestone v1.1 -- Complete
 
 ## Current Position
 
 Phase: 9 of 9 (Quick Paste Hotkeys)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-07 -- Completed 09-01-PLAN.md (Quick Paste Hotkeys)
+Plan: 2 of 2 in current phase
+Status: Phase complete (all v1.1 phases delivered)
+Last activity: 2026-02-07 -- Completed 09-02-PLAN.md (Quick Paste Badges)
 
-Progress: [####################░] 95% (21/22 plans across all milestones)
+Progress: [######################] 100% (22/22 plans across all milestones)
 
 ## Previous Milestone: v1.0
 
@@ -55,6 +55,8 @@ Recent decisions affecting current work:
 - [09-01]: writeToPasteboardPlainText omits .rtf only, keeps .string and .html
 - [09-01]: Non-text types (url, image, file) delegate to normal writeToPasteboard -- no RTF to strip
 - [09-01]: quickPasteEnabled defaults to true (opt-out, not opt-in)
+- [09-02]: Badge visibility controlled by parent (FilteredCardListView) via nil badgePosition, not @AppStorage in child
+- [09-02]: 1-based badge numbers (1-9) matching Cmd+1-9 hotkeys, converted from 0-based array index
 
 ### Pending Todos
 
@@ -75,5 +77,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 09-01-PLAN.md (Quick Paste Hotkeys)
+Stopped at: Completed 09-02-PLAN.md (Quick Paste Badges) -- Phase 9 complete, all v1.1 milestones delivered
 Resume file: None
