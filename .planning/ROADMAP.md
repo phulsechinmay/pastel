@@ -108,9 +108,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- CodeDetectionService (multi-signal heuristic), ColorDetectionService (hex/rgb/hsl regex), detection wired into ClipboardMonitor
-- [ ] 07-02-PLAN.md -- Highlightr SPM dependency, CodeCardView (syntax-highlighted preview, language badge, monospaced font, async caching)
-- [ ] 07-03-PLAN.md -- ColorSwatchView / ColorCardView, updated ClipboardCardView routing for .code and .color types
+- [ ] 07-01-PLAN.md -- ColorDetectionService (hex/rgb/hsl regex), CodeDetectionService (multi-signal heuristic), detection wired into ClipboardMonitor
+- [ ] 07-02-PLAN.md -- HighlightSwift SPM dependency, CodeCardView (syntax-highlighted preview, language badge, monospaced font, async caching), fire-and-forget language detection
+- [ ] 07-03-PLAN.md -- ColorCardView (swatch + text), updated ClipboardCardView routing for .code and .color types
 
 ### Phase 8: URL Preview Cards
 **Goal**: URL clipboard items auto-fetch page metadata and display rich preview cards with title, favicon, and og:image, with graceful fallback on failure
