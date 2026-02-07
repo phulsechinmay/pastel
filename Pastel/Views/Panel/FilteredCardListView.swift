@@ -19,6 +19,9 @@ struct FilteredCardListView: View {
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("quickPasteEnabled") private var quickPasteEnabled: Bool = true
 
+    @Environment(\.modelContext) private var modelContext
+    @State private var dropTargetIndex: Int? = nil
+
     @Binding var selectedIndex: Int?
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
@@ -96,17 +99,32 @@ struct FilteredCardListView: View {
                                 ClipboardCardView(
                                     item: item,
                                     isSelected: selectedIndex == index,
-                                    badgePosition: badge
+                                    badgePosition: badge,
+                                    isDropTarget: dropTargetIndex == index
                                 )
                                 .frame(width: 260, height: 195)
                                 .clipped()
-                                .id(index)
                                 .onTapGesture(count: 2) {
                                     onPaste(item)
                                 }
                                 .onTapGesture(count: 1) {
                                     selectedIndex = index
                                 }
+                                .dropDestination(for: String.self) { strings, _ in
+                                    guard let encodedID = strings.first,
+                                          let labelID = PersistentIdentifier.fromTransferString(encodedID),
+                                          let label = try? modelContext.model(for: labelID) as? Label else {
+                                        return false
+                                    }
+                                    item.label = label
+                                    try? modelContext.save()
+                                    return true
+                                } isTargeted: { targeted in
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        dropTargetIndex = targeted ? index : nil
+                                    }
+                                }
+                                .id(index)
                             }
                         }
                         .padding(.horizontal, 10)
@@ -130,15 +148,30 @@ struct FilteredCardListView: View {
                                 ClipboardCardView(
                                     item: item,
                                     isSelected: selectedIndex == index,
-                                    badgePosition: badge
+                                    badgePosition: badge,
+                                    isDropTarget: dropTargetIndex == index
                                 )
-                                .id(index)
                                 .onTapGesture(count: 2) {
                                     onPaste(item)
                                 }
                                 .onTapGesture(count: 1) {
                                     selectedIndex = index
                                 }
+                                .dropDestination(for: String.self) { strings, _ in
+                                    guard let encodedID = strings.first,
+                                          let labelID = PersistentIdentifier.fromTransferString(encodedID),
+                                          let label = try? modelContext.model(for: labelID) as? Label else {
+                                        return false
+                                    }
+                                    item.label = label
+                                    try? modelContext.save()
+                                    return true
+                                } isTargeted: { targeted in
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        dropTargetIndex = targeted ? index : nil
+                                    }
+                                }
+                                .id(index)
                             }
                         }
                         .padding(.horizontal, 10)

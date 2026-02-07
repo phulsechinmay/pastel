@@ -31,13 +31,17 @@ struct ClipboardCardView: View {
         contrastingColor(forHex: item.detectedColorHex)
     }
 
-    /// 1-based position badge number (1–9), or nil to hide badge.
+    /// 1-based position badge number (1-9), or nil to hide badge.
     var badgePosition: Int?
 
-    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, onPaste: (() -> Void)? = nil) {
+    /// Whether a label chip is currently being dragged over this card.
+    var isDropTarget: Bool
+
+    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, isDropTarget: Bool = false, onPaste: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
         self.badgePosition = badgePosition
+        self.isDropTarget = isDropTarget
         self.onPaste = onPaste
     }
 
@@ -104,6 +108,7 @@ struct ClipboardCardView: View {
         }
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .animation(.easeInOut(duration: 0.15), value: isDropTarget)
         .contextMenu {
             // Label assignment submenu
             Menu("Label") {
@@ -213,6 +218,8 @@ struct ClipboardCardView: View {
     private var cardBackground: AnyShapeStyle {
         if isColorCard {
             return AnyShapeStyle(colorFromHex(item.detectedColorHex))
+        } else if isDropTarget {
+            return AnyShapeStyle(Color.accentColor.opacity(0.15))   // Subtle accent highlight
         } else if isSelected {
             return AnyShapeStyle(Color.accentColor.opacity(0.3))
         } else if isHovered {
@@ -222,9 +229,11 @@ struct ClipboardCardView: View {
         }
     }
 
-    /// Card border: accent when selected, subtle white for color cards, clear otherwise.
+    /// Card border: accent when drop target or selected, subtle white for color cards, clear otherwise.
     private var cardBorderColor: Color {
-        if isSelected {
+        if isDropTarget {
+            return Color.accentColor          // Bright accent border during drag hover
+        } else if isSelected {
             return Color.accentColor.opacity(0.5)
         } else if isColorCard {
             return Color.white.opacity(0.15)
