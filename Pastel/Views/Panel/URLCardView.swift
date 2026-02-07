@@ -76,31 +76,60 @@ struct URLCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Whether the banner image is large enough to display as a full-width banner.
+    /// Small images (e.g. favicons returned as og:image) look bad when scaled up.
+    private var hasBannerSizedImage: Bool {
+        guard let img = bannerImage else { return false }
+        return img.size.width >= 200 && img.size.height >= 100
+    }
+
     /// Enriched state: og:image banner (if available) + favicon + title row
     private var enrichedState: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // og:image banner (only when available)
-            if let bannerImage {
+            if hasBannerSizedImage, let bannerImage {
+                // Full-width banner for large og:images
                 GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = w / 2
                     Image(nsImage: bannerImage)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.width / 2)
+                        .frame(width: w, height: h)
+                        .position(x: w / 2, y: h / 2)
                         .clipped()
                 }
                 .aspectRatio(2 / 1, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .transition(.opacity)
+            } else if bannerImage != nil || faviconImage != nil {
+                // Small og:image or favicon only — show centered at natural size
+                let displayImage = faviconImage ?? bannerImage
+                if let displayImage {
+                    HStack {
+                        Spacer()
+                        Image(nsImage: displayImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 64, maxHeight: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .transition(.opacity)
+                }
             }
 
             // Favicon + title row (always shown when enriched)
             HStack(spacing: 6) {
-                if let faviconImage {
+                if hasBannerSizedImage, let faviconImage {
+                    // Show favicon only when we have a proper banner above
                     Image(nsImage: faviconImage)
                         .resizable()
                         .frame(width: 16, height: 16)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
-                } else {
+                } else if !hasBannerSizedImage {
+                    // No banner — use globe as prefix icon
                     Image(systemName: "globe")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
