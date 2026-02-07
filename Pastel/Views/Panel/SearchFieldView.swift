@@ -7,6 +7,7 @@ import SwiftUI
 struct SearchFieldView: View {
 
     @Binding var searchText: String
+    var requestFocus: Bool = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -14,9 +15,11 @@ struct SearchFieldView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
-            TextField("Search...", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
+            FocusableTextField(
+                text: $searchText,
+                placeholder: "Search...",
+                requestFocus: requestFocus
+            )
 
             if !searchText.isEmpty {
                 Button {

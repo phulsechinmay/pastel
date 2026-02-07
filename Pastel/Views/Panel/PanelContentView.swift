@@ -23,10 +23,10 @@ struct PanelContentView: View {
 
     private enum PanelFocus: Hashable {
         case cardList
-        case search
     }
 
     @FocusState private var panelFocus: PanelFocus?
+    @State private var isSearchFocused = false
 
     private var isHorizontal: Bool {
         let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
@@ -43,8 +43,7 @@ struct PanelContentView: View {
                         .scaledToFit()
                         .frame(height: 38)
 
-                    SearchFieldView(searchText: $searchText)
-                        .focused($panelFocus, equals: .search)
+                    SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
                         .frame(maxWidth: 200)
 
                     ChipBarView(labels: labels, selectedLabel: $selectedLabel)
@@ -94,8 +93,7 @@ struct PanelContentView: View {
 
                 Divider()
 
-                SearchFieldView(searchText: $searchText)
-                    .focused($panelFocus, equals: .search)
+                SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
                 ChipBarView(labels: labels, selectedLabel: $selectedLabel)
             }
 
@@ -107,8 +105,9 @@ struct PanelContentView: View {
                 onPaste: { item in pasteItem(item) },
                 onPastePlainText: { item in pastePlainTextItem(item) },
                 onTypeToSearch: { char in
-                    searchText = String(char)
-                    panelFocus = .search
+                    searchText.append(char)
+                    panelFocus = nil
+                    isSearchFocused = true
                 }
             )
             .focused($panelFocus, equals: .cardList)
@@ -118,10 +117,12 @@ struct PanelContentView: View {
         .defaultFocus($panelFocus, .cardList)
         .onAppear {
             DispatchQueue.main.async {
+                isSearchFocused = false
                 panelFocus = .cardList
             }
         }
         .onChange(of: panelActions.showCount) { _, _ in
+            isSearchFocused = false
             panelFocus = .cardList
         }
         .task(id: searchText) {
