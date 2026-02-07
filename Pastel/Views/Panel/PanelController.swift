@@ -118,6 +118,7 @@ final class PanelController {
 
         panel.setFrame(offScreen, display: false)
         panel.orderFrontRegardless()
+        panel.makeKey()
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = animationDuration
