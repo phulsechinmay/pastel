@@ -1,11 +1,11 @@
 import SwiftUI
 import SwiftData
 
-/// Horizontal scrolling chip bar for label filtering and inline label creation.
+/// Wrapping chip bar for label filtering and inline label creation.
 ///
 /// Displays one chip per label plus a trailing "+" chip for creating new labels.
 /// Tapping a chip toggles filtering; tapping the active chip deselects it.
-/// The "+" chip presents a popover for entering a name and picking a color.
+/// Chips wrap to multiple centered lines when they don't fit in a single row.
 struct ChipBarView: View {
 
     let labels: [Label]
@@ -30,18 +30,13 @@ struct ChipBarView: View {
     ]
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                // Existing label chips
-                ForEach(labels) { label in
-                    labelChip(for: label)
-                }
-
-                // "+" create chip
-                createChip
+        CenteredFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+            ForEach(labels) { label in
+                labelChip(for: label)
             }
-            .padding(.horizontal, 12)
+            createChip
         }
+        .padding(.horizontal, 12)
         .padding(.vertical, 6)
     }
 
@@ -105,7 +100,7 @@ struct ChipBarView: View {
         } else {
             // Color labels use the label color as background
             let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
-            return isActive ? labelColor.opacity(0.5) : labelColor.opacity(0.3)
+            return isActive ? labelColor.opacity(0.7) : labelColor.opacity(0.45)
         }
     }
 
@@ -248,5 +243,78 @@ struct ChipBarView: View {
         modelContext.insert(newLabel)
         try? modelContext.save()
         showingCreateLabel = false
+    }
+}
+
+// MARK: - Centered Flow Layout
+
+/// A layout that arranges subviews in rows, wrapping to new lines and centering each row.
+private struct CenteredFlowLayout: Layout {
+
+    var horizontalSpacing: CGFloat
+    var verticalSpacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        // When no width proposed, calculate single-line width as ideal
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let singleLineWidth = sizes.reduce(0) { $0 + $1.width }
+            + CGFloat(max(0, sizes.count - 1)) * horizontalSpacing
+
+        let containerWidth = proposal.width ?? singleLineWidth
+
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var maxWidth: CGFloat = 0
+
+        for size in sizes {
+            if currentX + size.width > containerWidth && currentX > 0 {
+                maxWidth = max(maxWidth, currentX - horizontalSpacing)
+                currentY += lineHeight + verticalSpacing
+                currentX = 0
+                lineHeight = 0
+            }
+            currentX += size.width + horizontalSpacing
+            lineHeight = max(lineHeight, size.height)
+        }
+        maxWidth = max(maxWidth, currentX - horizontalSpacing)
+
+        return CGSize(width: maxWidth, height: currentY + lineHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        // First pass: group subviews into lines
+        var lines: [(subviews: [LayoutSubviews.Element], sizes: [CGSize])] = [([], [])]
+
+        var currentX: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX + size.width > bounds.width && currentX > 0 {
+                lines.append(([], []))
+                currentX = 0
+            }
+            lines[lines.count - 1].subviews.append(subview)
+            lines[lines.count - 1].sizes.append(size)
+            currentX += size.width + horizontalSpacing
+        }
+
+        // Second pass: place each line centered
+        var y = bounds.minY
+        for line in lines {
+            let lineWidth = line.sizes.reduce(0) { $0 + $1.width }
+                + CGFloat(max(0, line.sizes.count - 1)) * horizontalSpacing
+            let lineHeight = line.sizes.map(\.height).max() ?? 0
+            var x = bounds.minX + (bounds.width - lineWidth) / 2
+
+            for (i, subview) in line.subviews.enumerated() {
+                let size = line.sizes[i]
+                subview.place(
+                    at: CGPoint(x: x, y: y + (lineHeight - size.height) / 2),
+                    proposal: .unspecified
+                )
+                x += size.width + horizontalSpacing
+            }
+            y += lineHeight + verticalSpacing
+        }
     }
 }

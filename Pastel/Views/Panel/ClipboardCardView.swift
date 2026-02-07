@@ -108,6 +108,18 @@ struct ClipboardCardView: View {
         .frame(maxWidth: .infinity, minHeight: cardMinHeight, maxHeight: 195, alignment: .topLeading)
         .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .top) {
+            if !isColorCard,
+               let dominantColor = AppIconColorService.shared.dominantColor(forBundleID: item.sourceAppBundleID) {
+                LinearGradient(
+                    colors: [dominantColor.opacity(0.35), .clear],
+                    startPoint: .top,
+                    endPoint: .init(x: 0.5, y: 0.55)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .allowsHitTesting(false)
+            }
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(cardBorderColor, lineWidth: 1.5)
@@ -136,18 +148,11 @@ struct ClipboardCardView: View {
                         item.label = label
                         try? modelContext.save()
                     } label: {
-                        HStack {
-                            if let emoji = label.emoji, !emoji.isEmpty {
-                                Text("\(emoji) \(label.name)")
-                            } else {
-                                Image(systemName: "circle.fill")
-                                    .foregroundStyle(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                                Text(label.name)
-                            }
-                            if item.label?.persistentModelID == label.persistentModelID {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
+                        if let emoji = label.emoji, !emoji.isEmpty {
+                            Text("\(emoji) \(label.name)")
+                        } else {
+                            Image(nsImage: colorDot(for: label))
+                            Text(label.name)
                         }
                     }
                 }
@@ -193,13 +198,26 @@ struct ClipboardCardView: View {
         try? modelContext.save()
     }
 
+    /// Pre-rendered colored circle for context menu (NSMenu templates SF Symbols, ignoring foregroundStyle).
+    private func colorDot(for label: Label) -> NSImage {
+        let size: CGFloat = 12
+        let nsColor = NSColor(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+        nsColor.setFill()
+        NSBezierPath(ovalIn: NSRect(x: 0, y: 0, width: size, height: size)).fill()
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
+    }
+
     /// Label chip background on cards: label color for non-emoji labels, standard for emoji.
     private func cardLabelChipBackground(_ label: Label) -> Color {
         if let emoji = label.emoji, !emoji.isEmpty {
             return isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1)
         } else {
             let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
-            return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.25)
+            return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.4)
         }
     }
 

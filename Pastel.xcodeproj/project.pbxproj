@@ -52,6 +52,7 @@
 		E42B5A361ECF65BE3C4B1EF2 /* FileCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FC617DD35144DF808D4822 /* FileCardView.swift */; };
 		E5F6071829304B5C6D7E8FA1 /* ColorCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F6071829304B5C6D7E8FA2 /* ColorCardView.swift */; };
 		F8A1B2C3D4E50617182930B1 /* URLMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1B2C3D4E50617182930B2 /* URLMetadataService.swift */; };
+		F8A1B2C3D4E50617182930C1 /* AppIconColorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1B2C3D4E50617182930C2 /* AppIconColorService.swift */; };
 		FAB729BD87018467E0979A52 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543EE2EEFDD439C620E6A0A0 /* SettingsView.swift */; };
 		FC28C1E1511F71298087486A /* PasteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */; };
 		FF2C5CE75C36A126A3782DF2 /* ClipboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */; };
@@ -107,6 +108,7 @@
 		E931197AB3A47AD6193B9FF1 /* URLCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLCardView.swift; sourceTree = "<group>"; };
 		F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		F8A1B2C3D4E50617182930B2 /* URLMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLMetadataService.swift; sourceTree = "<group>"; };
+		F8A1B2C3D4E50617182930C2 /* AppIconColorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconColorService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -198,6 +200,7 @@
 				4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */,
 				ADA2DA3D25FB59CE37228411 /* RetentionService.swift */,
 				F8A1B2C3D4E50617182930B2 /* URLMetadataService.swift */,
+				F8A1B2C3D4E50617182930C2 /* AppIconColorService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -396,6 +399,7 @@
 				61FC3644E015576CBEB288A7 /* StatusPopoverView.swift in Sources */,
 				3ADFAC504957D459F381AFB2 /* TextCardView.swift in Sources */,
 				F8A1B2C3D4E50617182930B1 /* URLMetadataService.swift in Sources */,
+				F8A1B2C3D4E50617182930C1 /* AppIconColorService.swift in Sources */,
 				8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
