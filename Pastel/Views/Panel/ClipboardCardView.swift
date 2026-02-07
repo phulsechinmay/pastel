@@ -218,6 +218,12 @@ struct ClipboardCardView: View {
     }
 
     private var cardMinHeight: CGFloat {
-        item.type == .image ? 120 : 80
+        if item.type == .image {
+            return 120
+        } else if item.type == .url && item.urlPreviewImagePath != nil {
+            return 140
+        } else {
+            return 80
+        }
     }
 }
