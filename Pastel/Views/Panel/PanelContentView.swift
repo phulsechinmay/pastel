@@ -12,6 +12,7 @@ struct PanelContentView: View {
 
     @Environment(PanelActions.self) private var panelActions
     @Environment(AppState.self) private var appState
+    @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
 
     @Query(sort: \Label.sortOrder) private var labels: [Label]
 
@@ -20,38 +21,72 @@ struct PanelContentView: View {
     @State private var selectedLabel: Label? = nil
     @State private var selectedIndex: Int? = nil
 
+    private var isHorizontal: Bool {
+        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
+        return !edge.isVertical
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header with settings gear
-            HStack {
-                Text("Pastel")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    if let container = appState.modelContainer {
-                        SettingsWindowController.shared.showSettings(
-                            modelContainer: container,
-                            appState: appState
-                        )
-                    }
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
+            if isHorizontal {
+                // Horizontal mode: single inline row with header, search, chips, and gear
+                HStack(spacing: 8) {
+                    Text("Pastel")
+                        .font(.headline)
                         .foregroundStyle(.secondary)
+
+                    SearchFieldView(searchText: $searchText)
+                        .frame(maxWidth: 200)
+
+                    ChipBarView(labels: labels, selectedLabel: $selectedLabel)
+
+                    Spacer()
+
+                    Button {
+                        if let container = appState.modelContainer {
+                            SettingsWindowController.shared.showSettings(
+                                modelContainer: container,
+                                appState: appState
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            } else {
+                // Vertical mode: header on top, search and chips stacked below
+                HStack {
+                    Text("Pastel")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        if let container = appState.modelContainer {
+                            SettingsWindowController.shared.showSettings(
+                                modelContainer: container,
+                                appState: appState
+                            )
+                        }
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+
+                Divider()
+
+                SearchFieldView(searchText: $searchText)
+                ChipBarView(labels: labels, selectedLabel: $selectedLabel)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-
-            Divider()
-
-            // Search field
-            SearchFieldView(searchText: $searchText)
-
-            // Chip bar for label filtering
-            ChipBarView(labels: labels, selectedLabel: $selectedLabel)
 
             // Filtered content area with keyboard navigation
             FilteredCardListView(
