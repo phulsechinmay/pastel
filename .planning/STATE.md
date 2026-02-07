@@ -20,7 +20,7 @@ Progress: [#################░░░] 86% (20/22 plans across all milestones)
 
 - 29/29 requirements delivered across 5 phases (13 plans)
 - Total execution time: ~37 min
-- 5 quick tasks completed post-v1.0
+- 6 quick tasks completed post-v1.0
 
 ## Accumulated Context
 
@@ -50,6 +50,7 @@ Recent decisions affecting current work:
 - [08-01]: LPMetadataProvider created locally per fetch (not Sendable) -- matches Apple recommendation
 - [08-01]: loadImageData @MainActor for Swift 6 strict concurrency with NSItemProvider
 - [08-01]: UserDefaults "fetchURLMetadata" defaults to true via nil coalescing
+- [quick-006]: Center-crop banner via direct Image + scaledToFill + aspectRatio(.fill) + clipped -- no GeometryReader needed
 
 ### Pending Todos
 
@@ -61,6 +62,7 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 004 | Unified color/emoji label menu in settings | 2026-02-07 | a4687e2 | [004-unified-color-emoji-label-menu](./quick/004-unified-color-emoji-label-menu/) |
 | 005 | Card label chips and emoji menu fix | 2026-02-07 | 41861c0 | [005-card-label-chips-and-emoji-menu-fix](./quick/005-card-label-chips-and-emoji-menu-fix/) |
+| 006 | Fix URL card banner centering | 2026-02-07 | 95dfa7c | [006-fix-url-card-banner-centering](./quick/006-fix-url-card-banner-centering/) |
 
 ### Blockers/Concerns
 
@@ -69,5 +71,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 08-01-PLAN.md (URLMetadataService)
+Stopped at: Completed quick-006 (Fix URL card banner centering)
 Resume file: None
