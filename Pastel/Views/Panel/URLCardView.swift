@@ -1,5 +1,5 @@
-import AppKit
 import SwiftUI
+import AppKit
 
 /// Card content for `.url` clipboard items with rich metadata preview.
 ///
@@ -42,18 +42,12 @@ struct URLCardView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: item.urlMetadataFetched)
         .task(id: item.urlPreviewImagePath) {
-            guard let path = item.urlPreviewImagePath else {
-                bannerImage = nil
-                return
-            }
+            guard let path = item.urlPreviewImagePath else { bannerImage = nil; return }
             let url = ImageStorageService.shared.resolveImageURL(path)
             bannerImage = await loadImageFromDisk(url: url)
         }
         .task(id: item.urlFaviconPath) {
-            guard let path = item.urlFaviconPath else {
-                faviconImage = nil
-                return
-            }
+            guard let path = item.urlFaviconPath else { faviconImage = nil; return }
             let url = ImageStorageService.shared.resolveImageURL(path)
             faviconImage = await loadImageFromDisk(url: url)
         }
@@ -94,14 +88,20 @@ struct URLCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             if hasBannerSizedImage, let bannerImage {
                 // Full-width banner for large og:images
-                Image(nsImage: bannerImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(minWidth: 0, maxWidth: .infinity)
-                    .aspectRatio(2 / 1, contentMode: .fill)
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    let h = w / 2
+                    ZStack {
+                        Image(nsImage: bannerImage)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .frame(width: w, height: h)
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .transition(.opacity)
+                }
+                .aspectRatio(2 / 1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .transition(.opacity)
             } else if bannerImage != nil || faviconImage != nil {
                 // Small og:image or favicon only — show centered at natural size
                 let displayImage = faviconImage ?? bannerImage
