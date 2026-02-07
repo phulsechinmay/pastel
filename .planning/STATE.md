@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Phase: 7 of 9 (Code and Color Detection)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-02-07 -- Completed quick task 005: Card label chips and emoji menu fix
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-02-07 -- Completed 07-01-PLAN.md (Detection Services)
 
-Progress: [############░░░░░░░░] 68% (15/22 plans across all milestones)
+Progress: [#############░░░░░░░] 73% (16/22 plans across all milestones)
 
 ## Previous Milestone: v1.0
 
@@ -42,6 +42,10 @@ Recent decisions affecting current work:
 - [06-02]: Emoji-or-dot pattern: `if let emoji = label.emoji, !emoji.isEmpty` across all renderers
 - [quick-004]: Unified palette popover replaces separate color Menu + emoji TextField + smiley Button in LabelRow
 - [quick-005]: Color dot Circle dropped from context menu labels -- macOS NSMenu unreliable with shapes; concatenated text used instead
+- [07-01]: Swift Regex wholeMatch for all color patterns -- prevents false positives from embedded values
+- [07-01]: Code heuristic score >= 3 threshold (out of max 7) balances sensitivity vs false positives
+- [07-01]: detectLanguage stub returns nil until HighlightSwift added in Plan 07-02
+- [07-01]: Detection order: color first, code second (prevents rgb() from triggering code heuristic)
 
 ### Pending Todos
 
@@ -61,5 +65,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Quick task 005 complete, ready for Phase 7
+Stopped at: Completed 07-01-PLAN.md (Detection Services)
 Resume file: None
