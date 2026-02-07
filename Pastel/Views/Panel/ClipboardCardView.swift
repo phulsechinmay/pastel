@@ -23,6 +23,14 @@ struct ClipboardCardView: View {
 
     @State private var isHovered = false
 
+    /// Whether this card is a color item (entire card uses the detected color).
+    private var isColorCard: Bool { item.type == .color }
+
+    /// The contrasting text color for color cards (white or black based on luminance).
+    private var colorCardTextColor: Color {
+        contrastingColor(forHex: item.detectedColorHex)
+    }
+
     init(item: ClipboardItem, isSelected: Bool = false, onPaste: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
@@ -49,18 +57,23 @@ struct ClipboardCardView: View {
                         Text(label.name)
                             .font(.caption2)
                             .lineLimit(1)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.1), in: Capsule())
+                    .background(
+                        isColorCard
+                            ? colorCardTextColor.opacity(0.15)
+                            : Color.white.opacity(0.1),
+                        in: Capsule()
+                    )
                 }
 
                 Spacer()
 
                 Text(item.timestamp, format: .relative(presentation: .named))
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
             }
 
             // Content preview (full-width)
@@ -69,15 +82,11 @@ struct ClipboardCardView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: cardMinHeight, maxHeight: 195, alignment: .topLeading)
-        .background(
-            isSelected ? Color.accentColor.opacity(0.3)
-                : isHovered ? Color.white.opacity(0.12)
-                : Color.white.opacity(0.06),
-            in: RoundedRectangle(cornerRadius: 10)
-        )
+        .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1.5)
+                .strokeBorder(cardBorderColor, lineWidth: 1.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .onHover { hovering in
@@ -183,6 +192,29 @@ struct ClipboardCardView: View {
         case .color:
             ColorCardView(item: item)
         }
+    }
+
+    /// Card background: detected color for `.color` items, standard dark chrome otherwise.
+    private var cardBackground: AnyShapeStyle {
+        if isColorCard {
+            return AnyShapeStyle(colorFromHex(item.detectedColorHex))
+        } else if isSelected {
+            return AnyShapeStyle(Color.accentColor.opacity(0.3))
+        } else if isHovered {
+            return AnyShapeStyle(Color.white.opacity(0.12))
+        } else {
+            return AnyShapeStyle(Color.white.opacity(0.06))
+        }
+    }
+
+    /// Card border: accent when selected, subtle white for color cards, clear otherwise.
+    private var cardBorderColor: Color {
+        if isSelected {
+            return Color.accentColor.opacity(0.5)
+        } else if isColorCard {
+            return Color.white.opacity(0.15)
+        }
+        return Color.clear
     }
 
     private var cardMinHeight: CGFloat {
