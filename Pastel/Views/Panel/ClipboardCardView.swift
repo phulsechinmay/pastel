@@ -71,9 +71,14 @@ struct ClipboardCardView: View {
                         try? modelContext.save()
                     } label: {
                         HStack {
-                            Circle()
-                                .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                                .frame(width: 8, height: 8)
+                            if let emoji = label.emoji, !emoji.isEmpty {
+                                Text(emoji)
+                                    .font(.system(size: 10))
+                            } else {
+                                Circle()
+                                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                                    .frame(width: 8, height: 8)
+                            }
                             Text(label.name)
                             if item.label?.persistentModelID == label.persistentModelID {
                                 Image(systemName: "checkmark")

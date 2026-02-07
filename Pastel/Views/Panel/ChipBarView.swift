@@ -49,9 +49,14 @@ struct ChipBarView: View {
             }
         } label: {
             HStack(spacing: 4) {
-                Circle()
-                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                    .frame(width: 8, height: 8)
+                if let emoji = label.emoji, !emoji.isEmpty {
+                    Text(emoji)
+                        .font(.system(size: 10))
+                } else {
+                    Circle()
+                        .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                        .frame(width: 8, height: 8)
+                }
 
                 Text(label.name)
                     .font(.caption)
@@ -107,8 +112,9 @@ struct ChipBarView: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 180)
 
-            // Color palette
-            HStack(spacing: 6) {
+            // Color palette (6x2 grid)
+            let columns = Array(repeating: GridItem(.fixed(20), spacing: 6), count: 6)
+            LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(LabelColor.allCases, id: \.self) { labelColor in
                     Circle()
                         .fill(labelColor.color)
