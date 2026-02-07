@@ -21,6 +21,13 @@ struct PanelContentView: View {
     @State private var selectedLabel: Label? = nil
     @State private var selectedIndex: Int? = nil
 
+    private enum PanelFocus: Hashable {
+        case cardList
+        case search
+    }
+
+    @FocusState private var panelFocus: PanelFocus?
+
     private var isHorizontal: Bool {
         let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
         return !edge.isVertical
@@ -37,6 +44,7 @@ struct PanelContentView: View {
                         .frame(height: 38)
 
                     SearchFieldView(searchText: $searchText)
+                        .focused($panelFocus, equals: .search)
                         .frame(maxWidth: 200)
 
                     ChipBarView(labels: labels, selectedLabel: $selectedLabel)
@@ -87,6 +95,7 @@ struct PanelContentView: View {
                 Divider()
 
                 SearchFieldView(searchText: $searchText)
+                    .focused($panelFocus, equals: .search)
                 ChipBarView(labels: labels, selectedLabel: $selectedLabel)
             }
 
@@ -96,11 +105,20 @@ struct PanelContentView: View {
                 selectedLabelID: selectedLabel?.persistentModelID,
                 selectedIndex: $selectedIndex,
                 onPaste: { item in pasteItem(item) },
-                onPastePlainText: { item in pastePlainTextItem(item) }
+                onPastePlainText: { item in pastePlainTextItem(item) },
+                onTypeToSearch: { char in
+                    searchText = String(char)
+                    panelFocus = .search
+                }
             )
+            .focused($panelFocus, equals: .cardList)
             .id("\(debouncedSearchText)\(selectedLabel?.persistentModelID.hashValue ?? 0)\(appState.itemCount)")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .defaultFocus($panelFocus, .cardList)
+        .onChange(of: panelActions.showCount) { _, _ in
+            panelFocus = .cardList
+        }
         .task(id: searchText) {
             try? await Task.sleep(for: .milliseconds(200))
             guard !Task.isCancelled else { return }

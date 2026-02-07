@@ -22,6 +22,7 @@ struct FilteredCardListView: View {
     @Binding var selectedIndex: Int?
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
+    var onTypeToSearch: ((Character) -> Void)?
 
     /// Whether the panel is on a horizontal edge (top/bottom), requiring horizontal card layout.
     private var isHorizontal: Bool {
@@ -34,7 +35,8 @@ struct FilteredCardListView: View {
         selectedLabelID: PersistentIdentifier?,
         selectedIndex: Binding<Int?>,
         onPaste: @escaping (ClipboardItem) -> Void,
-        onPastePlainText: @escaping (ClipboardItem) -> Void
+        onPastePlainText: @escaping (ClipboardItem) -> Void,
+        onTypeToSearch: ((Character) -> Void)? = nil
     ) {
         let predicate: Predicate<ClipboardItem>
 
@@ -69,6 +71,7 @@ struct FilteredCardListView: View {
         _selectedIndex = selectedIndex
         self.onPaste = onPaste
         self.onPastePlainText = onPastePlainText
+        self.onTypeToSearch = onTypeToSearch
     }
 
     var body: some View {
@@ -198,6 +201,18 @@ struct FilteredCardListView: View {
             }
 
             return .handled
+        }
+        .onKeyPress(characters: .alphanumerics.union(.punctuationCharacters)) { keyPress in
+            // Don't intercept Cmd/Ctrl modified keys (those go to quick paste or system)
+            guard !keyPress.modifiers.contains(.command),
+                  !keyPress.modifiers.contains(.control) else { return .ignored }
+
+            // Forward unmodified character presses to search field
+            if let char = keyPress.characters.first, let onTypeToSearch {
+                onTypeToSearch(char)
+                return .handled
+            }
+            return .ignored
         }
         .onAppear {
             selectedIndex = nil
