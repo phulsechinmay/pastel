@@ -76,7 +76,7 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(maxWidth: 200)
+                    .frame(maxWidth: 320)
 
                     Text("\"Paste\" writes to clipboard and pastes into the active app.\n\"Copy to Clipboard\" only writes to clipboard.")
                         .font(.caption)

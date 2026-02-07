@@ -45,7 +45,7 @@ struct ClipboardCardView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: cardMinHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: cardMinHeight, maxHeight: 195, alignment: .topLeading)
         .background(
             isSelected ? Color.accentColor.opacity(0.3)
                 : isHovered ? Color.white.opacity(0.12)

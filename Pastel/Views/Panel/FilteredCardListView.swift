@@ -37,36 +37,24 @@ struct FilteredCardListView: View {
 
         if let labelID = selectedLabelID {
             if searchText.isEmpty {
-                // Label-only filter: guard nil then force-unwrap (safe due to nil check)
                 predicate = #Predicate<ClipboardItem> { item in
-                    item.label != nil &&
-                    item.label!.persistentModelID == labelID
+                    item.label?.persistentModelID == labelID
                 }
             } else {
-                // Both label + search filter
                 let search = searchText
                 predicate = #Predicate<ClipboardItem> { item in
-                    item.label != nil &&
-                    item.label!.persistentModelID == labelID &&
-                    (item.textContent != nil &&
-                     item.textContent!.localizedStandardContains(search)
-                     ||
-                     item.sourceAppName != nil &&
-                     item.sourceAppName!.localizedStandardContains(search))
+                    item.label?.persistentModelID == labelID &&
+                    (item.textContent?.localizedStandardContains(search) == true ||
+                     item.sourceAppName?.localizedStandardContains(search) == true)
                 }
             }
         } else if !searchText.isEmpty {
-            // Search-only filter: guard nil then force-unwrap (safe due to nil check)
             let search = searchText
             predicate = #Predicate<ClipboardItem> { item in
-                item.textContent != nil &&
-                item.textContent!.localizedStandardContains(search)
-                ||
-                item.sourceAppName != nil &&
-                item.sourceAppName!.localizedStandardContains(search)
+                item.textContent?.localizedStandardContains(search) == true ||
+                item.sourceAppName?.localizedStandardContains(search) == true
             }
         } else {
-            // No filter: return all items
             predicate = #Predicate<ClipboardItem> { _ in true }
         }
 

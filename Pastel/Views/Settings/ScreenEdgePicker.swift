@@ -8,12 +8,12 @@ struct ScreenEdgePicker: View {
 
     @Binding var selectedEdge: String
 
-    // Screen diagram dimensions
-    private let screenWidth: CGFloat = 160
-    private let screenHeight: CGFloat = 100
-    private let barThickness: CGFloat = 12
-    private let horizontalBarLength: CGFloat = 120
-    private let verticalBarLength: CGFloat = 70
+    // Screen diagram dimensions (60% of original)
+    private let screenWidth: CGFloat = 96
+    private let screenHeight: CGFloat = 60
+    private let barThickness: CGFloat = 7
+    private let horizontalBarLength: CGFloat = 72
+    private let verticalBarLength: CGFloat = 42
 
     var body: some View {
         ZStack {
