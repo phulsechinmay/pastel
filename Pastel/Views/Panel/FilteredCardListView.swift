@@ -37,24 +37,36 @@ struct FilteredCardListView: View {
 
         if let labelID = selectedLabelID {
             if searchText.isEmpty {
+                // Label-only filter: guard nil then force-unwrap (safe due to nil check)
                 predicate = #Predicate<ClipboardItem> { item in
-                    item.label?.persistentModelID == labelID
+                    item.label != nil &&
+                    item.label!.persistentModelID == labelID
                 }
             } else {
+                // Both label + search filter
                 let search = searchText
                 predicate = #Predicate<ClipboardItem> { item in
-                    item.label?.persistentModelID == labelID &&
-                    (item.textContent?.localizedStandardContains(search) ?? false ||
-                     item.sourceAppName?.localizedStandardContains(search) ?? false)
+                    item.label != nil &&
+                    item.label!.persistentModelID == labelID &&
+                    (item.textContent != nil &&
+                     item.textContent!.localizedStandardContains(search)
+                     ||
+                     item.sourceAppName != nil &&
+                     item.sourceAppName!.localizedStandardContains(search))
                 }
             }
         } else if !searchText.isEmpty {
+            // Search-only filter: guard nil then force-unwrap (safe due to nil check)
             let search = searchText
             predicate = #Predicate<ClipboardItem> { item in
-                item.textContent?.localizedStandardContains(search) ?? false ||
-                item.sourceAppName?.localizedStandardContains(search) ?? false
+                item.textContent != nil &&
+                item.textContent!.localizedStandardContains(search)
+                ||
+                item.sourceAppName != nil &&
+                item.sourceAppName!.localizedStandardContains(search)
             }
         } else {
+            // No filter: return all items
             predicate = #Predicate<ClipboardItem> { _ in true }
         }
 
@@ -89,7 +101,8 @@ struct FilteredCardListView: View {
                                     item: item,
                                     isSelected: selectedIndex == index
                                 )
-                                .frame(width: 260)
+                                .frame(width: 260, height: 195)
+                                .clipped()
                                 .id(index)
                                 .onTapGesture(count: 2) {
                                     onPaste(item)
