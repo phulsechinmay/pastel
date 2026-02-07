@@ -179,9 +179,9 @@ struct ClipboardCardView: View {
         case .file:
             FileCardView(item: item)
         case .code:
-            TextCardView(item: item)
+            CodeCardView(item: item)
         case .color:
-            TextCardView(item: item)
+            ColorCardView(item: item)
         }
     }
 

@@ -215,8 +215,7 @@ final class ClipboardMonitor {
             else if (contentType == .text || contentType == .richText),
                     CodeDetectionService.looksLikeCode(primaryContent) {
                 detectedContentType = .code
-                // Language detection is async -- will be wired in Plan 07-02
-                // For now, detectedLanguage stays nil
+                // detectedLanguage stays nil here; async detection fires after save
             }
         }
 
@@ -264,6 +263,19 @@ final class ClipboardMonitor {
             // Schedule expiration for concealed items (password managers)
             if isConcealed {
                 expirationService.scheduleExpiration(for: item)
+            }
+
+            // Fire-and-forget async language detection for code items
+            if detectedContentType == .code {
+                let itemID = item.persistentModelID
+                let textForDetection = primaryContent
+                Task {
+                    guard let result = await CodeDetectionService.detectLanguage(textForDetection) else { return }
+                    guard let savedItem = self.modelContext.model(for: itemID) as? ClipboardItem else { return }
+                    savedItem.detectedLanguage = result.language
+                    try? self.modelContext.save()
+                    Self.logger.debug("Detected language '\(result.language)' (relevance: \(result.relevance)) for code item")
+                }
             }
         } catch {
             // Handle @Attribute(.unique) conflict gracefully -- non-consecutive duplicate
