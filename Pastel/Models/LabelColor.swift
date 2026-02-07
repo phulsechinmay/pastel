@@ -11,6 +11,10 @@ enum LabelColor: String, CaseIterable {
     case purple
     case pink
     case gray
+    case teal
+    case indigo
+    case brown
+    case mint
 
     /// SwiftUI Color for rendering chips, dots, and other label indicators.
     var color: Color {
@@ -23,6 +27,10 @@ enum LabelColor: String, CaseIterable {
         case .purple: .purple
         case .pink: .pink
         case .gray: .gray
+        case .teal: .teal
+        case .indigo: .indigo
+        case .brown: .brown
+        case .mint: .mint
         }
     }
 }

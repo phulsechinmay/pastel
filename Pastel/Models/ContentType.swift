@@ -6,4 +6,6 @@ enum ContentType: String, Codable, CaseIterable, Sendable {
     case url
     case image
     case file
+    case code
+    case color
 }

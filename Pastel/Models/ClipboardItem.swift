@@ -51,6 +51,30 @@ final class ClipboardItem {
     /// Optional label for organization/filtering
     var label: Label?
 
+    /// Detected programming language (e.g., "swift", "python"). Nil = not code.
+    /// Populated by CodeDetectionService in Phase 7.
+    var detectedLanguage: String?
+
+    /// Detected color as 6-digit hex (no #). Nil = not a color value.
+    /// Populated by ColorDetectionService in Phase 7.
+    var detectedColorHex: String?
+
+    /// Page title fetched from URL metadata. Nil = not fetched or not a URL.
+    /// Populated by URLMetadataService in Phase 8.
+    var urlTitle: String?
+
+    /// Filename of cached favicon image on disk. Nil = not fetched.
+    /// Populated by URLMetadataService in Phase 8.
+    var urlFaviconPath: String?
+
+    /// Filename of cached og:image preview on disk. Nil = not fetched.
+    /// Populated by URLMetadataService in Phase 8.
+    var urlPreviewImagePath: String?
+
+    /// URL metadata fetch state: nil = not attempted, false = failed, true = succeeded.
+    /// Populated by URLMetadataService in Phase 8.
+    var urlMetadataFetched: Bool?
+
     /// Computed property to convert between String storage and ContentType enum
     var type: ContentType {
         get {
