@@ -66,6 +66,11 @@ final class AppState {
             self?.pastePlainText(item: item)
         }
 
+        // Wire copy-only callback: SwiftUI -> PanelActions -> onCopyOnlyItem -> AppState.copyOnly -> PasteService
+        panelController.onCopyOnlyItem = { [weak self] item in
+            self?.copyOnly(item: item)
+        }
+
         // Register global hotkey for panel toggle
         KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in
             MainActor.assumeIsolated {
@@ -170,5 +175,11 @@ final class AppState {
     func pastePlainText(item: ClipboardItem) {
         guard let clipboardMonitor else { return }
         pasteService.pastePlainText(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
+    }
+
+    /// Copy a clipboard item to the pasteboard without simulating Cmd+V.
+    func copyOnly(item: ClipboardItem) {
+        guard let clipboardMonitor else { return }
+        pasteService.copyOnly(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
     }
 }

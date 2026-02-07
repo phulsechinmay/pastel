@@ -11,6 +11,7 @@ import OSLog
 final class PanelActions {
     var pasteItem: ((ClipboardItem) -> Void)?
     var pastePlainTextItem: ((ClipboardItem) -> Void)?
+    var copyOnlyItem: ((ClipboardItem) -> Void)?
     /// Incremented each time the panel is shown; observed by PanelContentView to reset focus.
     var showCount = 0
 }
@@ -58,6 +59,10 @@ final class PanelController {
     /// Callback invoked when a SwiftUI view triggers a plain text paste action.
     /// Set by AppState during setupPanel() to wire into PasteService.pastePlainText.
     var onPastePlainTextItem: ((ClipboardItem) -> Void)?
+
+    /// Callback invoked when a SwiftUI view triggers an explicit copy-only action.
+    /// Set by AppState during setupPanel() to wire into PasteService.copyOnly.
+    var onCopyOnlyItem: ((ClipboardItem) -> Void)?
 
     /// Whether the panel is currently visible on screen.
     var isVisible: Bool {
@@ -112,6 +117,7 @@ final class PanelController {
         // Sync paste callbacks to panelActions (in case they were set after panel creation)
         panelActions.pasteItem = onPasteItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
+        panelActions.copyOnlyItem = onCopyOnlyItem
         panelActions.showCount += 1
 
         guard let panel else { return }
@@ -239,6 +245,7 @@ final class PanelController {
         // Sync paste callbacks into panelActions before creating SwiftUI view
         panelActions.pasteItem = onPasteItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
+        panelActions.copyOnlyItem = onCopyOnlyItem
 
         // Host SwiftUI content inside the visual effect view
         let contentView = PanelContentView()

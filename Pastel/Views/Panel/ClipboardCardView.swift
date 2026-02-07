@@ -21,6 +21,7 @@ struct ClipboardCardView: View {
 
     @Query(sort: \Label.sortOrder) private var labels: [Label]
     @Environment(\.modelContext) private var modelContext
+    @Environment(PanelActions.self) private var panelActions
 
     @State private var isHovered = false
     @State private var imageDimensions: String?
@@ -149,6 +150,18 @@ struct ClipboardCardView: View {
         .animation(.easeInOut(duration: 0.15), value: isSelected)
         .animation(.easeInOut(duration: 0.15), value: isDropTarget)
         .contextMenu {
+            Button("Copy") {
+                panelActions.copyOnlyItem?(item)
+            }
+            Button("Paste") {
+                panelActions.pasteItem?(item)
+            }
+            Button("Copy + Paste") {
+                panelActions.pasteItem?(item)
+            }
+
+            Divider()
+
             // Label assignment submenu
             Menu("Label") {
                 ForEach(labels) { label in

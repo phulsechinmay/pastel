@@ -84,6 +84,21 @@ final class PasteService {
         }
     }
 
+    /// Copy a clipboard item to the pasteboard without simulating Cmd+V.
+    ///
+    /// Always writes to pasteboard and hides the panel, regardless of the user's
+    /// paste behavior preference. Used by the context menu "Copy" action.
+    func copyOnly(
+        item: ClipboardItem,
+        clipboardMonitor: ClipboardMonitor,
+        panelController: PanelController
+    ) {
+        writeToPasteboard(item: item)
+        clipboardMonitor.skipNextChange = true
+        panelController.hide()
+        logger.info("Copy-only (explicit) -- wrote \(item.type.rawValue) to pasteboard")
+    }
+
     /// Paste a clipboard item as plain text (RTF stripped) into the frontmost app.
     ///
     /// Follows the same flow as `paste()` but uses `writeToPasteboardPlainText(item:)` which
