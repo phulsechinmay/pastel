@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Phase: 8 of 9 (URL Preview Cards)
-Plan: 0 of 2 in current phase
-Status: Not started
-Last activity: 2026-02-07 -- Completed Phase 7 (Code and Color Detection)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-07 -- Completed 08-01-PLAN.md (URLMetadataService)
 
-Progress: [################░░░░] 82% (19/22 plans across all milestones)
+Progress: [#################░░░] 86% (20/22 plans across all milestones)
 
 ## Previous Milestone: v1.0
 
@@ -47,6 +47,9 @@ Recent decisions affecting current work:
 - [07-02]: .dark(.atomOne) theme for syntax highlighting matches always-dark panel
 - [07-03]: Full-card color background instead of small swatch -- more visually striking
 - [07-03]: WCAG luminance check for header text contrast on color cards
+- [08-01]: LPMetadataProvider created locally per fetch (not Sendable) -- matches Apple recommendation
+- [08-01]: loadImageData @MainActor for Swift 6 strict concurrency with NSItemProvider
+- [08-01]: UserDefaults "fetchURLMetadata" defaults to true via nil coalescing
 
 ### Pending Todos
 
@@ -66,5 +69,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed Phase 7 (Code and Color Detection)
+Stopped at: Completed 08-01-PLAN.md (URLMetadataService)
 Resume file: None
