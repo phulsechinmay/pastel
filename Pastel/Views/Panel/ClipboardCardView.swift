@@ -112,9 +112,9 @@ struct ClipboardCardView: View {
             if !isColorCard,
                let dominantColor = AppIconColorService.shared.dominantColor(forBundleID: item.sourceAppBundleID) {
                 LinearGradient(
-                    colors: [dominantColor.opacity(0.35), .clear],
+                    colors: [dominantColor.opacity(0.45), .clear],
                     startPoint: .top,
-                    endPoint: .init(x: 0.5, y: 0.55)
+                    endPoint: .init(x: 0.5, y: 0.6)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .allowsHitTesting(false)
@@ -148,12 +148,8 @@ struct ClipboardCardView: View {
                         item.label = label
                         try? modelContext.save()
                     } label: {
-                        if let emoji = label.emoji, !emoji.isEmpty {
-                            Text("\(emoji) \(label.name)")
-                        } else {
-                            Image(nsImage: colorDot(for: label))
-                            Text(label.name)
-                        }
+                        Image(nsImage: menuIcon(for: label))
+                        Text(label.name)
                     }
                 }
 
@@ -198,14 +194,27 @@ struct ClipboardCardView: View {
         try? modelContext.save()
     }
 
-    /// Pre-rendered colored circle for context menu (NSMenu templates SF Symbols, ignoring foregroundStyle).
-    private func colorDot(for label: Label) -> NSImage {
-        let size: CGFloat = 12
-        let nsColor = NSColor(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+    /// Pre-rendered menu icon for context menu labels.
+    /// Both emoji and color labels render as NSImage so NSMenu aligns them in the same image column.
+    private func menuIcon(for label: Label) -> NSImage {
+        let size: CGFloat = 16
         let image = NSImage(size: NSSize(width: size, height: size))
         image.lockFocus()
-        nsColor.setFill()
-        NSBezierPath(ovalIn: NSRect(x: 0, y: 0, width: size, height: size)).fill()
+        if let emoji = label.emoji, !emoji.isEmpty {
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 12)
+            ]
+            let str = NSAttributedString(string: emoji, attributes: attributes)
+            let strSize = str.size()
+            str.draw(at: NSPoint(
+                x: (size - strSize.width) / 2,
+                y: (size - strSize.height) / 2
+            ))
+        } else {
+            let nsColor = NSColor(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+            nsColor.setFill()
+            NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: 12, height: 12)).fill()
+        }
         image.unlockFocus()
         image.isTemplate = false
         return image

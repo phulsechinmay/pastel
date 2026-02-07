@@ -139,6 +139,9 @@ struct PanelContentView: View {
             isSearchFocused = false
             panelFocus = .cardList
         }
+        .onChange(of: selectedLabel) { _, _ in
+            panelFocus = .cardList
+        }
         .task(id: searchText) {
             try? await Task.sleep(for: .milliseconds(200))
             guard !Task.isCancelled else { return }
