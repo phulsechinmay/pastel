@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.1 -- Phase 6: Data Model and Label Enhancements
+**Current focus:** Milestone v1.1 -- Phase 7: Smart Content Detection
 
 ## Current Position
 
 Phase: 6 of 9 (Data Model and Label Enhancements)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-07 -- Completed 06-01-PLAN.md (Schema Extension)
+Plan: 2 of 2 in current phase (PHASE COMPLETE)
+Status: Phase 6 complete
+Last activity: 2026-02-07 -- Completed 06-02-PLAN.md (Emoji & Color Grid)
 
-Progress: [###########░░░░░░░░░] 64% (14/22 plans across all milestones)
+Progress: [############░░░░░░░░] 68% (15/22 plans across all milestones)
 
 ## Previous Milestone: v1.0
 
@@ -37,6 +37,9 @@ Recent decisions affecting current work:
 - [06-01]: All new ClipboardItem fields Optional with nil defaults -- no VersionedSchema needed
 - [06-01]: ContentType .code/.color routed to TextCardView as placeholder until Phase 7
 - [06-01]: LabelColor new cases appended after existing 8 for raw value stability
+- [06-02]: Emoji field between color dot menu and name in LabelRow for compact layout
+- [06-02]: orderFrontCharacterPalette with 0.1s FocusState delay for correct field targeting
+- [06-02]: Emoji-or-dot pattern: `if let emoji = label.emoji, !emoji.isEmpty` across all renderers
 
 ### Pending Todos
 
@@ -49,5 +52,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 06-01-PLAN.md
+Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
 Resume file: None
