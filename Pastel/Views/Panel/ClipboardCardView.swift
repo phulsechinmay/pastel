@@ -31,10 +31,33 @@ struct ClipboardCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header row: source app icon + timestamp
+            // Header row: source app icon + label chip + timestamp
             HStack {
                 sourceAppIcon
+
+                // Label chip (inline, only shown when assigned)
+                if let label = item.label {
+                    HStack(spacing: 3) {
+                        if let emoji = label.emoji, !emoji.isEmpty {
+                            Text(emoji)
+                                .font(.system(size: 9))
+                        } else {
+                            Circle()
+                                .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                                .frame(width: 6, height: 6)
+                        }
+                        Text(label.name)
+                            .font(.caption2)
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.white.opacity(0.1), in: Capsule())
+                }
+
                 Spacer()
+
                 Text(item.timestamp, format: .relative(presentation: .named))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -42,27 +65,6 @@ struct ClipboardCardView: View {
 
             // Content preview (full-width)
             contentPreview
-
-            // Label chip (only shown when a label is assigned)
-            if let label = item.label {
-                HStack(spacing: 3) {
-                    if let emoji = label.emoji, !emoji.isEmpty {
-                        Text(emoji)
-                            .font(.system(size: 9))
-                    } else {
-                        Circle()
-                            .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                            .frame(width: 6, height: 6)
-                    }
-                    Text(label.name)
-                        .font(.caption2)
-                        .lineLimit(1)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.1), in: Capsule())
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
