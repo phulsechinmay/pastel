@@ -91,12 +91,13 @@ struct URLCardView: View {
                 GeometryReader { geo in
                     let w = geo.size.width
                     let h = w / 2
-                    Image(nsImage: bannerImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: w, height: h)
-                        .position(x: w / 2, y: h / 2)
-                        .clipped()
+                    ZStack {
+                        Image(nsImage: bannerImage)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .frame(width: w, height: h)
+                    .clipped()
                 }
                 .aspectRatio(2 / 1, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
