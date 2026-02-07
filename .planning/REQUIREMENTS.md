@@ -75,9 +75,10 @@ Requirements for v1.1 milestone: Rich Content & Enhanced Paste.
 
 ### Enhanced Paste — Quick Paste Hotkeys
 
-- [ ] **PAST-10**: Cmd+Shift+1-9 pastes the Nth most recent item without opening the panel
-- [ ] **PAST-11**: Settings toggle to enable/disable quick paste hotkeys (enabled by default)
-- [ ] **PAST-12**: First 9 panel cards show position number badges (1-9) when hotkeys are enabled
+- [x] **PAST-10**: Cmd+1-9 pastes the Nth visible item while the panel is open
+- [x] **PAST-10b**: Cmd+Shift+1-9 pastes the Nth visible item as plain text (RTF stripped)
+- [x] **PAST-11**: Settings toggle to enable/disable quick paste hotkeys (enabled by default)
+- [x] **PAST-12**: First 9 panel cards show keycap-style position badges (⌘ 1-9) when hotkeys are enabled
 
 ### Label Enhancements
 
@@ -171,9 +172,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RICH-07 | Phase 8 | Pending |
 | RICH-08 | Phase 8 | Pending |
 | RICH-09 | Phase 8 | Pending |
-| PAST-10 | Phase 9 | Pending |
-| PAST-11 | Phase 9 | Pending |
-| PAST-12 | Phase 9 | Pending |
+| PAST-10 | Phase 9 | Complete |
+| PAST-10b | Phase 9 | Complete |
+| PAST-11 | Phase 9 | Complete |
+| PAST-12 | Phase 9 | Complete |
 
 **v1.0 Coverage:**
 - v1 requirements: 29 total
@@ -187,4 +189,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-07 after Phase 7 completion*
+*Last updated: 2026-02-07 after Phase 9 completion*

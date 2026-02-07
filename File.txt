@@ -1,0 +1,3 @@
+Spotlight currently says "open pinned tab" for a bookmark item (also arcify pinned, but tab is not open) where the bookmark is not in the current tab group / space. In this case, we should just show the enter key as we will create a new tab and not open the pinned tab. 
+
+For bookmark items, "open pinned tab" should only be shown if the tab is bookmarked / arcify pinned in the current tab group / space 

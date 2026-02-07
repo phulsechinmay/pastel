@@ -77,7 +77,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Data Model and Label Enhancements** - Extend schema for rich content and ship label emoji with expanded color palette
 - [x] **Phase 7: Code and Color Detection** - Detect code snippets and color values at capture time with syntax-highlighted and swatch card views
 - [ ] **Phase 8: URL Preview Cards** - Auto-fetch URL metadata and render rich preview cards with title, favicon, and og:image
-- [ ] **Phase 9: Quick Paste Hotkeys** - Cmd+Shift+1-9 pastes the Nth item without opening the panel
+- [x] **Phase 9: Quick Paste Hotkeys** - Cmd+1-9 pastes the Nth item while panel is open, with position badges
 
 ## Phase Details
 
@@ -140,8 +140,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md -- Quick paste .onKeyPress handlers (Cmd+1-9 normal, Cmd+Shift+1-9 plain text), pastePlainText on PasteService, Settings toggle under Hotkey section
-- [ ] 09-02-PLAN.md -- Keycap-style position badges (⌘ 1-9) on first 9 panel cards, badge visibility tied to quickPasteEnabled setting
+- [x] 09-01-PLAN.md -- Quick paste .onKeyPress handlers (Cmd+1-9 normal, Cmd+Shift+1-9 plain text), pastePlainText on PasteService, Settings toggle under Hotkey section
+- [x] 09-02-PLAN.md -- Keycap-style position badges (⌘ 1-9) on first 9 panel cards, badge visibility tied to quickPasteEnabled setting
 
 ## Progress
 
@@ -158,4 +158,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 6. Data Model and Label Enhancements | v1.1 | 2/2 | Complete | 2026-02-07 |
 | 7. Code and Color Detection | v1.1 | 3/3 | Complete | 2026-02-07 |
 | 8. URL Preview Cards | v1.1 | 0/2 | Not started | - |
-| 9. Quick Paste Hotkeys | v1.1 | 0/2 | Not started | - |
+| 9. Quick Paste Hotkeys | v1.1 | 2/2 | Complete | 2026-02-07 |
