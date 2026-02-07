@@ -74,14 +74,27 @@ struct LabelSettingsView: View {
 
 // MARK: - Label Row
 
-/// A single label row with inline editing for name and color.
+/// A single label row with inline editing for name, color, and emoji.
 private struct LabelRow: View {
 
     @Bindable var label: Label
     @Environment(\.modelContext) private var modelContext
     @State private var isEditing = false
+    @FocusState private var isEmojiFieldFocused: Bool
 
     var onDelete: () -> Void
+
+    /// Binding that truncates emoji input to a single grapheme cluster.
+    private var emojiBinding: Binding<String> {
+        Binding(
+            get: { label.emoji ?? "" },
+            set: { newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                label.emoji = trimmed.isEmpty ? nil : String(trimmed.prefix(1))
+                try? modelContext.save()
+            }
+        )
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -101,12 +114,40 @@ private struct LabelRow: View {
                     }
                 }
             } label: {
-                Circle()
-                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                    .frame(width: 14, height: 14)
+                if let emoji = label.emoji, !emoji.isEmpty {
+                    Text(emoji)
+                        .font(.system(size: 14))
+                } else {
+                    Circle()
+                        .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                        .frame(width: 14, height: 14)
+                }
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+
+            // Emoji input
+            HStack(spacing: 2) {
+                TextField("", text: emojiBinding)
+                    .textFieldStyle(.plain)
+                    .frame(width: 24)
+                    .multilineTextAlignment(.center)
+                    .focused($isEmojiFieldFocused)
+
+                Button {
+                    isEmojiFieldFocused = true
+                    // Small delay to ensure TextField gains focus before picker opens
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NSApp.orderFrontCharacterPalette(nil)
+                    }
+                } label: {
+                    Image(systemName: "face.smiling")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open emoji picker (or press Ctrl+Cmd+Space in the emoji field)")
+            }
 
             // Name field (click to edit)
             if isEditing {
