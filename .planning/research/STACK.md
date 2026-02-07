@@ -1,514 +1,674 @@
-# Stack Research
+# Stack Research: v1.1 Rich Content & Enhanced Paste
 
-**Domain:** Native macOS Clipboard Manager
+**Domain:** Native macOS Clipboard Manager -- Stack Additions
 **Project:** Pastel
-**Researched:** 2026-02-05
+**Researched:** 2026-02-07
 **Confidence:** MEDIUM-HIGH
 
-> **Note on sources:** WebSearch and WebFetch were unavailable during this research session. All recommendations are based on training knowledge of Apple's frameworks and macOS development ecosystem. Apple's first-party frameworks (AppKit, SwiftUI, SwiftData, Core Graphics) are stable, well-documented, and unlikely to have changed significantly since training cutoff. Third-party library versions should be verified against current releases before implementation. Confidence levels reflect this.
+> **Note on sources:** WebSearch and WebFetch were unavailable during this research session. Recommendations are based on: (1) direct inspection of the Pastel codebase and all source files, (2) direct inspection of the checked-out KeyboardShortcuts v2.4.0 source code in `.build/checkouts/`, (3) the resolved Package.resolved confirming exact dependency versions, and (4) training knowledge of Apple's frameworks and the macOS ecosystem. Apple's first-party frameworks are stable APIs. Third-party library versions should be verified against current GitHub releases before adding to `project.yml`.
+
+> **Scope:** This document covers ONLY the stack additions needed for v1.1. The existing v1.0 stack is validated and unchanged.
 
 ---
 
-## Recommended Stack
+## Existing Stack (Validated, No Changes)
 
-### Core Technologies
+| Technology | Version | Purpose | Status |
+|------------|---------|---------|--------|
+| Swift 6.0 | 6.0 | Primary language | Validated |
+| SwiftUI + AppKit hybrid | macOS 14+ | UI framework | Validated |
+| SwiftData | macOS 14+ | Persistence | Validated |
+| KeyboardShortcuts (sindresorhus) | 2.4.0 (from Package.resolved) | Panel toggle hotkey + recorder | Validated |
+| LaunchAtLogin-Modern (sindresorhus) | 1.1.0 (from Package.resolved) | Login item | Validated |
+| NSPanel + NSHostingView | AppKit | Non-activating sliding panel | Validated |
+| CGEvent Cmd+V | CoreGraphics | Paste simulation | Validated |
+| NSPasteboard polling (0.5s) | AppKit | Clipboard monitoring | Validated |
+| XcodeGen (project.yml) | -- | Project generation | Validated |
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| Swift | 6.0+ | Primary language | Only sensible choice for native macOS. Swift 6 adds complete concurrency checking which matters for clipboard polling on background threads. Swift 5.10+ is also fine if Swift 6 migration overhead is too high. | HIGH |
-| SwiftUI | macOS 14+ (Sonoma) | UI framework | Modern declarative UI. MenuBarExtra (macOS 13+) and improved window management make it viable for menu bar apps. macOS 14 adds Observable macro which replaces ObservableObject for cleaner state management. | HIGH |
-| AppKit (bridged) | macOS 14+ | Window management, clipboard, system integration | SwiftUI alone cannot handle NSPanel, NSPasteboard, or accessibility APIs. AppKit bridging via NSViewRepresentable/NSHostingView is essential. This is the standard pattern for pro macOS apps. | HIGH |
-| Xcode | 16+ | IDE and build system | Required for macOS app development. Xcode 16 ships with Swift 6, modern SwiftUI previews, and current macOS SDK. | HIGH |
+---
 
-### Clipboard Monitoring
+## New Stack Additions for v1.1
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| NSPasteboard | AppKit (system) | Read clipboard contents | The only API for reading macOS clipboard. Use `NSPasteboard.general` to access the system clipboard. No alternative exists. | HIGH |
-| Timer-based polling | Foundation (system) | Detect clipboard changes | NSPasteboard has no notification/delegate for changes. The standard approach used by every macOS clipboard manager (Maccy, Clipy, Paste) is to poll `changeCount` on a timer. 0.5-1.0 second interval is the sweet spot. | HIGH |
-| NSPasteboard.changeCount | AppKit (system) | Change detection | Integer that increments on every clipboard change. Compare previous vs current value on each poll tick. This is the canonical detection mechanism. | HIGH |
+### 1. Syntax Highlighting for Code Snippets
 
-**Clipboard monitoring detail:**
+**Recommendation: Highlightr (raspu/Highlightr)**
+
+| Attribute | Value |
+|-----------|-------|
+| Library | [Highlightr](https://github.com/raspu/Highlightr) |
+| SPM | `from: "2.2.0"` (VERIFY on GitHub -- training data version) |
+| Platform | macOS, iOS |
+| License | MIT |
+| Approach | Wraps highlight.js -- 190+ languages, 90+ themes, auto-detection |
+| Confidence | MEDIUM |
+
+**Why Highlightr over Splash:**
+
+A clipboard manager captures code from ANY language -- Swift, Python, JavaScript, Go, Rust, Ruby, SQL, YAML, Dockerfile, shell scripts, and dozens more. The syntax highlighter must handle all of them.
+
+| Criterion | Highlightr (Recommended) | Splash (JohnSundell) |
+|-----------|-------------------------|---------------------|
+| Language coverage | 190+ languages with individual grammars | Swift-focused tokenizer, heuristic for C-family |
+| Auto language detection | Yes -- `highlightAuto()` uses highlight.js detection | No -- single tokenizer assumes Swift-like syntax |
+| Ruby, Python, SQL, YAML, Shell | Correct highlighting with proper grammars | Approximate at best, broken at worst |
+| Bundle size | ~2MB (highlight.js + themes) | ~50KB |
+| Performance | JS evaluation via JavaScriptCore (one-time init) | Pure Swift |
+| Output | `NSAttributedString` | `AttributedString` via custom OutputFormat |
+
+**The bundle size tradeoff is worth it.** Pastel is a desktop app, not a mobile app. 2MB is negligible. The alternative -- showing broken syntax highlighting for Python or SQL -- is worse than showing slightly slower-loading correct highlighting.
+
+**Why NOT Splash:** Splash's tokenizer is fundamentally designed for Swift. Its "works for C-family" claim means it recognizes braces, semicolons, and common keywords. For Python (indentation-significant, no braces, `def`/`class` keywords), Ruby (`do`/`end` blocks, `@` instance variables), SQL (`SELECT`/`FROM`/`WHERE`), YAML (colon-delimited key-value), and shell scripts (`$` variables, pipes, `if`/`fi`), Splash will produce incorrect or absent highlighting. A clipboard manager that only highlights Swift well is a poor user experience.
+
+**Integration pattern:**
+```swift
+import Highlightr
+
+// Singleton -- Highlightr loads highlight.js once (~100ms cold start)
+let highlightr: Highlightr = {
+    let h = Highlightr()!
+    h.setTheme(to: "atom-one-dark")  // Matches Pastel's always-dark UI
+    return h
+}()
+
+// Auto-detect language and highlight
+func highlightCode(_ code: String) -> NSAttributedString? {
+    // highlightAuto returns (result: NSAttributedString?, language: String?)
+    return highlightr.highlight(code)
+}
+```
+
+**SwiftUI rendering for code cards:**
+- For 4-8 line preview cards: convert `NSAttributedString` to `AttributedString`, use `Text(attributedString)`.
+- For scrollable full-code views (if ever needed): bridge `NSTextView` via `NSViewRepresentable`.
+
+**Cold start mitigation:** Initialize `Highlightr()` once at app launch in `AppState`, not per-card render. The highlight.js runtime loads in ~100ms on first call, then subsequent highlights are fast (<5ms for typical clipboard-sized code).
+
+#### Code Detection Heuristic (No Library Needed)
+
+Detection happens at capture time in `ClipboardMonitor.processPasteboardContent()`. Use a scoring heuristic:
 
 ```swift
-// The standard pattern — every macOS clipboard manager uses this
-class ClipboardMonitor {
-    private var timer: Timer?
-    private var lastChangeCount: Int = 0
+func isLikelyCode(_ text: String) -> Bool {
+    let lines = text.components(separatedBy: .newlines)
+    guard lines.count >= 2 else { return false }
 
-    func startMonitoring() {
-        lastChangeCount = NSPasteboard.general.changeCount
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkForChanges()
+    var score = 0
+
+    // Structural indicators
+    if text.contains("{") && text.contains("}") { score += 2 }
+    if text.contains(";") { score += 1 }
+
+    // Indentation (2+ spaces or tabs)
+    let indentedLines = lines.filter { $0.hasPrefix("  ") || $0.hasPrefix("\t") }
+    if indentedLines.count > lines.count / 3 { score += 2 }
+
+    // Language keywords
+    let keywords = ["func ", "def ", "class ", "import ", "const ", "let ", "var ",
+                     "return ", "if ", "else ", "for ", "while ", "fn ", "pub ",
+                     "function ", "async ", "await ", "struct ", "enum ", "interface "]
+    for keyword in keywords where text.contains(keyword) { score += 1; break }
+
+    // Comment patterns
+    if text.contains("//") || text.contains("/*") || text.contains("# ") { score += 1 }
+
+    return score >= 3
+}
+```
+
+**False positive avoidance:** Score threshold of 3 means casual text with a semicolon or brace won't trigger. False negatives (missing some code) are acceptable -- the item shows as plain text, which is still usable.
+
+**Confidence:** MEDIUM for Highlightr (verify maintenance status, SPM version, Swift 6 compatibility on GitHub). HIGH for code detection heuristic (standard pattern, no dependencies).
+
+---
+
+### 2. URL Metadata Fetching (Open Graph)
+
+**Recommendation: Apple's LinkPresentation framework (LPMetadataProvider)**
+
+| Attribute | Value |
+|-----------|-------|
+| Framework | LinkPresentation (Apple first-party) |
+| Import | `import LinkPresentation` |
+| Availability | macOS 10.15+ (well within our 14.0 target) |
+| Dependency | None -- ships with macOS |
+| Confidence | HIGH |
+
+**Why LPMetadataProvider:**
+
+1. **Apple's official API for exactly this use case.** It extracts Open Graph metadata, page titles, favicons, and preview images from URLs.
+2. **Zero dependencies.** Ships with macOS. No SPM package needed.
+3. **Handles edge cases internally.** HTML encoding, relative URLs, favicon discovery from `<link>` tags, OG tag parsing, and image downloading are all handled by Apple's implementation.
+4. **Async/await support.** `try await provider.startFetchingMetadata(for: url)` integrates cleanly with Swift concurrency.
+
+**Why NOT URLSession + regex HTML parsing:**
+
+Building a custom HTML metadata extractor requires:
+- Fetching HTML with URLSession (straightforward)
+- Parsing `<meta property="og:title">`, `<meta property="og:image">`, `<title>` tags (regex is fragile for HTML)
+- Handling relative URLs for favicons and images
+- Handling charset encoding variations
+- Handling redirects, non-HTML responses, malformed HTML
+
+This is reimplementing what `LPMetadataProvider` already does. The "control" benefit is marginal -- a clipboard manager does not need fine-grained control over metadata extraction. It needs "title + favicon + image if available, nil if not."
+
+**Known LPMetadataProvider behaviors to handle:**
+- It can be slow (2-5s) on some URLs. Solution: use a timeout and fire-and-forget. Card shows URL text immediately, updates when metadata arrives.
+- It is not cancellable once started. Solution: ignore results for items that have been deleted by the time the fetch completes.
+- It caches internally. For a clipboard manager this is actually beneficial -- re-copying the same URL won't trigger another network request.
+
+**Integration pattern:**
+```swift
+import LinkPresentation
+
+@MainActor
+final class URLMetadataService {
+    func fetchMetadata(for url: URL) async -> (title: String?, faviconData: Data?, ogImageURL: URL?) {
+        let provider = LPMetadataProvider()
+        provider.timeout = 5.0  // Don't hang on slow sites
+
+        do {
+            let metadata = try await provider.startFetchingMetadata(for: url)
+
+            let title = metadata.title
+
+            // Extract favicon data from NSItemProvider
+            var faviconData: Data? = nil
+            if let iconProvider = metadata.iconProvider {
+                faviconData = try? await iconProvider.loadDataRepresentation(for: .png)
+            }
+
+            // Get OG image URL (download separately if needed)
+            var ogImageURL: URL? = nil
+            if let imageProvider = metadata.imageProvider {
+                // imageProvider provides the actual image data
+                // Store URL from metadata.url or download the image
+            }
+
+            return (title, faviconData, ogImageURL)
+        } catch {
+            return (nil, nil, nil)  // Graceful fallback to plain URL card
         }
     }
+}
+```
 
-    private func checkForChanges() {
-        let currentCount = NSPasteboard.general.changeCount
-        if currentCount != lastChangeCount {
-            lastChangeCount = currentCount
-            // Read and process new clipboard content
-        }
+**Favicon fallback:** If LPMetadataProvider fails or returns no icon, use the Google favicon service as a reliable backup:
+```
+https://www.google.com/s2/favicons?domain=example.com&sz=32
+```
+
+**Data storage on ClipboardItem:**
+```swift
+var urlTitle: String?            // Cached page title
+var urlFaviconPath: String?      // Disk path to cached favicon PNG
+var urlPreviewImagePath: String? // Disk path to cached OG image
+var urlMetadataFetched: Bool     // Whether fetch was attempted (default: false)
+```
+
+Store favicon/images on disk (reuse `ImageStorageService` directory) rather than inline in SwiftData. This keeps the database lean, especially with many URL items.
+
+**Fetch strategy:**
+1. When a URL item is created in `ClipboardMonitor`, fire-and-forget an async metadata fetch.
+2. On completion, update the `ClipboardItem` fields and save.
+3. Card view observes the model and updates automatically via SwiftData/SwiftUI binding.
+4. On failure, set `urlMetadataFetched = true` to prevent re-fetching. Card falls back to globe + URL text.
+
+**Confidence:** HIGH. LPMetadataProvider is a stable Apple framework, available since macOS 10.15, designed for exactly this use case.
+
+---
+
+### 3. Color Value Detection and Swatches
+
+**Recommendation: No Library -- Pure Swift Regex + SwiftUI Color Rendering**
+
+| Attribute | Value |
+|-----------|-------|
+| Dependency | None |
+| Approach | Regex detection at capture time, SwiftUI `Color` for swatch |
+| Confidence | HIGH |
+
+Color detection is a well-defined string parsing problem. The formats are finite and standardized. No library needed.
+
+**Detection patterns:**
+```swift
+/// Detect if text is primarily a color value (the whole string is a color)
+func detectColorValue(_ text: String) -> String? {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // Hex: #RGB, #RRGGBB, #RRGGBBAA
+    if let match = trimmed.wholeMatch(of: /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/) {
+        return normalizeToHex6(String(match.1))
     }
+
+    // rgb(R, G, B) / rgba(R, G, B, A)
+    if let match = trimmed.wholeMatch(of: /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*[\d.]+\s*)?\)$/) {
+        let r = Int(match.1)!, g = Int(match.2)!, b = Int(match.3)!
+        return String(format: "#%02X%02X%02X", r, g, b)
+    }
+
+    // hsl(H, S%, L%) / hsla(H, S%, L%, A)
+    if let match = trimmed.wholeMatch(of: /^hsla?\(\s*(\d{1,3})\s*,\s*(\d{1,3})%\s*,\s*(\d{1,3})%\s*(?:,\s*[\d.]+\s*)?\)$/) {
+        return hslToHex(h: Int(match.1)!, s: Int(match.2)!, l: Int(match.3)!)
+    }
+
+    return nil
 }
 ```
 
-**Why not event-based?** Apple does not provide a clipboard change notification. There is no `NSPasteboard.didChangeNotification`. The `NSPasteboardDidChange` notification that some sources mention does not exist in the public API. Polling `changeCount` is the only reliable approach and is used by all production clipboard managers on macOS.
+**Why `wholeMatch` (entire string must be a color):** If text contains a color embedded in a larger context (e.g., `background-color: #FF5733;`), it should remain classified as `.text` (or `.code`), not `.color`. Only standalone color values get the `.color` content type. Embedded colors can optionally show a small swatch overlay but the card type does not change.
 
-### Database / Persistence
-
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| SwiftData | macOS 14+ (Sonoma) | Clipboard history metadata storage | Apple's modern persistence framework. Swift-native with `@Model` macro, automatic SwiftUI integration via `@Query`, built-in sorting/filtering/predicates. Eliminates Core Data boilerplate. Backed by SQLite under the hood. | MEDIUM-HIGH |
-
-**Why SwiftData over alternatives:**
-
-SwiftData is the recommended choice because:
-1. **Swift-native API** -- `@Model` macro instead of `.xcdatamodeld` files and NSManagedObject subclasses
-2. **SwiftUI integration** -- `@Query` property wrapper auto-refreshes views when data changes, `modelContainer` modifier sets up the stack
-3. **Automatic migrations** -- Lightweight schema migration works automatically for simple changes
-4. **Predicate macro** -- Type-safe `#Predicate` replaces NSPredicate string-based queries
-5. **Simpler than Core Data** -- No MOC/PSC/entity description ceremony
-
-**Model example for clipboard items:**
-
+**Swatch rendering (SwiftUI):**
 ```swift
-@Model
-class ClipboardItem {
-    var content: String          // text content or file path
-    var type: ClipboardItemType  // text, image, url, file, code, color
-    var timestamp: Date
-    var changeCount: Int         // NSPasteboard changeCount when captured
-    var sourceApp: String?       // bundle ID of the app that copied
-    var imagePath: String?       // relative path to stored image file
-    var thumbnailPath: String?   // relative path to thumbnail
-    var labels: [Label]          // many-to-many relationship
-    var isPinned: Bool
-
-    init(...) { ... }
+func colorFromHex(_ hex: String) -> Color {
+    let clean = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+    var hexValue: UInt64 = 0
+    Scanner(string: clean).scanHexInt64(&hexValue)
+    let r = Double((hexValue >> 16) & 0xFF) / 255.0
+    let g = Double((hexValue >> 8) & 0xFF) / 255.0
+    let b = Double(hexValue & 0xFF) / 255.0
+    return Color(red: r, green: g, blue: b)
 }
 
-@Model
-class Label {
-    var name: String
-    var color: String            // hex color
-    var items: [ClipboardItem]   // inverse relationship
-}
-```
-
-### Image Storage
-
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| FileManager | Foundation (system) | Store images on disk | Images should NOT go in SwiftData/SQLite. Store as files in app's Application Support directory. Database stores only the relative path. This keeps the database fast and small. | HIGH |
-| NSImage / CGImage | AppKit/CoreGraphics | Thumbnail generation | Resize images to ~200px thumbnails on capture. Store thumbnail alongside full image. Load full image only on demand (double-click). | HIGH |
-| Application Support directory | macOS convention | Storage location | `~/Library/Application Support/Pastel/Images/` is the correct macOS convention for user data files. Use FileManager.default.urls(for: .applicationSupportDirectory). | HIGH |
-
-**Image storage pattern:**
-
-```
-~/Library/Application Support/Pastel/
-  Images/
-    {uuid}.png          -- full-size image
-    {uuid}_thumb.png    -- 200px thumbnail
-```
-
-**Why not store images in the database:**
-- SQLite performance degrades with large BLOBs
-- SwiftData has no efficient BLOB streaming
-- File system provides OS-level caching and memory mapping
-- Thumbnails can be loaded lazily in the sidebar
-- Cleanup is straightforward (delete file + database row)
-
-### Window Management (Screen-Edge Panel)
-
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| NSPanel | AppKit (system) | Floating screen-edge panel | NSPanel is a subclass of NSWindow designed for auxiliary panels. Key properties: `isFloatingPanel = true` (stays above normal windows), `becomesKeyOnlyIfNeeded = true` (doesn't steal focus), `hidesOnDeactivate = false` (stays visible). This is what PastePal and similar apps use. | HIGH |
-| NSHostingView | SwiftUI (system) | Bridge SwiftUI into NSPanel | NSPanel is AppKit-only. Embed SwiftUI views inside it using NSHostingView. This gives you SwiftUI's declarative UI inside AppKit's window management. Standard pattern for pro macOS apps. | HIGH |
-
-**Why NSPanel, not a SwiftUI Window:**
-- SwiftUI `Window` and `WindowGroup` cannot be positioned at screen edges programmatically
-- SwiftUI windows cannot be configured as floating panels
-- SwiftUI windows always appear in the Window menu and can steal focus
-- NSPanel provides `styleMask: [.nonactivatingPanel]` which is critical -- the panel must NOT deactivate the user's current app (otherwise paste-back fails)
-- NSPanel with `.nonactivatingPanel` lets the user interact with the panel without losing focus on their target app
-
-**Panel configuration pattern:**
-
-```swift
-class PanelController: NSObject {
-    private var panel: NSPanel!
-
-    func createPanel() {
-        panel = NSPanel(
-            contentRect: calculateFrame(),
-            styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
-            backing: .buffered,
-            defer: false
+// ColorCardView: large swatch + text overlay
+VStack(spacing: 8) {
+    RoundedRectangle(cornerRadius: 8)
+        .fill(colorFromHex(item.detectedColorHex ?? "#000000"))
+        .frame(height: 44)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
         )
-        panel.isFloatingPanel = true
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = false
-        panel.hidesOnDeactivate = false
-        panel.becomesKeyOnlyIfNeeded = true
-        panel.contentView = NSHostingView(rootView: ClipboardPanelView())
-        panel.animationBehavior = .utilityWindow
-    }
-
-    func calculateFrame() -> NSRect {
-        // Position at screen edge based on user preference
-        guard let screen = NSScreen.main else { return .zero }
-        let screenFrame = screen.visibleFrame
-        // Example: right edge, full height, 320px wide
-        return NSRect(x: screenFrame.maxX - 320, y: screenFrame.minY,
-                      width: 320, height: screenFrame.height)
-    }
+    Text(item.textContent ?? "")
+        .font(.system(.callout, design: .monospaced))
+        .foregroundStyle(.secondary)
 }
 ```
 
-### Menu Bar App Architecture
+**Confidence:** HIGH. Pure Swift, no dependencies, well-understood problem space.
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| MenuBarExtra | SwiftUI macOS 13+ | Menu bar icon and dropdown | SwiftUI's native menu bar API. Two styles: `.menu` (standard dropdown) and `.window` (custom window). Use `.window` style for a richer settings dropdown, or `.menu` for a simple menu. | HIGH |
-| NSApp.setActivationPolicy(.accessory) | AppKit (system) | Hide dock icon | Makes the app a menu bar-only (agent) app with no Dock icon. Set via Info.plist `LSUIElement = true` or programmatically. | HIGH |
-| App protocol with @main | SwiftUI (system) | App lifecycle | Standard SwiftUI app entry point. Combine MenuBarExtra scene with Settings scene. | HIGH |
+---
 
-**App structure pattern:**
+### 4. Cmd+1-9 Global Hotkeys for Direct Paste
 
+**Recommendation: Use existing KeyboardShortcuts library (already installed, v2.4.0)**
+
+| Attribute | Value |
+|-----------|-------|
+| Library | KeyboardShortcuts (sindresorhus) -- already in project |
+| Version | 2.4.0 (confirmed in Package.resolved) |
+| New dependency | None |
+| Confidence | HIGH (verified against checked-out source code) |
+
+**Why reuse KeyboardShortcuts (not raw Carbon):**
+
+I inspected the checked-out KeyboardShortcuts v2.4.0 source code directly and confirmed:
+
+1. **Key constants exist.** `Key.swift` defines `.one` through `.nine` (mapping to `kVK_ANSI_1` through `kVK_ANSI_9`).
+
+2. **Shortcut construction works.** `Shortcut(.one, modifiers: [.command])` creates a Cmd+1 shortcut.
+
+3. **Programmatic registration is supported.** `KeyboardShortcuts.Name("pasteSlot1", default: .init(.one, modifiers: [.command]))` registers a named shortcut with a default binding.
+
+4. **Handler registration uses the same pattern as the existing panel toggle.** `KeyboardShortcuts.onKeyUp(for: .pasteSlot1) { ... }` -- identical to `AppState.swift` line 65.
+
+5. **Enable/disable is supported.** `KeyboardShortcuts.enable(.pasteSlot1)` and `KeyboardShortcuts.disable(.pasteSlot1)` (confirmed in KeyboardShortcuts.swift lines 233-268) allow runtime toggling for a Settings UI.
+
+6. **Carbon under the hood.** `CarbonKeyboardShortcuts.swift` calls `RegisterEventHotKey` -- the exact same API a raw Carbon implementation would use. There is zero performance or capability difference.
+
+**Why NOT raw Carbon for this:**
+
+Writing raw Carbon `RegisterEventHotKey` code directly (as suggested by some approaches) means:
+- Duplicating the event handler setup that KeyboardShortcuts already manages
+- Managing `EventHotKeyRef` lifecycle manually
+- Handling `Unmanaged` pointer dance for the callback's `userData`
+- Potentially conflicting with KeyboardShortcuts' existing Carbon event handler
+- More error-prone code for the same result
+
+KeyboardShortcuts is already installed, already manages the Carbon event handler, and provides a clean Swift API. Using it for Cmd+1-9 is strictly simpler.
+
+**Integration pattern:**
 ```swift
-@main
-struct PastelApp: App {
-    @StateObject var appState = AppState()
+// Define shortcut names (in AppState.swift extension)
+extension KeyboardShortcuts.Name {
+    static let togglePanel = Self("togglePanel", default: .init(.v, modifiers: [.command, .shift]))
+    static let pasteSlot1 = Self("pasteSlot1", default: .init(.one, modifiers: [.command]))
+    static let pasteSlot2 = Self("pasteSlot2", default: .init(.two, modifiers: [.command]))
+    static let pasteSlot3 = Self("pasteSlot3", default: .init(.three, modifiers: [.command]))
+    static let pasteSlot4 = Self("pasteSlot4", default: .init(.four, modifiers: [.command]))
+    static let pasteSlot5 = Self("pasteSlot5", default: .init(.five, modifiers: [.command]))
+    static let pasteSlot6 = Self("pasteSlot6", default: .init(.six, modifiers: [.command]))
+    static let pasteSlot7 = Self("pasteSlot7", default: .init(.seven, modifiers: [.command]))
+    static let pasteSlot8 = Self("pasteSlot8", default: .init(.eight, modifiers: [.command]))
+    static let pasteSlot9 = Self("pasteSlot9", default: .init(.nine, modifiers: [.command]))
+}
 
-    var body: some Scene {
-        // Menu bar icon
-        MenuBarExtra("Pastel", systemImage: "clipboard") {
-            MenuBarView()
-                .environmentObject(appState)
+// In AppState.setupPanel(), register all 9:
+let slotNames: [KeyboardShortcuts.Name] = [
+    .pasteSlot1, .pasteSlot2, .pasteSlot3, .pasteSlot4, .pasteSlot5,
+    .pasteSlot6, .pasteSlot7, .pasteSlot8, .pasteSlot9
+]
+for (index, name) in slotNames.enumerated() {
+    KeyboardShortcuts.onKeyUp(for: name) { [weak self] in
+        MainActor.assumeIsolated {
+            self?.pasteNthItem(index: index)
         }
-        .menuBarExtraStyle(.window)
-
-        // Settings window (Cmd+, opens this)
-        Settings {
-            SettingsView()
-                .environmentObject(appState)
-        }
-
-        // Note: The sliding panel is NOT a SwiftUI Scene.
-        // It's an NSPanel managed by AppState/PanelController.
     }
 }
 ```
 
-**Why this architecture:**
-- `MenuBarExtra` handles the menu bar icon and its dropdown natively
-- `Settings` scene gives you the standard macOS Preferences window
-- The sliding panel is managed separately via AppKit (NSPanel) because SwiftUI scenes cannot be non-activating floating panels
-- `LSUIElement = true` in Info.plist hides the Dock icon
+**Critical: Cmd+1-9 conflict mitigation**
 
-### Paste-Back (Accessibility)
+Cmd+1 through Cmd+9 are used by Safari (tabs), Chrome (tabs), Terminal (tabs), Finder (sidebar), and many other apps. Carbon `RegisterEventHotKey` intercepts globally -- other apps will NOT receive these shortcuts.
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| CGEvent | CoreGraphics (system) | Simulate Cmd+V keystroke | Post synthetic keyboard events to paste content. Create a Cmd+V key event pair (down + up) and post it. Requires Accessibility permission. | HIGH |
-| Accessibility permission | macOS system | Required for paste simulation | App must be granted Accessibility access in System Settings > Privacy & Security > Accessibility. Without this, CGEvent posting is silently ignored. | HIGH |
-| NSPasteboard (write) | AppKit (system) | Place content on clipboard before paste | Write the selected history item to NSPasteboard.general, then simulate Cmd+V. The target app receives the paste normally. | HIGH |
+**Recommended approach:**
+- **Default to DISABLED.** Unlike the panel toggle (which has no common conflict), Cmd+1-9 will break basic functionality in browsers and terminals. Opt-in is the right default.
+- Add a "Quick Paste Shortcuts" toggle in Settings (General tab). When enabled, registers all 9 hotkeys. When disabled, calls `KeyboardShortcuts.disable(...)` for all 9.
+- Show a warning: "Enabling quick paste shortcuts will override Cmd+1 through Cmd+9 in all apps."
+- Consider offering alternative modifiers: Ctrl+1-9 or Cmd+Shift+1-9 have fewer conflicts.
 
-**Paste-back flow:**
-
-```
-User clicks item in panel
-  -> Write item to NSPasteboard.general
-  -> Brief delay (~50ms) for pasteboard to sync
-  -> Post CGEvent for Cmd+V (key down + key up)
-  -> Target app receives paste
-```
-
-**CGEvent paste simulation:**
+**Settings UI:**
+A single Toggle + informational text. Do NOT show 9 individual recorder rows -- these are fixed bindings, not user-configurable.
 
 ```swift
-func simulatePaste() {
-    // Virtual key code for 'V' is 9
-    let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: true)
-    let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: false)
+Toggle("Enable Quick Paste (Cmd+1-9)", isOn: $quickPasteEnabled)
+    .onChange(of: quickPasteEnabled) { _, enabled in
+        if enabled {
+            KeyboardShortcuts.enable(slotNames)
+        } else {
+            KeyboardShortcuts.disable(slotNames)
+        }
+    }
 
-    // Add Cmd modifier
-    keyDown?.flags = .maskCommand
-    keyUp?.flags = .maskCommand
+Text("When enabled, pressing Cmd+1 pastes the most recent item, Cmd+2 the second most recent, and so on. This overrides Cmd+1-9 in other apps.")
+    .font(.caption)
+    .foregroundStyle(.secondary)
+```
 
-    // Post to the system
-    keyDown?.post(tap: .cghidEventTap)
-    keyUp?.post(tap: .cghidEventTap)
+**Confidence:** HIGH. Verified directly against the checked-out KeyboardShortcuts v2.4.0 source code. Key constants, Shortcut construction, and enable/disable APIs all confirmed.
+
+---
+
+### 5. Label Emoji Support
+
+**Recommendation: No Library -- SwiftUI TextField + System Emoji Picker**
+
+| Attribute | Value |
+|-----------|-------|
+| Dependency | None |
+| API | `NSApp.orderFrontCharacterPalette(_:)` + SwiftUI TextField |
+| Availability | macOS 10.0+ |
+| Confidence | HIGH |
+
+**Model change:**
+```swift
+@Model
+final class Label {
+    var name: String
+    var colorName: String
+    var sortOrder: Int
+    var emoji: String?  // NEW: single emoji character, nil = use color dot
+
+    @Relationship(deleteRule: .nullify, inverse: \ClipboardItem.label)
+    var items: [ClipboardItem]
+    // ...
 }
 ```
 
-**Critical: The panel must use `.nonactivatingPanel` style.** If the panel steals focus from the target app, Cmd+V goes to the panel, not the app. This is the #1 mistake in clipboard manager development.
+SwiftData handles lightweight migration automatically for new optional properties (they get nil default).
 
-### Global Hotkeys
+**Emoji input approach (in LabelSettingsView):**
 
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| CGEvent.tapCreate | CoreGraphics (system) | Global hotkey listener | Create an event tap to intercept keyboard events system-wide. Can filter for specific key combinations. Requires Accessibility permission. | HIGH |
-| HotKey (third-party) | ~0.2.0 | Simplified hotkey registration | Popular Swift wrapper around Carbon's `RegisterEventHotKey`. Cleaner API than raw CGEvent taps for simple hotkey registration. GitHub: soffes/HotKey. | MEDIUM |
-| NSEvent.addGlobalMonitorForEvents | AppKit (system) | Alternative global key monitoring | Monitors key events globally. Simpler than CGEvent taps but cannot intercept/consume events (only observe). Good for toggle hotkey where you don't need to swallow the keypress. | HIGH |
-
-**Recommendation:** Use `NSEvent.addGlobalMonitorForEvents` for the panel toggle hotkey (simpler, no event interception needed). For Cmd+1-9 paste shortcuts within the panel, use regular SwiftUI keyboard shortcuts since the panel is your own window.
-
-### Search
-
-| Technology | Version | Purpose | Why Recommended | Confidence |
-|------------|---------|---------|-----------------|------------|
-| SwiftData #Predicate | macOS 14+ | Database-level search | Use `#Predicate` with `.contains()` for searching clipboard text content. SwiftData translates this to SQLite LIKE queries. Fast enough for typical clipboard history sizes (thousands of items). | MEDIUM-HIGH |
-| NSTextField (for search bar) | AppKit (system) | Search input with focus | SwiftUI TextField may have focus issues in NSPanel context. If focus management is problematic, bridge an NSTextField via NSViewRepresentable. | MEDIUM |
-
-### Supporting Libraries
-
-| Library | Version | Purpose | When to Use | Confidence |
-|---------|---------|---------|-------------|------------|
-| HotKey (soffes/HotKey) | ~0.2 | Global hotkey registration | For panel toggle shortcut. Wraps Carbon RegisterEventHotKey in Swift API. | MEDIUM (verify current version) |
-| LaunchAtLogin (sindresorhus) | ~5.0 | Launch at login functionality | For "Start at Login" preference. Handles modern macOS ServiceManagement API. | MEDIUM (verify current version) |
-| Defaults (sindresorhus) | ~8.0 | UserDefaults wrapper | For strongly-typed app preferences (sidebar position, retention period, paste behavior). | MEDIUM (verify current version) |
-| KeyboardShortcuts (sindresorhus) | ~2.0 | User-configurable hotkeys | If you want users to customize the panel toggle hotkey. More full-featured than HotKey, includes a SwiftUI recording view. | MEDIUM (verify current version) |
-| Highlightr | ~2.1 | Syntax highlighting | For code snippet previews in the clipboard history panel. Wraps highlight.js. | LOW (verify current version and maintenance status) |
-
-> **Version caveat:** Third-party library versions above are from training data. Verify against current GitHub releases before adding to Package.swift. Use Swift Package Manager for all dependencies.
-
-### Development Tools
-
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| Xcode 16+ | IDE, build, debug, notarize | Required. Use Xcode's SwiftUI previews for rapid UI iteration. |
-| Swift Package Manager | Dependency management | Built into Xcode. No CocoaPods or Carthage needed. |
-| Instruments (Xcode) | Performance profiling | Use for clipboard polling performance, memory usage with images, UI responsiveness. |
-| `tccutil` | Reset Accessibility permissions during dev | `tccutil reset Accessibility com.yourteam.Pastel` to test permission flows. |
-| Console.app | System log viewing | Debug NSPasteboard issues and event posting. |
-
----
-
-## Alternatives Considered
-
-### Database: SwiftData vs Core Data vs Raw SQLite
-
-| Criterion | SwiftData (Recommended) | Core Data | Raw SQLite (GRDB/SQLite.swift) |
-|-----------|------------------------|-----------|-------------------------------|
-| **Swift-native API** | Yes (`@Model` macro) | No (NSManagedObject, .xcdatamodeld) | Varies by wrapper |
-| **SwiftUI integration** | Excellent (`@Query`) | Good (`@FetchRequest`) | Manual (need ObservableObject wrapper) |
-| **Schema management** | Automatic lightweight migration | Manual migration mapping | Manual SQL migrations |
-| **Learning curve** | Low if familiar with SwiftUI | Medium (lots of ceremony) | Low-medium |
-| **Maturity** | macOS 14+ (relatively new) | 15+ years, battle-tested | Battle-tested |
-| **Complex queries** | Good (`#Predicate` macro) | Good (NSPredicate) | Full SQL power |
-| **Relationship support** | Yes | Yes | Manual joins |
-| **When to choose** | Default for new SwiftUI apps | Legacy apps or pre-macOS 14 | Need raw SQL performance or complex queries |
-
-**Recommendation:** SwiftData. For a new macOS 14+ app with SwiftUI, SwiftData is the clear winner. It eliminates Core Data boilerplate while providing equivalent functionality for our use case (simple models, basic queries, SwiftUI views). The clipboard history data model is straightforward -- this is exactly what SwiftData was designed for.
-
-**Fallback:** If SwiftData has issues during development (it is younger than Core Data), Core Data is the fallback. They share the same SQLite backend and similar concepts. Migration path is well-documented by Apple.
-
-### Menu Bar: MenuBarExtra vs NSStatusItem
-
-| Criterion | MenuBarExtra (Recommended) | NSStatusItem (AppKit) |
-|-----------|---------------------------|----------------------|
-| **SwiftUI-native** | Yes | No (requires bridging) |
-| **Customization** | Window or menu style | Full control |
-| **Minimum macOS** | 13.0 (Ventura) | Any version |
-| **Ease of use** | Very high | Medium |
-| **When to choose** | New SwiftUI apps targeting macOS 13+ | Need pre-Ventura support or deep customization |
-
-**Recommendation:** MenuBarExtra. Since we're targeting macOS 14+ for SwiftData anyway, MenuBarExtra is available and provides the simplest path. Use `.window` style for a custom dropdown view, or `.menu` style for a standard menu.
-
-### Window: NSPanel vs SwiftUI Window vs NSWindow
-
-| Criterion | NSPanel (Recommended) | SwiftUI Window/WindowGroup | NSWindow |
-|-----------|----------------------|---------------------------|----------|
-| **Non-activating** | Yes (`.nonactivatingPanel`) | No | Possible but more work |
-| **Floating** | Built-in (`isFloatingPanel`) | No | Manual level management |
-| **Focus behavior** | `becomesKeyOnlyIfNeeded` | Always steals focus | Manual |
-| **SwiftUI content** | Via NSHostingView | Native | Via NSHostingView |
-| **When to choose** | Auxiliary panels, palettes, inspectors | Primary app windows | Custom window behaviors |
-
-**Recommendation:** NSPanel. This is a hard requirement, not a preference. The clipboard panel MUST NOT steal focus from the user's active app, or paste-back breaks. Only NSPanel with `.nonactivatingPanel` style mask provides this behavior. Wrap SwiftUI views inside it via NSHostingView.
-
-### Global Hotkeys: HotKey vs KeyboardShortcuts vs Raw CGEvent
-
-| Criterion | HotKey | KeyboardShortcuts | CGEvent Tap |
-|-----------|--------|-------------------|-------------|
-| **API simplicity** | Very simple | Simple with UI | Complex |
-| **User-configurable** | No | Yes (recording view) | No |
-| **SwiftUI integration** | Minimal | Good | None |
-| **When to choose** | Fixed hotkeys, simple case | User-customizable hotkeys with settings UI | Need event interception |
-
-**Recommendation:** KeyboardShortcuts (sindresorhus). It provides a SwiftUI-compatible hotkey recorder that users can use to customize their panel toggle key. This is more user-friendly than hardcoded hotkeys and is the standard in the macOS indie app ecosystem. HotKey is fine if you want simpler code and don't need user customization.
-
-### Image Thumbnail Generation: NSImage vs Core Image vs vImage
-
-| Criterion | NSImage (Recommended) | Core Image | vImage |
-|-----------|----------------------|------------|--------|
-| **Simplicity** | Very simple | Medium | Complex |
-| **Quality** | Good | Excellent | Excellent |
-| **Performance** | Good enough | GPU-accelerated | SIMD-accelerated |
-| **When to choose** | Standard thumbnails | Filter chains, effects | Batch processing, extreme perf |
-
-**Recommendation:** NSImage. For generating ~200px thumbnails, NSImage's built-in scaling is perfectly adequate. Core Image and vImage are overkill. A simple `NSImage.resize(to:)` extension is all you need.
-
----
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Electron / web views | Defeats the purpose of native macOS. Clipboard managers need low latency, minimal memory, and deep system integration. Electron cannot access NSPasteboard or simulate key events natively. | Swift + SwiftUI + AppKit |
-| Core Data (for new project) | Unnecessary boilerplate when SwiftData is available. `.xcdatamodeld` files, NSManagedObject subclasses, and fetch request controllers add ceremony with no benefit for this use case. | SwiftData |
-| Realm | Third-party database that adds dependency weight. SwiftData/SQLite are first-party and sufficient. Realm's cloud sync features are irrelevant (no sync needed). | SwiftData |
-| NSPasteboard notifications | Do not exist in the public API. Some outdated blog posts reference private/deprecated notifications. The only reliable approach is polling `changeCount`. | Timer-based polling of `changeCount` |
-| SwiftUI Window for the panel | Cannot be configured as non-activating. Will steal focus from the active app and break paste-back. This is a showstopper. | NSPanel with NSHostingView |
-| CocoaPods / Carthage | Outdated dependency managers. Swift Package Manager is built into Xcode and is the standard for pure Swift projects. | Swift Package Manager |
-| Storing images in SQLite/SwiftData | Large BLOBs degrade query performance, increase database file size, and complicate backups. | FileManager + disk storage with path references in SwiftData |
-| `NSEvent.addLocalMonitorForEvents` for global hotkeys | "Local" monitor only works when your app is the active app. For a menu bar app that needs to respond globally, you need global monitors. | `NSEvent.addGlobalMonitorForEvents` or HotKey/KeyboardShortcuts |
-| UIKit | iOS framework. Does not exist on macOS. Use AppKit for macOS-specific APIs. | AppKit |
-| Combine for simple state | Combine adds complexity for basic state management. SwiftUI's `@Observable` (macOS 14+) and `@State`/`@Binding` are simpler and sufficient. | `@Observable` macro, `@State`, `@Binding` |
-
----
-
-## Stack Patterns by Variant
-
-**If targeting macOS 13 (Ventura) minimum:**
-- Use `ObservableObject` + `@Published` instead of `@Observable` macro
-- Use Core Data instead of SwiftData (SwiftData requires macOS 14)
-- MenuBarExtra is still available (macOS 13+)
-- Everything else remains the same
-
-**If targeting macOS 14 (Sonoma) minimum (RECOMMENDED):**
-- Use `@Observable` macro for state management
-- Use SwiftData for persistence
-- Use MenuBarExtra for menu bar
-- Full access to modern SwiftUI features
-
-**If targeting macOS 15 (Sequoia) minimum:**
-- Same as macOS 14 stack
-- Gains access to latest SwiftUI improvements
-- Smaller user base (users on older macOS)
-
-**Recommendation:** Target macOS 14 (Sonoma). This gives access to SwiftData and `@Observable` while covering the vast majority of active macOS users. macOS 13 is increasingly old, and supporting it means giving up SwiftData (the biggest DX win in the stack).
-
----
-
-## Version Compatibility Matrix
-
-| Component | Minimum macOS | Notes |
-|-----------|---------------|-------|
-| SwiftUI | 10.15+ | But modern features (MenuBarExtra, Observable) require 13-14+ |
-| MenuBarExtra | 13.0 (Ventura) | `.window` style also requires 13.0 |
-| SwiftData | 14.0 (Sonoma) | Sets the floor for our deployment target |
-| `@Observable` macro | 14.0 (Sonoma) | Replacement for ObservableObject |
-| `#Predicate` macro | 14.0 (Sonoma) | Used with SwiftData queries |
-| NSPanel | Any | Stable AppKit API, available on all macOS versions |
-| NSPasteboard | Any | Stable AppKit API |
-| CGEvent | Any | Requires Accessibility permission |
-| FileManager | Any | Foundation, always available |
-
-**Deployment target:** macOS 14.0 (Sonoma)
-**Build with:** Xcode 16+ / Swift 6.0+
-
----
-
-## Project Setup
-
-### Package.swift Dependencies
+A compact TextField where the user can:
+1. Type or paste an emoji directly.
+2. Press Ctrl+Cmd+Space (or Globe key on newer keyboards) to open the system emoji picker, which inserts into the focused TextField.
 
 ```swift
-// In Xcode project, add via File > Add Package Dependencies:
-
-// Global hotkey registration with SwiftUI recorder
-// https://github.com/sindresorhus/KeyboardShortcuts
-// Version: verify latest on GitHub
-
-// Launch at Login
-// https://github.com/sindresorhus/LaunchAtLogin-Modern
-// Version: verify latest on GitHub
-// Note: "Modern" variant uses the ServiceManagement framework (macOS 13+)
-
-// Optional: Syntax highlighting for code snippets
-// https://github.com/raspu/Highlightr
-// Version: verify latest on GitHub
+HStack(spacing: 8) {
+    // Emoji field (or button to clear)
+    if let emoji = label.emoji, !emoji.isEmpty {
+        Button {
+            label.emoji = nil  // Clear emoji, revert to color dot
+            try? modelContext.save()
+        } label: {
+            Text(emoji)
+                .font(.system(size: 18))
+        }
+        .buttonStyle(.plain)
+        .help("Click to remove emoji")
+    } else {
+        TextField("", text: Binding(
+            get: { label.emoji ?? "" },
+            set: { newValue in
+                if let first = newValue.first {
+                    label.emoji = String(first)
+                } else {
+                    label.emoji = nil
+                }
+                try? modelContext.save()
+            }
+        ))
+        .frame(width: 32)
+        .help("Type an emoji or press Globe key")
+    }
+}
 ```
 
-### Info.plist Configuration
+**Why NOT a custom emoji grid picker:**
+- Adds UI complexity for a feature that users rarely change.
+- The system emoji picker (Ctrl+Cmd+Space) is the standard macOS way to input emoji.
+- A text field is simpler, familiar, and supports all emoji without a curated subset.
 
-```xml
-<!-- Menu bar only app (no dock icon) -->
-<key>LSUIElement</key>
-<true/>
-
-<!-- App Sandbox entitlements -->
-<!-- Note: Accessibility permission is requested at runtime, not via entitlement -->
+**Display in chips and cards:**
+```swift
+// In ChipBarView and ClipboardCardView label indicator:
+if let emoji = label.emoji, !emoji.isEmpty {
+    Text(emoji).font(.system(size: 12))
+} else {
+    Circle()
+        .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+        .frame(width: 8, height: 8)
+}
 ```
 
-### Entitlements
+**Expanded color palette (bonus):**
 
-```xml
-<!-- com.yourteam.Pastel.entitlements -->
-<key>com.apple.security.app-sandbox</key>
-<true/>
+Add 4 new cases to `LabelColor`. All use SwiftUI named colors available on macOS 14+:
 
-<!-- File access for image storage in Application Support -->
-<key>com.apple.security.files.user-selected.read-write</key>
-<true/>
+```swift
+enum LabelColor: String, CaseIterable {
+    case red, orange, yellow, green, blue, purple, pink, gray
+    // New in v1.1
+    case teal, indigo, brown, mint
+
+    var color: Color {
+        switch self {
+        case .red: .red
+        case .orange: .orange
+        case .yellow: .yellow
+        case .green: .green
+        case .blue: .blue
+        case .purple: .purple
+        case .pink: .pink
+        case .gray: .gray
+        case .teal: .teal
+        case .indigo: .indigo
+        case .brown: .brown
+        case .mint: .mint
+        }
+    }
+}
 ```
 
-> **Sandbox note:** If distributing outside the Mac App Store, you can skip App Sandbox. If targeting the Mac App Store, you'll need to carefully configure sandbox entitlements. Accessibility permission (for paste-back) works with sandboxed apps but requires user approval in System Settings.
+No migration concern -- `LabelColor` is a Swift enum used at the view layer. The database stores raw color name strings. Existing labels with old color names remain valid.
 
-### Directory Structure
+**Confidence:** HIGH. Pure SwiftUI + SwiftData, no dependencies, standard patterns.
 
+---
+
+## Summary: New Dependencies
+
+### Required New SPM Dependency
+
+| Library | Package URL | Version | Purpose | Confidence |
+|---------|-------------|---------|---------|------------|
+| Highlightr | `https://github.com/raspu/Highlightr` | `from: "2.2.0"` (VERIFY) | Syntax highlighting for code cards -- 190+ languages with auto-detection | MEDIUM |
+
+### Everything Else: Zero New Dependencies
+
+| Capability | Technology | Why No Library Needed |
+|------------|-----------|----------------------|
+| URL metadata | LinkPresentation (Apple framework) | Ships with macOS 10.15+; just `import LinkPresentation` |
+| Color detection | Swift Regex | ~40 lines of regex patterns for hex/rgb/hsl |
+| Color swatch rendering | SwiftUI `Color(red:green:blue:)` | Native SwiftUI |
+| Cmd+1-9 hotkeys | KeyboardShortcuts (already installed) | v2.4.0 already in project; supports `.one`-`.nine` key constants |
+| Emoji input | SwiftUI TextField + system picker | `NSApp.orderFrontCharacterPalette(_:)` built into macOS |
+| Expanded label colors | SwiftUI named colors | `.teal`, `.indigo`, `.brown`, `.mint` on macOS 14+ |
+
+**Total new third-party dependencies: 1 (Highlightr)**
+
+---
+
+## What NOT to Add
+
+| Technology | Why Avoid | Use Instead |
+|------------|-----------|-------------|
+| Splash (JohnSundell) | Swift-focused tokenizer. Poor coverage for Python, Ruby, SQL, YAML, Shell -- common in clipboard content. | Highlightr (190+ language grammars) |
+| SwiftSoup / Kanna (HTML parsers) | Over-engineering for URL metadata when LPMetadataProvider exists. | `import LinkPresentation` |
+| TreeSitter (swift-tree-sitter) | Requires per-language grammar binaries, complex build integration. Designed for editors, not preview cards. | Highlightr |
+| WKWebView for code rendering | Loads entire web engine per card. Performance disaster in scrolling list. | Highlightr -> NSAttributedString -> SwiftUI Text |
+| Raw Carbon RegisterEventHotKey | Duplicates what KeyboardShortcuts already manages. More error-prone, potentially conflicts with existing Carbon handler. | KeyboardShortcuts (already installed) |
+| Custom emoji picker libraries | macOS has a built-in one. Adding a library is unnecessary weight. | TextField + system picker |
+| NSColorPanel for color swatches | Full color picker UI. We only display swatches, not pick colors. | SwiftUI `Color(red:green:blue:)` |
+| OpenGraph.swift (third-party) | ~20 lines of work that LPMetadataProvider already handles. | LinkPresentation |
+
+---
+
+## SwiftData Model Changes
+
+### ContentType enum additions
+
+```swift
+enum ContentType: String, Codable, CaseIterable, Sendable {
+    case text
+    case richText
+    case url
+    case image
+    case file
+    case code      // NEW: detected code snippet
+    case color     // NEW: detected color value (standalone hex/rgb/hsl)
+}
 ```
-Pastel/
-  PastelApp.swift              -- @main entry point, Scene definitions
-  Models/
-    ClipboardItem.swift        -- SwiftData @Model
-    Label.swift                -- SwiftData @Model
-    ClipboardItemType.swift    -- Enum for content types
-  Services/
-    ClipboardMonitor.swift     -- NSPasteboard polling
-    PasteService.swift         -- CGEvent paste simulation
-    ImageStorageService.swift  -- File system image management
-    HotkeyService.swift        -- Global hotkey registration
-  Views/
-    Panel/
-      ClipboardPanelView.swift -- Main panel SwiftUI view
-      ClipboardCardView.swift  -- Individual item card
-      SearchBar.swift          -- Search input
-      LabelChipBar.swift       -- Label filter chips
-    MenuBar/
-      MenuBarView.swift        -- MenuBarExtra content
-    Settings/
-      SettingsView.swift       -- Preferences window
-      GeneralSettings.swift    -- General tab
-      AppearanceSettings.swift -- Appearance tab
-  Controllers/
-    PanelController.swift      -- NSPanel management
-  Extensions/
-    NSImage+Thumbnail.swift    -- Image resizing
-    NSPasteboard+Read.swift    -- Typed pasteboard reading
-  Resources/
-    Assets.xcassets            -- App icon, colors
+
+### ClipboardItem new fields
+
+```swift
+// Code snippet metadata
+var detectedLanguage: String?       // Language from Highlightr auto-detect, e.g. "swift", "python"
+
+// Color detection
+var detectedColorHex: String?       // Normalized "#RRGGBB" value
+
+// URL metadata (cached from LPMetadataProvider)
+var urlTitle: String?               // Page title from OG or <title>
+var urlFaviconPath: String?         // Disk path to cached favicon image
+var urlPreviewImagePath: String?    // Disk path to cached OG image
+var urlMetadataFetched: Bool        // Whether fetch was attempted (default: false)
 ```
+
+### Label new field
+
+```swift
+var emoji: String?                  // Single emoji character; nil = use color dot
+```
+
+**Migration:** All new fields are optional or have default values (`urlMetadataFetched` defaults to `false`). SwiftData automatic lightweight migration handles this with no manual migration code.
+
+---
+
+## project.yml Changes
+
+```yaml
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "2.4.0"
+  LaunchAtLogin:
+    url: https://github.com/sindresorhus/LaunchAtLogin-Modern
+    from: "1.1.0"
+  Highlightr:                                    # NEW for v1.1
+    url: https://github.com/raspu/Highlightr
+    from: "2.2.0"                                # VERIFY on GitHub before adding
+
+targets:
+  Pastel:
+    dependencies:
+      - package: KeyboardShortcuts
+      - package: LaunchAtLogin
+      - package: Highlightr                      # NEW
+```
+
+---
+
+## Integration Points with Existing Code
+
+| Existing File | Change Needed | Reason |
+|---------------|---------------|--------|
+| `Models/ContentType.swift` | Add `.code` and `.color` cases | New content types |
+| `Models/ClipboardItem.swift` | Add 6 new optional properties | Code language, color hex, URL metadata |
+| `Models/Label.swift` | Add `emoji: String?` | Emoji label support |
+| `Models/LabelColor.swift` | Add `.teal`, `.indigo`, `.brown`, `.mint` cases | Expanded palette |
+| `Services/ClipboardMonitor.swift` | Call code/color detection after text classification; trigger async URL metadata fetch for URL items | Enrichment at capture time |
+| `App/AppState.swift` | Register Cmd+1-9 handlers via KeyboardShortcuts; add `pasteNthItem(index:)`; initialize Highlightr singleton | Quick paste + highlighting |
+| `Views/Panel/ClipboardCardView.swift` | Add `.code` and `.color` cases to `contentPreview` switch | Route to new card subviews |
+| `Views/Panel/URLCardView.swift` | Enhance to show `urlTitle`, favicon, OG image when available | Rich URL cards |
+| `Views/Panel/ChipBarView.swift` | Show emoji instead of color dot when `label.emoji != nil` | Emoji labels |
+| `Views/Settings/LabelSettingsView.swift` | Add emoji input field to label row | Emoji label management |
+| `Views/Settings/GeneralSettingsView.swift` | Add "Quick Paste Shortcuts" toggle section | Cmd+1-9 enable/disable |
+
+### New Files to Create
+
+| File | Purpose | Dependencies |
+|------|---------|--------------|
+| `Services/CodeDetectionService.swift` | Heuristic code detection scoring | None (pure Swift) |
+| `Services/ColorDetectionService.swift` | Regex color detection + hex normalization | Foundation |
+| `Services/URLMetadataService.swift` | Async LPMetadataProvider fetch + disk caching | LinkPresentation, ImageStorageService |
+| `Views/Panel/CodeCardView.swift` | Syntax-highlighted code preview card | Highlightr |
+| `Views/Panel/ColorCardView.swift` | Color swatch + hex/rgb text display | SwiftUI |
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Reason |
+|------|------------|--------|
+| Cmd+1-9 via KeyboardShortcuts | HIGH | Verified against checked-out source code; Key.one-.nine confirmed, enable/disable API confirmed |
+| URL metadata via LPMetadataProvider | HIGH | Apple first-party framework, stable since macOS 10.15 |
+| Color detection via regex | HIGH | Pure Swift, well-defined format space |
+| Emoji for labels | HIGH | SwiftData optional property + SwiftUI TextField |
+| Expanded label colors | HIGH | SwiftUI named colors on macOS 14+ |
+| Highlightr for syntax highlighting | MEDIUM | Well-known library, but current version/maintenance unverified (WebSearch unavailable) |
+| SwiftData lightweight migration | HIGH | All new fields optional/defaulted; standard SwiftData behavior |
+
+---
+
+## Verification Checklist (Before Implementation)
+
+- [ ] Highlightr: verify latest tag on GitHub, confirm Swift 6 / macOS 14 compatibility, confirm SPM target exists
+- [ ] Highlightr: test `highlightAuto()` with Python, JavaScript, SQL, YAML, Shell samples
+- [ ] LPMetadataProvider: test with 10 diverse URLs (news sites, GitHub, Twitter, etc.) to confirm latency and reliability
+- [ ] KeyboardShortcuts: test Cmd+1 registration to confirm it works alongside existing Cmd+Shift+V toggle
+- [ ] SwiftData migration: test adding new optional fields to existing database with existing clipboard items
 
 ---
 
 ## Sources
 
-All recommendations in this document are based on training knowledge of Apple's frameworks. The following should be consulted for verification:
-
-- **Apple Developer Documentation** -- developer.apple.com/documentation (NSPasteboard, SwiftData, NSPanel, MenuBarExtra, CGEvent)
-- **Apple WWDC sessions** -- WWDC23 "Meet SwiftData", WWDC23 "Build programmatic UI with Xcode", WWDC22 "Bring your app to the menu bar" (MenuBarExtra introduction)
-- **Open-source clipboard managers** -- github.com/p0deje/Maccy (Swift, open-source clipboard manager using NSPasteboard polling), github.com/Clipy/Clipy (older but established architecture patterns)
-- **sindresorhus GitHub** -- github.com/sindresorhus (KeyboardShortcuts, LaunchAtLogin, Defaults -- prolific macOS open-source developer, widely used libraries)
-- **soffes/HotKey** -- github.com/soffes/HotKey (simple hotkey library)
-
-**Confidence rationale:** Apple's first-party frameworks (AppKit, SwiftUI, SwiftData, CoreGraphics) are stable APIs documented by Apple. The patterns described (NSPasteboard polling, NSPanel for floating panels, CGEvent for paste simulation) are well-established in the macOS clipboard manager ecosystem and used by production apps (Maccy, Clipy, Paste, PastePal). Third-party library versions are from training data and should be verified.
+- **KeyboardShortcuts source code** -- directly inspected at `/Users/phulsechinmay/Desktop/Projects/pastel/.build/checkouts/KeyboardShortcuts/` (v2.4.0, confirmed in Package.resolved)
+- **Pastel codebase** -- all 40+ source files inspected for integration points
+- **Package.resolved** -- confirmed KeyboardShortcuts 2.4.0, LaunchAtLogin-Modern 1.1.0
+- **Apple Developer Documentation** (training knowledge) -- LPMetadataProvider, LinkPresentation framework
+- **Highlightr** (training knowledge) -- github.com/raspu/Highlightr; version needs verification
 
 ---
-*Stack research for: Pastel -- Native macOS Clipboard Manager*
-*Researched: 2026-02-05*
+*Stack research for: Pastel v1.1 -- Rich Content & Enhanced Paste*
+*Researched: 2026-02-07*

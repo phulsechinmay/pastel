@@ -1,308 +1,244 @@
 # Project Research Summary
 
-**Project:** Pastel
-**Domain:** Native macOS Clipboard Manager
-**Researched:** 2026-02-05
+**Project:** Pastel v1.1 -- Rich Content & Enhanced Paste
+**Domain:** Native macOS Clipboard Manager (enrichment layer on shipped v1.0)
+**Researched:** 2026-02-07
 **Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-Pastel is a native macOS clipboard manager with a screen-edge sliding panel interface. Based on research of established clipboard managers (Maccy, Clipy, Paste, PastePal), the recommended approach is a hybrid AppKit/SwiftUI architecture targeting macOS 14+ with Swift 6. The core technical pattern is well-established: timer-based NSPasteboard polling (0.5s intervals) for clipboard monitoring, NSPanel with non-activating configuration for the floating panel, and CGEvent-based Cmd+V simulation for paste-back.
+Pastel v1.1 adds five feature areas to a stable v1.0 foundation: code snippet detection with syntax highlighting, color value detection with swatches, URL preview cards with auto-fetched Open Graph metadata, Cmd+1-9 direct paste hotkeys, and label emoji with an expanded color palette. All four research streams agree on the core approach: v1.1 is an enrichment layer that adds new optional metadata fields to the existing ClipboardItem model and introduces three new detection/fetch services, with no changes to the existing content ingestion pipeline's control flow. The v1.0 architecture is well-suited for these additions -- ClipboardMonitor is the single ingestion point, ContentType drives card routing, and SwiftData lightweight migration handles new optional fields cleanly.
 
-The primary architectural decision is mandating AppKit NSPanel over pure SwiftUI windows. This is non-negotiable because paste-back functionality requires the panel to remain non-activating, which only NSPanel can provide. Pure SwiftUI windows steal focus and break the entire paste workflow. The recommended stack is Swift 6 + SwiftUI (for UI content) + AppKit bridges (for window management and system integration) + SwiftData (for persistence) + direct disk storage for images.
+The recommended approach minimizes new dependencies. Only one new third-party library is needed: Highlightr for syntax highlighting (190+ language grammars with auto-detection). Everything else uses Apple frameworks (LinkPresentation for URL metadata), the already-installed KeyboardShortcuts library (for Cmd+1-9 hotkeys), or pure Swift (color detection regex, emoji input). There is a key disagreement between researchers on two topics -- whether to add `.code`/`.color` as new ContentType enum cases vs. treating them as display enrichments on `.text`, and whether to use Highlightr vs. a custom regex-based highlighter. These are resolved below with clear recommendations.
 
-Key risks center on three areas: (1) NSPasteboard polling must be tuned correctly (0.5s interval) to avoid battery drain or missed clipboard changes, (2) NSPanel focus management must be configured perfectly or paste-back fails entirely, and (3) image storage must be disk-based from day one or memory/database bloat causes crashes at scale. These are all preventable with correct foundational architecture. The domain is well-documented with multiple open-source reference implementations, giving high confidence in the technical approach.
+The three highest risks are: (1) Cmd+1-9 global hotkey conflicts with browsers and other apps -- this is the single decision most likely to cause user frustration if handled incorrectly; (2) URL metadata fetching introducing network I/O into a previously offline capture pipeline -- must be fully decoupled from clipboard capture; (3) SwiftData schema migration when adding new fields -- all fields must be optional with nil defaults, tested against a v1.0 database before shipping. The label emoji and color detection features are low risk and should be built first.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The macOS clipboard manager domain has converged on a standard technical stack built on Apple's native frameworks. Swift is the only sensible choice for native macOS development, with Swift 6 providing complete concurrency checking essential for background clipboard polling. SwiftUI handles UI content using modern declarative patterns, but AppKit integration is mandatory for window management (NSPanel), clipboard access (NSPasteboard), and paste simulation (CGEvent).
+v1.1 requires only one new third-party dependency. The existing stack (Swift 6, SwiftUI+AppKit hybrid, SwiftData, KeyboardShortcuts 2.4.0, LaunchAtLogin-Modern 1.1.0) is unchanged and validated.
 
-**Core technologies:**
-- **Swift 6.0 + Xcode 16**: Native language with full concurrency checking for clipboard polling on background threads
-- **SwiftUI (macOS 14+)**: Declarative UI framework for view content, MenuBarExtra for status bar presence
-- **AppKit (bridged)**: Essential for NSPanel (non-activating floating window), NSPasteboard (clipboard access), and system integration
-- **SwiftData (macOS 14+)**: Modern persistence with @Model macro, automatic SwiftUI integration via @Query, eliminates Core Data boilerplate
-- **NSPasteboard + Timer polling**: Only reliable clipboard monitoring approach; poll changeCount every 0.5s (no notification API exists)
-- **CGEvent API**: Simulate Cmd+V keystroke for paste-back; requires Accessibility permission
-- **FileManager + disk storage**: Images stored as files in Application Support directory, database holds only file paths
+**New and reused technologies:**
 
-**Critical version constraint:** macOS 14.0 (Sonoma) minimum deployment target enables SwiftData and @Observable macro. This covers vast majority of active users while unlocking best-in-class developer experience.
+- **Highlightr** (`from: "2.2.0"`, VERIFY): Syntax highlighting via highlight.js -- 190+ languages, auto-detection, dark themes. The only new SPM dependency. MEDIUM confidence (verify current version, Swift 6 compatibility, maintenance status on GitHub before adding).
+- **LinkPresentation (LPMetadataProvider)**: Apple first-party framework for URL metadata extraction -- title, favicon, og:image. Ships with macOS 10.15+, zero dependencies. HIGH confidence.
+- **KeyboardShortcuts (existing, v2.4.0)**: Already installed. Supports `.one` through `.nine` key constants, `Shortcut` construction, `enable/disable` API. Verified against checked-out source. HIGH confidence.
+- **Pure Swift regex**: Color detection (hex/rgb/hsl patterns) and code detection heuristic. No library needed. HIGH confidence.
+- **SwiftUI native colors**: `.teal`, `.indigo`, `.brown`, `.mint` available on macOS 14+ for expanded label palette. HIGH confidence.
+
+**Stack items explicitly rejected:**
+- Splash (Swift-only highlighting -- insufficient for a clipboard manager that captures all languages)
+- TreeSitter (heavyweight grammar binaries, overkill for preview cards)
+- WKWebView for code rendering (performance disaster in scrolling lists)
+- SwiftSoup/Kanna for HTML parsing (LPMetadataProvider handles this)
+- Raw Carbon RegisterEventHotKey (duplicates KeyboardShortcuts, more error-prone)
 
 ### Expected Features
 
-Research across competitors (PastePal, Paste, Maccy, Clipy, CopyClip, Raycast) reveals a clear feature landscape with 15 table stakes features, 17 competitive differentiators, and 11 anti-features to deliberately avoid.
-
 **Must have (table stakes):**
-- Clipboard monitoring (text, images, URLs, files) — core purpose, every competitor has this
-- Persistent history across restarts — users expect data survives
-- History list/panel UI — the core browsing surface
-- Search across history — essential once history exceeds ~20 items
-- Paste-back into active app — the whole point of the product
-- Global hotkey to open panel — power users expect hotkey access
-- Menu bar residence + launch at login — always-running daemon pattern
-- Duplicate detection — don't store same content twice consecutively
-- Delete individual items + clear all — privacy baseline
-- History size limit / retention settings — storage management
+- Monospaced, syntax-highlighted code previews with auto language detection
+- Color swatch rendering for hex and rgb values alongside original text
+- URL cards showing page title and domain (fetched from page metadata)
+- Non-blocking URL metadata fetch with graceful fallback to plain URL card
+- Cmd+Shift+1-9 hotkeys to paste Nth item without opening panel
+- Enable/disable toggle for quick paste hotkeys in Settings
+- Expanded label color palette (8 to 12 colors)
+- Optional emoji per label replacing color dot when set
+- Backward-compatible SwiftData migration for all model changes
 
-**Should have (competitive differentiators):**
-- Screen-edge sliding panel — Pastel's core differentiator vs. dropdown/popup competitors
-- Rich content previews (images, code, colors) — see what you copied at a glance
-- Label/tag organization — turns clipboard into lightweight knowledge tool
-- Hotkey paste (Cmd+1-9) — paste last 9 items without opening panel
-- Configurable sidebar position (all edges) — useful for different monitor setups
-- Code snippet detection + syntax highlighting — high value for developer audience
-- Keyboard-driven navigation — full workflow without touching mouse
-- Paste as plain text option — strip formatting, users specifically seek this
+**Should have (differentiators):**
+- Language badge on code cards ("Swift", "Python")
+- Favicon display on URL cards
+- og:image header on URL cards (progressive enhancement)
+- Position number badges (1-9) on panel cards when hotkeys active
+- Alternate color format display (copy hex, see rgb and vice versa)
+- System emoji picker access via Ctrl+Cmd+Space in label settings
 
-**Defer to v2+ (nice-to-have):**
-- URL preview cards with Open Graph metadata — requires network fetching, adds complexity
-- Drag-and-drop from panel — covered by paste-back for v1
-- App-specific allow/ignore lists — useful but adds complexity to monitoring pipeline
-- iCloud sync — explicitly out of scope, massive complexity
-
-**Anti-features (deliberately NOT building):**
-- iCloud sync across devices — massive complexity, server costs, privacy concerns
-- AI-powered features (summarize, translate) — scope creep, every app has AI now
-- Plugin/extension system — premature, huge API surface
-- Clipboard rules/automation engine — different product category
-- Browser extension integration — NSPasteboard already captures browser copies
+**Defer (v2+):**
+- Full webpage screenshot thumbnails
+- TreeSitter-grade syntax accuracy
+- User-selectable language per code item
+- Custom hex color input for labels
+- Per-slot custom hotkey assignment (snippet/template territory)
+- Configurable modifier key for quick paste hotkeys
+- HUD overlay showing paste preview near cursor
 
 ### Architecture Approach
 
-The architecture is a hybrid AppKit/SwiftUI system with clear separation: SwiftUI for all view content, AppKit for window management and system integration. This is the standard pattern for professional macOS menu bar utilities that need deep system integration.
+The v1.0 architecture has clean separation and well-defined extension points. v1.1 adds three new services (CodeDetectionService, ColorDetectionService, URLMetadataService), two new card views (CodeCardView, ColorCardView/ColorSwatchView), and enhances the existing URLCardView. All detection runs at capture time in ClipboardMonitor, and results are stored as optional fields on ClipboardItem. Card routing in ClipboardCardView dispatches to type-specific subviews based on ContentType and the presence of new metadata fields.
 
-**Major components:**
-1. **ClipboardMonitor** — Timer-based polling of NSPasteboard.general.changeCount every 0.5s; when changed, immediately read content and classify type (text, image, URL, file, code, color)
-2. **ClipboardItem Store (SwiftData)** — Persists metadata (content type, timestamp, source app, labels) in SQLite-backed database; text stored inline, images as file path references
-3. **ImageStorageService** — Saves full images to ~/Library/Application Support/Pastel/images/, generates 200px thumbnails on background queue, keeps database small and fast
-4. **SlidingPanel (NSPanel + NSHostingView)** — AppKit NSPanel configured as .nonactivatingPanel + .floating so it appears over other apps without stealing focus; hosts SwiftUI views via NSHostingView bridge
-5. **PasteBackService** — Writes selected item to NSPasteboard, then posts CGEvent for Cmd+V keystroke to frontmost app; requires Accessibility permission
-6. **HotkeyManager** — Registers global hotkeys via Carbon RegisterEventHotKey API for panel toggle and Cmd+1-9 paste shortcuts
-7. **MenuBarExtra + Settings** — SwiftUI MenuBarExtra scene for status bar icon, standard Settings scene for preferences window
+**New services:**
+1. **CodeDetectionService** -- Heuristic code detection (shebang, keywords, structural patterns, indentation). Pure function, no dependencies.
+2. **ColorDetectionService** -- Regex-based color parsing (hex/rgb/hsl). Pure function, no dependencies.
+3. **URLMetadataService** -- Async LPMetadataProvider fetch with 5s timeout. Fire-and-forget after item insertion. Disk caching for favicon/og:image via existing ImageStorageService.
 
-**Key architectural patterns:**
-- NSPasteboard polling with changeCount is the ONLY reliable clipboard monitoring approach (no notification API exists)
-- NSPanel with .nonactivatingPanel style mask is mandatory for paste-back to work (SwiftUI windows steal focus and break paste flow)
-- Images MUST be stored on disk, not in database BLOBs (prevents database bloat and memory issues at scale)
-- CGEvent paste simulation with 50-100ms delay after panel hide (gives target app time to regain focus)
-- Hybrid AppKit/SwiftUI: SwiftUI for reactive UI, AppKit for system-level window control
+**New views:**
+1. **CodeCardView** -- Syntax-highlighted preview via Highlightr, language badge, monospaced font.
+2. **ColorSwatchView** -- Rounded rectangle swatch + original text value.
 
-**Data flow:**
-System clipboard changes → ClipboardMonitor detects via changeCount → classifies content type → persists to SwiftData + disk (images) → UI auto-updates via @Query → User selects item → PasteBackService writes to pasteboard → panel dismisses → CGEvent Cmd+V → target app pastes
+**Model additions (all optional, nil default):**
+- ClipboardItem: `detectedLanguage`, `detectedColorHex`, `urlTitle`, `urlFaviconPath`, `urlPreviewImagePath`, `urlMetadataFetched`
+- Label: `emoji`
+- LabelColor enum: 4 new cases (teal, indigo, brown, mint)
+- ContentType enum: 2 new cases (.code, .color)
 
 ### Critical Pitfalls
 
-Six critical pitfalls emerged from research, each capable of causing rewrites or broken core functionality:
+1. **Cmd+1-9 global hotkey conflicts (CRITICAL)** -- Cmd+1-9 are used by Safari, Chrome, Finder, Terminal, and most editors for tab/view switching. Registering them globally via Carbon breaks basic functionality in those apps. **Prevention:** Use Cmd+Shift+1-9 as the default modifier. Provide a Settings toggle to enable/disable.
 
-1. **NSPasteboard polling misconfiguration** — Poll too fast (drains battery, energy warnings), too slow (misses rapid clipboard changes), or defer content reading (captures wrong content). **Prevention:** 0.5s interval with DispatchSourceTimer leeway, read content immediately on changeCount change, use main thread for NSPasteboard access (not thread-safe).
+2. **URL metadata fetching must be decoupled from capture (HIGH)** -- The clipboard capture pipeline is synchronous and offline. Network I/O must never block it. **Prevention:** Insert ClipboardItem immediately, fire async metadata fetch afterward. Update model when metadata arrives. Skip private/local URLs. 5-second timeout. Rate limit to 2-3 concurrent fetches.
 
-2. **NSPanel focus stealing breaks paste-back** — If panel becomes key window, Cmd+V pastes into panel instead of target app, destroying the entire value proposition. **Prevention:** Use NSPanel with .nonactivatingPanel style mask, set isFloatingPanel = true, hidesOnDeactivate = false, level = .floating. Host SwiftUI via NSHostingView. This must be correct from day one; retrofitting onto SwiftUI Window is a complete rewrite.
+3. **SwiftData migration must use optional fields only (HIGH)** -- Adding non-optional fields without defaults crashes on existing databases. **Prevention:** Every new field is `String?` or `Bool` with default. Test migration against a v1.0 database before shipping.
 
-3. **Accessibility permission UX disaster** — Paste-back requires Accessibility permission; if not checked/handled gracefully, paste silently fails and users think app is broken. **Prevention:** Check AXIsProcessTrusted() before every paste, show onboarding explaining why permission needed before triggering system prompt, gracefully degrade to copy-only mode if denied, provide re-check button in settings.
+4. **Code detection false positives (HIGH)** -- Naive heuristics misclassify URLs, config text, and prose as code. **Prevention:** Multi-signal scoring with high threshold (3+), minimum line count, negative signals for natural language. Test with diverse non-code clipboard content.
 
-4. **App Sandbox blocks Mac App Store distribution** — Clipboard managers need Accessibility API access (for paste-back) and global hotkeys, both incompatible with App Sandbox. **Decision:** Direct distribution outside Mac App Store, no sandbox. This enables full feature set. Attempting to sandbox later breaks paste-back.
+5. **Syntax highlighting performance (MEDIUM)** -- Highlightr uses JavaScriptCore with ~100ms cold start. **Prevention:** Initialize once at app launch, highlight asynchronously, cache results by content hash. Truncate input to ~2000 chars for preview cards. Never highlight synchronously in view body.
 
-5. **Image storage in memory/database causes OOM crashes** — Screenshots are 5-50MB uncompressed; storing 100 images in memory or as SQLite BLOBs balloons RAM/database, degrades query performance. **Prevention:** Store images as files in Application Support, generate thumbnails (200px) on background queue, database holds only file paths, lazy-load full images on demand, enforce disk budget (e.g., 500MB) with oldest-first deletion.
+## Key Disagreements Resolved
 
-6. **CGEvent paste fails silently in specific contexts** — Secure input fields (banking apps, password managers), certain Electron/Java apps, and timing issues cause paste simulation to fail or paste wrong content. **Prevention:** Add 50-100ms delay between panel hide and CGEvent post, pause clipboard monitoring during paste-back (set flag to ignore next changeCount), detect IsSecureEventInputEnabled() and show "copied to clipboard" toast instead, test with diverse apps (Safari, Chrome, Terminal, VS Code, IntelliJ).
+### ContentType Enum: New Cases vs. Display Enrichment
+
+**STACK.md and FEATURES.md** recommend adding `.code` and `.color` cases to ContentType. **ARCHITECTURE.md and PITFALLS.md** recommend keeping these as display enrichments (optional metadata fields) on `.text` items, with no new enum cases.
+
+**Resolution: Add `.code` and `.color` to ContentType.** ContentType is stored as a raw String and new enum cases are additive -- they do not break existing predicates. New items get the new types; existing items remain `.text`. The benefit is cleaner card routing (switch on type rather than checking nullable fields) and clearer semantics in the data model. The detection priority order (URL > color > code > text) prevents ambiguity. Ensure all existing `switch` statements on ContentType gain the new cases.
+
+### Syntax Highlighting: Highlightr vs. Custom Regex
+
+**STACK.md and FEATURES.md** recommend Highlightr for its 190+ language coverage and auto-detection. **ARCHITECTURE.md** recommends a custom regex-based highlighter to avoid the JavaScript dependency. **PITFALLS.md** notes Highlightr's JSContext overhead and suggests Splash as an alternative.
+
+**Resolution: Use Highlightr.** A clipboard manager captures code from every language. A custom regex highlighter covering 5-10 languages provides a degraded experience for users copying Python, Ruby, SQL, YAML, or shell scripts. Highlightr's auto-detection is the key value -- it eliminates the need for language-specific detection heuristics. The ~2MB bundle size is negligible for a desktop app. The JSContext cold start (~100ms) is mitigated by initializing once at app launch. If Highlightr proves unmaintained or incompatible with Swift 6, fall back to the custom regex approach as a contingency.
+
+### Hotkey Default Modifier
+
+**STACK.md** recommends Cmd+1-9 defaulting to DISABLED. **FEATURES.md** recommends Ctrl+1-9 as default. **ARCHITECTURE.md** recommends Cmd+Shift+1-9. **PITFALLS.md** recommends panel-open-only via local event monitor.
+
+**Resolution: Cmd+Shift+1-9, globally registered, enabled by default, with Settings toggle.** Cmd+Shift+1-9 conflicts with nothing in standard macOS apps. Global registration (not panel-open-only) provides the core value -- pasting without opening the panel. A Settings toggle allows users to disable if needed. This avoids the NSPanel local event monitor complexity flagged by the pitfalls researcher while keeping the feature accessible out of the box.
 
 ## Implications for Roadmap
 
-Based on research, the roadmap should follow a strict dependency-driven structure with five phases. The architecture mandates specific ordering: clipboard monitoring + data persistence + panel infrastructure MUST come first as the foundation, paste-back and hotkeys next to validate core value, then content richness (images/previews), organization features (labels/search), and finally polish.
+Based on combined research, the five feature areas should be organized into 4 phases, ordered by dependency depth, risk level, and feature completeness.
 
-### Phase 1: Foundation (Clipboard Monitoring + Basic Panel)
-**Rationale:** Everything depends on reliable clipboard monitoring and data persistence. Without these, nothing else can be built or tested. The panel infrastructure (NSPanel configuration) must also be architected correctly from day one because retrofitting non-activating behavior onto a standard window is a rewrite.
+### Phase 1: Data Model + Label Enhancements
 
-**Delivers:** Functional clipboard manager that captures text/images/URLs/files, persists to SwiftData database, displays in a basic screen-edge sliding panel, supports search, and provides menu bar presence with launch-at-login.
+**Rationale:** Schema changes must come first because every subsequent phase depends on the new model fields. Label enhancements are the lowest-risk feature and can ship alongside the schema changes to provide immediate visual value.
 
-**Addresses features:**
-- Clipboard monitoring (all content types)
-- Persistent history (SwiftData)
-- Basic panel UI (NSPanel + NSHostingView + simple list)
-- Search (SwiftData predicates)
-- Menu bar + launch at login (MenuBarExtra + SMAppService)
-- Duplicate detection
-- Delete individual/clear all
-- History retention settings
+**Delivers:**
+- New optional fields on ClipboardItem (detectedLanguage, detectedColorHex, urlTitle, urlFaviconPath, urlPreviewImagePath, urlMetadataFetched)
+- New `.code` and `.color` ContentType cases
+- New `emoji: String?` on Label model
+- Expanded LabelColor enum (teal, indigo, brown, mint)
+- Emoji-or-dot rendering in ChipBarView and context menu
+- Emoji input in LabelSettingsView
+- SwiftData migration validation against v1.0 database
 
-**Avoids pitfalls:**
-- NSPasteboard polling configured at 0.5s with correct read-immediately pattern (Pitfall 1)
-- NSPanel with .nonactivatingPanel from day one (Pitfall 2)
-- Images stored on disk, not database BLOBs (Pitfall 5)
-- Direct distribution decision made (Pitfall 4)
+**Features addressed:** Label emoji, expanded color palette
+**Pitfalls addressed:** SwiftData migration (Pitfall 5), emoji storage/layout (Pitfall 7), color palette backward compatibility (Pitfall 11)
 
-**Research needed:** None — this phase uses well-documented Apple APIs and established patterns.
+### Phase 2: Code + Color Detection and Card Views
 
-### Phase 2: Core UX (Paste-Back + Hotkeys)
-**Rationale:** Paste-back is the core value proposition — without it, Pastel is just a clipboard viewer. Hotkeys enable the power-user workflow. These features validate whether the NSPanel configuration is correct and whether the product concept works.
+**Rationale:** Code and color detection are pure-function services with no external dependencies (detection only -- highlighting is also included since it pairs directly with the code card). Building detection and card rendering together provides a complete "rich text cards" experience. Color detection is trivially simple; code detection needs careful threshold tuning.
 
-**Delivers:** Working paste-back functionality (double-click or Enter to paste into frontmost app), global hotkey to toggle panel, Accessibility permission onboarding flow, animated panel slide transitions.
+**Delivers:**
+- CodeDetectionService with multi-signal heuristic
+- ColorDetectionService with hex/rgb/hsl regex parsing
+- Detection wired into ClipboardMonitor.processPasteboardContent()
+- CodeCardView with Highlightr syntax highlighting (singleton init, async caching)
+- ColorSwatchView / ColorCardView
+- Updated ClipboardCardView routing for .code and .color types
+- Highlightr SPM dependency added to project.yml
 
-**Uses stack elements:**
-- CGEvent API for Cmd+V simulation
-- Carbon RegisterEventHotKey for global hotkeys
-- AXIsProcessTrusted for permission checking
-- NSAnimationContext for panel animations
+**Features addressed:** Code snippet highlighting, color swatches, language badges
+**Pitfalls addressed:** False positive detection (Pitfall 1), highlighting performance (Pitfall 2), scroll caching (Pitfall 9), regex greedy matching (Pitfall 6)
+**Uses:** Highlightr (new SPM dependency)
 
-**Implements architecture:**
-- PasteBackService component
-- HotkeyManager component
-- Screen-edge positioning calculations
-- Panel animation state machine
+### Phase 3: URL Preview Cards
 
-**Avoids pitfalls:**
-- 50-100ms delay between panel hide and CGEvent post (Pitfall 6)
-- Pause clipboard monitoring during paste-back with isPasting flag (Pitfall 6)
-- Accessibility permission check before every paste with graceful degradation (Pitfall 2)
-- Detect secure input mode and fall back to copy-only (Pitfall 6)
+**Rationale:** URL metadata fetching is the highest-risk feature due to network I/O, async complexity, and edge cases (private URLs, slow servers, non-HTML responses). Build it after the simpler detection features are stable. The existing URLCardView provides a working fallback.
 
-**Research needed:** Minimal — CGEvent paste simulation is well-documented, but edge cases with specific apps (Electron, Java) may need empirical testing.
+**Delivers:**
+- URLMetadataService with LPMetadataProvider
+- Async fire-and-forget metadata fetch triggered after URL item insertion
+- Enhanced URLCardView showing title + favicon + og:image when available
+- Fallback to globe + URL text on fetch failure
+- Favicon and og:image disk caching via ImageStorageService
+- Image cleanup extension in RetentionService and clearAllHistory
+- Skip logic for private/local URLs
+- Settings toggle to disable URL fetching
 
-### Phase 3: Content Richness (Images + Rich Previews)
-**Rationale:** Now that core capture/display/paste pipeline is solid, add visual richness that makes Pastel delightful. Images and rich previews differentiate from lightweight competitors (Maccy, Flycut). This phase depends on the storage architecture from Phase 1 being correct.
+**Features addressed:** URL preview cards, favicon display, og:image headers
+**Pitfalls addressed:** Blocking capture pipeline (Pitfall 3), redundant fetches (Pitfall 8), non-HTML URLs (Pitfall 12), background thread SwiftData updates (Integration Pitfall B)
+**Uses:** LinkPresentation framework (Apple, zero dependency)
 
-**Delivers:** Image thumbnails in panel, syntax highlighting for code snippets, color swatches for hex/RGB values, source app tracking, content type detection intelligence.
+### Phase 4: Quick Paste Hotkeys (Cmd+Shift+1-9)
 
-**Addresses features:**
-- Rich image previews (thumbnails, full-size on click)
-- Code syntax highlighting
-- Color swatch detection
-- Source app tracking (via NSWorkspace)
-- Intelligent content type classification
+**Rationale:** Functionally independent of the card enrichment features. Building it last means the paste pipeline is stable and all card types are rendering correctly. This phase needs Accessibility permission (already granted from v1.0) and careful testing of the hotkey-to-paste flow.
 
-**Uses stack elements:**
-- ImageStorageService with thumbnail generation (NSImage/CGImage)
-- Highlightr library for code syntax highlighting
-- String+Detection utilities for identifying code/color/URL patterns
+**Delivers:**
+- 9 KeyboardShortcuts.Name definitions (quickPaste1-9, Cmd+Shift+1-9)
+- quickPaste(index:) method on AppState
+- pasteWithoutPanel flow in PasteService (writeToPasteboard + skip monitor + CGEvent)
+- Settings toggle in GeneralSettingsView ("Quick Paste Shortcuts" section)
+- Position number badges (1-9) on first 9 panel cards
+- Correct mapping to visible (filtered) list when panel is open
 
-**Avoids pitfalls:**
-- Thumbnail generation on background queue, never blocking main thread (Pitfall 5)
-- Lazy-load full images on demand, only thumbnails in memory (Pitfall 5)
-- Disk budget enforcement with oldest-first cleanup (Pitfall 5)
-
-**Research needed:** Minor — Syntax highlighting library evaluation (Highlightr vs. alternatives), language detection strategies for code snippets.
-
-### Phase 4: Organization (Labels + Enhanced Search)
-**Rationale:** As users accumulate history, organization features become valuable. Labels and enhanced search help at scale but aren't needed when users have 50 items. These can be built independently of content types from Phase 3.
-
-**Delivers:** Label system for categorizing items, label-based filtering, enhanced search across labels, pinned/favorite items, keyboard-driven navigation in panel.
-
-**Addresses features:**
-- Label/tag organization
-- Label filtering (chip bar UI)
-- Favorite/pin items
-- Keyboard navigation (arrow keys + Enter + Escape + Cmd+1-9)
-- Search combined with label filters
-
-**Implements architecture:**
-- LabelManager component
-- SwiftData many-to-many relationships (ClipboardItem ↔ Label)
-- Label chip UI components
-- Keyboard navigation state machine
-
-**Avoids pitfalls:**
-- Labels are optional, not mandatory (UX Pitfall: forced organization adds friction)
-- Default view shows ALL items, labels are filter dimension (UX Pitfall)
-- Search performs well at scale with SwiftData predicates or FTS5 if needed (Performance Trap)
-
-**Research needed:** Optional — If search performance degrades at 2000+ items, research SQLite FTS5 integration alongside SwiftData.
-
-### Phase 5: Polish (Settings + Configurability + Edge Cases)
-**Rationale:** After all features are working, add configurability and handle edge cases. Settings depend on knowing what needs configuration (which requires all features built first). This phase is about production-ready refinement.
-
-**Delivers:** Complete Settings window, configurable sidebar position (all four edges), hotkey customization, paste behavior settings (direct vs. copy-then-paste), always-dark theme refinement, multi-monitor support, edge case handling.
-
-**Addresses features:**
-- Configurable sidebar position (left/right/top/bottom edges)
-- Paste as plain text option
-- Settings window with tabs (General, Appearance, Hotkeys)
-- User-configurable global hotkeys (via KeyboardShortcuts library)
-- Animated panel transitions (polish pass)
-
-**Avoids pitfalls:**
-- Panel appears on screen with frontmost app (multi-monitor support) (UX Pitfall)
-- Panel doesn't cover area where user wants to paste (configurable position) (UX Pitfall)
-- Hotkey numbers displayed on first 9 items (UX Pitfall)
-- Memory stable after 48 hours of use (tested) ("Looks Done But Isn't")
-- Orphaned image files cleaned up when items deleted ("Looks Done But Isn't")
-
-**Research needed:** None — Settings UI is standard SwiftUI, edge cases are discovered during testing.
+**Features addressed:** Cmd+Shift+1-9 direct paste, number badges, settings toggle
+**Pitfalls addressed:** Global hotkey conflicts (Pitfall 4), filter mapping confusion (Pitfall 10), number badge layout overlap (Pitfall 13)
+**Uses:** KeyboardShortcuts (existing, v2.4.0)
 
 ### Phase Ordering Rationale
 
-The five-phase structure follows strict technical dependencies:
-
-1. **Phase 1 is non-negotiable first** because clipboard monitoring, persistence, and NSPanel configuration are architectural foundations. Every other feature builds on top. Getting NSPanel configuration wrong means a rewrite.
-
-2. **Phase 2 must come after Phase 1** because paste-back depends on having items in history and the panel working. It validates the core product concept. If paste-back doesn't work due to NSPanel misconfiguration, we discover it here before building more features.
-
-3. **Phase 3 (content richness) is independent of Phase 4 (organization)** but both depend on Phase 1's storage architecture. They could theoretically be parallel, but content richness delivers more user-visible value, so it comes first.
-
-4. **Phase 4 adds organization** which becomes valuable as history grows. Can't build labels until the data model is stable (Phase 1).
-
-5. **Phase 5 is last** because settings UI depends on having features to configure. Building settings prematurely means redesigning them as features evolve.
-
-**Dependency-driven not feature-driven:** This ordering prevents architectural rewrites. Building paste-back before getting NSPanel right, or adding images before deciding on storage strategy, causes expensive backtracking.
+- **Phase 1 first** because every other phase adds fields to the models that Phase 1 defines. The label enhancements ride along as a low-risk quick win with immediate visual payoff.
+- **Phase 2 second** because code and color detection are pure functions with no network dependency and can be unit tested in isolation. Highlightr is the only new library and should be validated early.
+- **Phase 3 third** because URL metadata fetching introduces network I/O and async complexity. Building it after Phase 2 means the card rendering pipeline is already proven for the simpler cases.
+- **Phase 4 last** because hotkeys are architecturally independent -- they bypass the panel entirely. They also benefit from all card types being complete (the number badges make more sense when cards show rich content).
+- This ordering matches risk escalation: Phase 1 is near-zero risk, Phase 2 is low risk with one library to validate, Phase 3 is medium risk with network I/O, Phase 4 is medium risk with global hotkey conflict surface.
 
 ### Research Flags
 
 **Phases needing deeper research during planning:**
-- **Phase 3 (Content Richness):** Syntax highlighting library evaluation (Highlightr maintenance status, alternatives like TreeSitter), language detection for code snippets, color parsing edge cases
-- **Phase 4 (Organization):** If search performance degrades at scale (2000+ items), may need SQLite FTS5 integration research
+- **Phase 2:** Verify Highlightr's current version, Swift 6 compatibility, and macOS 14 support on GitHub before implementation. Test `highlightAuto()` with diverse language samples. If Highlightr is unmaintained or broken, fall back to custom regex highlighter.
+- **Phase 3:** Test LPMetadataProvider with 10+ diverse URLs (news sites, GitHub, social media, API endpoints, redirect chains) to calibrate timeout, error handling, and edge cases. Verify Content-Type header checking for non-HTML responses.
 
-**Phases with standard patterns (skip research-phase):**
-- **Phase 1:** NSPasteboard polling, SwiftData persistence, MenuBarExtra — all well-documented Apple APIs with established patterns
-- **Phase 2:** CGEvent paste simulation, Carbon hotkey registration — mature APIs with reference implementations in Maccy/Clipy
-- **Phase 5:** Settings UI, preferences persistence — standard SwiftUI patterns
+**Phases with standard patterns (skip deep research):**
+- **Phase 1:** SwiftData optional field addition and enum expansion are well-documented patterns. Just test migration.
+- **Phase 4:** KeyboardShortcuts API is verified against the checked-out source code. Registration, enable/disable, and handler patterns are confirmed.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Swift, SwiftUI, AppKit, SwiftData are Apple first-party frameworks with stable APIs and extensive documentation. NSPasteboard, NSPanel, CGEvent are mature (10+ years). SwiftData is newer (WWDC 2023) but stable for production by late 2024. Third-party library versions (HotKey, Highlightr) are from training data and should be verified. |
-| Features | MEDIUM | Competitor feature analysis based on training knowledge of PastePal, Paste, Maccy, Clipy, Raycast through May 2025. WebSearch unavailable for live verification. Feature landscape is stable (clipboard managers haven't fundamentally changed), but specific version details may have updated. |
-| Architecture | HIGH | Architectural patterns (NSPasteboard polling, NSPanel non-activating, CGEvent paste, disk-based image storage) are established community consensus observed in open-source clipboard managers. These patterns are 5+ years old and proven. AppKit/SwiftUI hybrid approach is standard for pro macOS apps. |
-| Pitfalls | MEDIUM-HIGH | Core pitfalls (NSPanel focus stealing, image storage OOM, polling misconfiguration, Accessibility permission UX) are well-known in macOS utility development community. Specific edge cases (CGEvent failures in certain apps) are anecdotal and may vary by macOS version. Security considerations (concealed pasteboard types) are documented Apple APIs. |
+| Stack | MEDIUM-HIGH | All Apple frameworks are HIGH. Highlightr is MEDIUM (verify version and Swift 6 compat). Everything else is validated or zero-dependency. |
+| Features | MEDIUM-HIGH | Feature scope is well-defined from PROJECT.md. Detection heuristics need tuning during implementation. URL metadata edge cases need real-world testing. |
+| Architecture | HIGH | Based on direct source code analysis of all 40+ Pastel files. Integration points are concrete and verified against the codebase. |
+| Pitfalls | HIGH | Pitfalls are based on well-understood patterns (hotkey conflicts, SwiftData migration, threading, regex). No novel risks. |
 
 **Overall confidence:** MEDIUM-HIGH
 
-The technical approach is sound with HIGH confidence because it's based on mature Apple APIs and proven patterns from established clipboard managers. Feature landscape confidence is MEDIUM due to lack of live competitor verification, but the core features are stable. The main uncertainty is around third-party library versions and edge cases in paste simulation with specific apps.
-
 ### Gaps to Address
 
-**SwiftData maturity on macOS:** SwiftData was introduced WWDC 2023 (macOS 14). By late 2024 it was production-ready, but edge cases with complex queries or relationships may exist. **Mitigation:** Start with SwiftData for rapid development; if issues arise, Core Data is a well-documented fallback. They share SQLite backend and similar concepts.
-
-**Third-party library versions:** Versions listed (HotKey ~0.2, KeyboardShortcuts ~2.0, Highlightr ~2.1) are from training data. **Mitigation:** Verify current versions on GitHub before adding to Package.swift. All libraries are widely used in macOS indie app ecosystem.
-
-**Paste simulation edge cases:** CGEvent Cmd+V simulation may fail in specific apps (certain Electron builds, Java apps, remote desktop clients). **Mitigation:** Test with diverse apps during Phase 2 (Safari, Chrome, Firefox, Terminal, VS Code, IntelliJ, 1Password). Document known incompatibilities and provide "copied to clipboard" fallback.
-
-**macOS Sequoia (15.x) and macOS 16 changes:** Research based on training knowledge through May 2025. macOS evolves, and new privacy restrictions or API changes may have occurred. **Mitigation:** Verify NSPasteboard behavior, Accessibility permission flow, and CGEvent posting against current macOS release notes during Phase 1 setup.
-
-**Search performance at scale:** SwiftData predicate-based search may degrade at 5000+ items. **Mitigation:** Test search performance during Phase 4 with synthetic large datasets. If needed, research SQLite FTS5 integration as a parallel search index.
-
-**Multi-monitor edge cases:** Panel positioning on secondary displays, different DPI scaling, vertical monitors. **Mitigation:** Test with 2+ monitor setups during Phase 5. NSScreen API handles most cases, but edge detection calculations need empirical validation.
+- **Highlightr verification**: Current version, SPM target name, Swift 6 strict concurrency compatibility, and macOS 14 support must be checked on GitHub before adding the dependency. If unavailable or broken, the custom regex highlighter is the fallback (covers fewer languages but works).
+- **LPMetadataProvider real-world behavior**: Rate limiting, behavior with paywalled sites, and non-HTML URLs need empirical testing. The manual URLSession+regex fallback is documented but should only be needed if LPMetadataProvider proves unreliable.
+- **KeyboardShortcuts Cmd+Shift+1-9**: While `.one` through `.nine` key constants and modifier support are confirmed in the library source, the specific combination Cmd+Shift+1-9 should be tested for conflicts with any standard macOS system shortcut (none are expected, but verify).
+- **SwiftData migration with 6+ new fields**: Adding multiple optional fields simultaneously should be safe for lightweight migration, but test on a populated v1.0 database to confirm. If it fails, fields may need to be added in stages across multiple schema versions.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Apple Developer Documentation — NSPasteboard, NSPanel, CGEvent, SwiftData, MenuBarExtra, @Observable, Core Graphics, AppKit, SwiftUI (developer.apple.com/documentation)
-- Apple WWDC sessions — WWDC23 "Meet SwiftData", WWDC22 "Bring your app to the menu bar" (MenuBarExtra introduction)
-- Apple Human Interface Guidelines — macOS menu bar apps, panel windows, Accessibility patterns
+- Pastel v1.0 source code -- all 40+ Swift files inspected for integration points and architecture analysis
+- KeyboardShortcuts v2.4.0 checked-out source -- Key.swift (.one-.nine), Shortcut constructor, enable/disable API, CarbonKeyboardShortcuts wrapping
+- Package.resolved -- confirmed dependency versions (KeyboardShortcuts 2.4.0, LaunchAtLogin-Modern 1.1.0)
+- Apple Developer Documentation (training knowledge) -- LPMetadataProvider, LinkPresentation, SwiftData migration, SwiftUI Color constants
 
 ### Secondary (MEDIUM confidence)
-- Open-source clipboard managers — Maccy (github.com/p0deje/Maccy), Clipy (github.com/Clipy/Clipy) — architectural patterns for NSPasteboard polling, CGEvent paste simulation, hotkey registration
-- sindresorhus libraries — KeyboardShortcuts, LaunchAtLogin, Defaults (github.com/sindresorhus) — widely used in macOS indie app ecosystem
-- soffes/HotKey — Simple Swift wrapper for Carbon RegisterEventHotKey (github.com/soffes/HotKey)
-- Training knowledge of PastePal, Paste, Raycast, CopyClip feature sets through May 2025
+- Highlightr library (github.com/raspu/Highlightr) -- training knowledge of highlight.js wrapper, 190+ languages, auto-detection. Version and current maintenance need verification.
+- Open Graph Protocol (ogp.me) -- stable web standard, unlikely to have changed
+- PastePal and CopyLess 2 feature sets -- competitive reference for feature expectations
 
 ### Tertiary (LOW confidence)
-- Highlightr library for syntax highlighting — Version and maintenance status should be verified (github.com/raspu/Highlightr)
-- Specific macOS Sequoia (15.x) or macOS 16 changes — Should be verified against current release notes
-
-**Note on research conditions:** WebSearch and WebFetch were unavailable during this research session. All findings are based on training knowledge of well-established Apple frameworks and patterns through May 2025. Core APIs (NSPasteboard, NSPanel, CGEvent) have been stable for 10+ years and are unlikely to have changed fundamentally. SwiftData is newer (2023) but production-ready. Third-party library versions should be verified before implementation.
+- Highlightr Swift 6 compatibility -- unverified, needs testing
+- LPMetadataProvider rate limiting behavior -- undocumented by Apple, needs empirical testing
 
 ---
-*Research completed: 2026-02-05*
+*Research completed: 2026-02-07*
 *Ready for roadmap: yes*

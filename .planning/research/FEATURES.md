@@ -1,297 +1,573 @@
-# Feature Research
+# Feature Research: v1.1 Rich Content & Enhanced Paste
 
-**Domain:** macOS Clipboard Manager
-**Researched:** 2026-02-05
-**Confidence:** MEDIUM (based on training data through May 2025; WebSearch/WebFetch unavailable for live verification)
+**Domain:** macOS Clipboard Manager (enrichment layer)
+**Project:** Pastel
+**Researched:** 2026-02-06
+**Confidence:** MEDIUM-HIGH (based on training data through May 2025; WebSearch/WebFetch unavailable for live verification. Apple framework APIs and established patterns are HIGH confidence; third-party library specifics are MEDIUM.)
 
-## Competitors Analyzed
+> **Scope:** This document covers only the v1.1 features. For v1.0 feature landscape, see git history of this file. Five feature areas are investigated: code snippet detection + syntax highlighting, URL preview cards, color value detection + swatches, Cmd+1-9 direct paste hotkeys, and label emoji + expanded color palette.
 
-| App | Price Model | Positioning | Notes |
-|-----|-------------|-------------|-------|
-| PastePal | Freemium / one-time purchase | Feature-rich, screen-edge panel, label organization | Primary inspiration for Pastel |
-| Paste (by Lingual) | Subscription ($1.99/mo or Setapp) | Premium, visual-first, iCloud sync, pinboards | Market leader in polished UX |
-| Maccy | Free / open source | Lightweight, keyboard-driven, minimalist | Most popular free option |
-| CopyClip / CopyClip 2 | Free / Paid | Simple menu bar history | Basic tier, many downloads due to free |
-| Flycut | Free / open source | Developer-focused, Jumpcut fork | Very minimal, text-only |
-| Clipy | Free / open source | Japanese origin, snippet support | Aging, not updated frequently |
-| Alfred Clipboard History | Included with Alfred Powerpack | Integrated into Alfred launcher | Not standalone, but very popular |
-| Raycast Clipboard History | Included with Raycast | Integrated into Raycast launcher | Growing fast, especially among developers |
-| CopyLess 2 | Paid (one-time) | 10-item quick paste via number keys | Pioneered the Cmd+number paste paradigm |
-| Unclutter | Paid (one-time) | Clipboard + files + notes in one panel | Multi-tool, not clipboard-focused |
+---
 
-## Feature Landscape
+## 1. Code Snippet Detection + Syntax Highlighting
 
-### Table Stakes (Users Expect These)
+### How It Works in Clipboard Managers
 
-Features users assume exist. Missing any of these and users will switch to an alternative immediately.
+**Detection approach:** Code detection is a heuristic classification problem. No clipboard manager uses a formal parser. The standard approach is regex-based pattern matching against common code indicators:
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Clipboard monitoring (text) | Core purpose of the app | LOW | NSPasteboard polling or timer-based; every competitor does this |
-| Clipboard monitoring (images) | Users copy images constantly; screenshots, design assets | MEDIUM | Must handle various image formats (PNG, JPEG, TIFF, HEIC); storage strategy matters |
-| Clipboard monitoring (URLs) | URLs are the most-copied content type after text | LOW | Detect and present URLs distinctly from plain text |
-| Clipboard monitoring (files) | Users copy files in Finder regularly | MEDIUM | Store file references/paths, handle moved/deleted files gracefully |
-| Persistent history across restarts | Users expect history survives app/system restarts | MEDIUM | Requires local persistence (SQLite, SwiftData, or Core Data) |
-| History list/panel UI | Users need to browse and select from history | HIGH | The core UI surface; must be fast, scrollable, visually clear |
-| Search | Users accumulate hundreds/thousands of items | MEDIUM | Full-text search across all clipboard content; must be fast |
-| Keyboard shortcut to open | Power users (the target audience) expect hotkey access | LOW | Global hotkey registration via Carbon API or modern alternatives |
-| Paste-back into active app | The whole point -- select an item and it goes into the active app | HIGH | Requires Accessibility permissions; must handle paste simulation reliably |
-| Menu bar residence | Clipboard managers live in the menu bar, not the dock | LOW | Standard LSUIElement / NSApplication.activationPolicy pattern |
-| History size limit / retention | Users need control over storage growth | LOW | Settings for max items or time-based retention |
-| Delete individual items | Users copy sensitive data (passwords) and need to remove specific entries | LOW | Basic CRUD operation on history |
-| Clear all history | Quick way to nuke everything (privacy concern) | LOW | Single action, confirmation dialog |
-| Launch at login | Clipboard managers must run always; users expect auto-start | LOW | SMLoginItemSetEnabled or ServiceManagement framework |
-| Duplicate detection | Don't store the same content twice in a row | LOW | Compare new clipboard content with most recent entry; every good manager does this |
+| Signal | Weight | Examples |
+|--------|--------|---------|
+| Leading indentation with braces/semicolons | HIGH | `function foo() {`, `if (x) {`, `for i in range:` |
+| Language keywords at line start | HIGH | `import`, `func`, `def`, `class`, `const`, `let`, `var`, `return`, `public`, `private` |
+| Common syntax characters | MEDIUM | `=>`, `->`, `::`, `//`, `/*`, `*/`, `#include`, `@property` |
+| Multi-line content with consistent indentation | MEDIUM | 3+ lines with 2/4-space or tab indent |
+| Source app is a code editor | HIGH | Bundle IDs: `com.microsoft.VSCode`, `com.sublimetext.*`, `com.apple.dt.Xcode`, `com.jetbrains.*`, `com.googlecode.iterm2` |
+| Contains only ASCII printable + common whitespace | LOW | Code rarely has emoji or special Unicode |
 
-### Differentiators (Competitive Advantage)
+**Expected behavior in PastePal/Paste:** When a clipboard item is detected as code, the card preview switches from plain body text to a monospaced, syntax-highlighted view. The detection runs at capture time (not at render time), and the content type is stored in the model so rendering is fast on scroll.
 
-Features that separate good from great. Not every competitor has these; having them well-implemented creates real value.
+**Syntax highlighting approach:** Two options exist:
 
-| Feature | Value Proposition | Complexity | Who Has It | Notes |
-|---------|-------------------|------------|------------|-------|
-| Screen-edge sliding panel | Accessible from any app without context-switching; feels native and spatial | HIGH | PastePal, Paste | Pastel's core UI concept. Most competitors use a dropdown or popup. This is the single biggest differentiator for the "premium panel" category |
-| Rich content previews (images, code, colors) | See what you copied at a glance without pasting first | HIGH | PastePal, Paste | Thumbnails for images, syntax highlighting for code, color swatches for hex/rgb values. Most free tools show text-only or tiny icons |
-| Label/tag organization | Categorize clipboard items for later retrieval; turns clipboard into a lightweight knowledge tool | MEDIUM | PastePal (labels), Paste (pinboards) | Maccy/Flycut/CopyClip have zero organization. This is a clear differentiator |
-| Hotkey paste (Cmd+1-9) | Paste any of the last 9 items without opening the panel at all | MEDIUM | CopyLess 2, PastePal | Extremely fast for power users. Most competitors require opening UI first. Pastel should have this |
-| Configurable sidebar position (edges) | Let users choose which screen edge the panel slides from | MEDIUM | PastePal (limited), Paste (bottom only) | Most tools only offer one position. Multi-edge support is genuinely useful for different monitor setups |
-| Code snippet detection + syntax highlighting | Developers copy code constantly; showing it highlighted saves time identifying snippets | HIGH | PastePal (basic), none do it exceptionally | Requires language detection and highlighting. High value for developer audience |
-| Color detection (hex, RGB, HSL swatches) | Designers copy color values all day; showing a visual swatch is immediately useful | MEDIUM | PastePal | Detect color strings and render swatches. Niche but delightful |
-| URL preview cards | Show page title, favicon, maybe a thumbnail for copied URLs | HIGH | Paste (limited) | Requires fetching metadata (Open Graph tags). Can be done lazily. Adds visual richness |
-| Drag-and-drop from panel | Drag items out of the clipboard panel into other apps | MEDIUM | Paste, PastePal | Alternative to paste-back; especially useful for images and files |
-| Favorite/pin items | Pin frequently used items so they stay accessible regardless of history age | LOW | Paste (pinboards), PastePal (favorites) | Simple but high-value. Pinned items persist beyond retention limits |
-| Merge/combine clipboard items | Select multiple items and combine them into one | MEDIUM | Paste | Niche but valued by users who assemble content from multiple sources |
-| Paste as plain text option | Strip formatting when pasting rich text | LOW | Most competitors | Simple but users specifically seek this out. Should be a modifier key (e.g., Shift+click or Opt+paste) |
-| App-specific clipboard history | Show what was copied from which app, filter by source app | MEDIUM | Paste, PastePal | Requires tracking source app via NSWorkspace. Useful for context |
-| Intelligent content type detection | Auto-categorize items as text, code, URL, image, file, color | MEDIUM | PastePal | Makes search and filtering much more useful. Foundation for rich previews |
-| Keyboard-driven navigation | Navigate history, select, and paste entirely with keyboard | MEDIUM | Maccy (excellent), Alfred, Raycast | Power users hate touching the mouse. Arrow keys + Enter to paste is essential for speed |
-| Animated panel transitions | Smooth slide-in/out animation for the edge panel | MEDIUM | PastePal, Paste | Feels polished vs. an abrupt popup. SwiftUI animations make this achievable |
+1. **Highlightr library** (MEDIUM confidence -- verify current maintenance status)
+   - Swift wrapper around highlight.js (JavaScript-based)
+   - Supports 190+ languages and 90+ themes
+   - Auto-language detection via highlight.js heuristics
+   - Returns NSAttributedString suitable for rendering
+   - Concern: Bundles a JavaScriptCore engine. Size and performance implications for a lightweight app.
+   - macOS support: YES (AppKit NSAttributedString output)
+   - SwiftUI integration: Requires wrapping NSTextView or using AttributedString conversion
 
-### Anti-Features (Commonly Requested, Often Problematic)
+2. **Custom regex-based highlighting** (HIGH confidence -- no dependencies)
+   - Implement a minimal highlighter for the top 5-8 languages
+   - Much simpler: keyword coloring, string literal coloring, comment coloring
+   - Fast (no JS engine), small footprint
+   - Covers 80% of visual value with 20% of complexity
+   - Languages to cover: Swift, Python, JavaScript/TypeScript, JSON, HTML/CSS, SQL, Shell/Bash, Go/Rust
 
-Features that seem good but create problems. Deliberately do NOT build these (or defer indefinitely).
+**Recommendation: Start with Highlightr for auto-detection + rich highlighting. Fall back to the custom approach only if Highlightr proves too heavy or unmaintained.** Highlightr's auto-detection is the key value -- manually detecting language from a code snippet is hard to get right. A dark theme like "atom-one-dark" or "monokai" will blend naturally with Pastel's always-dark UI.
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| iCloud sync across devices | "I want my clipboard on my iPhone too" | Massive complexity: conflict resolution, storage costs, privacy concerns (syncing passwords/sensitive data to cloud), unreliable offline behavior. Paste charges a subscription primarily because of this feature's server costs | Do NOT build for v1. If ever, treat as a separate milestone with its own research. Universal Clipboard (built into macOS) already handles basic cross-device paste |
-| Snippet templates / text expansion | "Let me save templates and expand them with shortcuts" | This is an entirely different product category (TextExpander, Typinator, Espanso). Building it dilutes focus and creates a mediocre version of a specialized tool | Keep clipboard manager focused. If users want templates, they'll pair Pastel with a dedicated text expander |
-| Browser extension integration | "Detect what I copy in Chrome specifically" | NSPasteboard already captures browser copies. A browser extension adds maintenance burden (Chrome, Firefox, Safari each need separate extensions), review processes, and security concerns | The standard pasteboard monitoring already captures browser content. No extension needed |
-| AI-powered features (summarize, transform) | "Use AI to summarize my clipboard" or "translate copied text" | Requires API keys or local model, adds latency, cost, and complexity. Tangential to core value. Every app is adding AI; it's not a differentiator, it's a distraction | Keep the app fast and focused. If anything, add a "copy as plain text" or "transform case" as simple text operations, not AI |
-| Real-time collaboration / shared clipboard | "Share clipboard with my team" | Networking, authentication, conflict resolution, privacy nightmares. Completely different product category | Out of scope. Teams use Slack/messaging for sharing content |
-| Plugin/extension system | "Let me write plugins for custom behavior" | Massive API surface to design, maintain, and support. Premature for v1. Plugin APIs are hard to get right and hard to change once published | Build a solid, opinionated app first. Plugin system is a v3+ consideration if there's proven demand |
-| Clipboard rules / automation | "Auto-process items matching a pattern" (e.g., auto-strip tracking params from URLs) | Rules engines are complex to build and UX-heavy to configure. Scope creep. Users who want this use Keyboard Maestro or Shortcuts | Keep processing manual. At most, offer "paste as plain text" as the one transformation |
-| Multi-window / detachable panels | "Let me have clipboard panels on multiple monitors" | Window management complexity multiplies. Focus on one excellent panel | Single panel, configurable position. Support multiple displays by letting user choose which screen edge |
-| Encrypting clipboard history | "Encrypt my clipboard database" | Adds complexity, degrades search performance (can't index encrypted content easily), gives false sense of security since data was already in plaintext on clipboard | Offer "clear history" and "exclude sensitive apps" instead. The clipboard itself is unencrypted at the OS level |
-| Allow/Ignore app lists (for v1) | "Don't capture from my password manager" | Useful but adds complexity to the monitoring pipeline and requires a settings UI for app selection. Already marked out of scope for v1 in PROJECT.md | Defer to v2 as planned. For v1, users can manually delete sensitive items. The "clear history" button covers the acute need |
-| Complex theming / custom colors | "Let me customize the UI colors" | Design maintenance burden, visual inconsistency, QA surface area. The always-dark decision is correct | Always-dark is a feature, not a limitation. Ship one polished theme |
+**Where detection happens:** At capture time in `ClipboardMonitor.processPasteboardContent()`. After content is classified as `.text`, run a secondary classification: "is this code?" If yes, set `contentType` to a new `.code` value. Store the detected language as metadata on the model. Rendering reads the stored type and language, applies highlighting via Highlightr or custom logic.
 
-## Feature Dependencies
+**Model changes needed:**
+- Add `.code` case to `ContentType` enum
+- Add `detectedLanguage: String?` field to `ClipboardItem`
+- Card dispatcher routes `.code` to a new `CodeCardView`
+
+### Table Stakes for Code Highlighting
+
+| Requirement | Why Expected | Complexity | Notes |
+|-------------|--------------|------------|-------|
+| Monospaced font for code cards | Code must look like code; proportional font destroys readability | LOW | `.system(.callout, design: .monospaced)` |
+| At least keyword + string + comment coloring | Three-color minimum makes code recognizable at a glance | MEDIUM | Even basic regex covers this |
+| Auto-detection (user should not have to label items as code) | The entire value is automatic; manual tagging is not workflow-compatible | HIGH | Highlightr auto-detect or source-app heuristic |
+| Dark theme highlighting | Must not clash with always-dark UI; light-background themes would look broken | LOW | Use a dark highlight.js theme |
+| Text stays selectable/copyable | Users paste code, so the underlying text must remain intact | LOW | Highlighting is presentation only; pasteback uses original textContent |
+
+### Differentiators for Code Highlighting
+
+| Feature | Value | Complexity | Notes |
+|---------|-------|------------|-------|
+| Language badge on card | Small pill showing "Swift", "Python", etc. | LOW | Display `detectedLanguage` when available |
+| Line numbers in preview | Helps identify code structure | MEDIUM | Adds visual noise in a small card; consider only for expanded view |
+| Copy as code block (with backticks) | Paste into Slack/Discord with formatting | LOW | Transform on paste: wrap in triple backticks |
+
+### Anti-Features for Code Highlighting
+
+| Anti-Feature | Why Avoid | Alternative |
+|--------------|-----------|-------------|
+| Full syntax tree parsing (TreeSitter, etc.) | Massive dependency for marginal visual improvement over regex; overkill for card previews | Highlightr's JS-based highlighting is sufficient |
+| User-selectable language per item | Adds UI complexity for rare correction; auto-detect is good enough for 90%+ of cases | Trust auto-detection; users who care will paste code elsewhere |
+| Editable code in the card | Clipboard manager is not a code editor | Read-only preview |
+| Code execution / REPL | Completely different product | Do not build |
+
+---
+
+## 2. URL Preview Cards (Open Graph Metadata)
+
+### How It Works in Clipboard Managers
+
+**The standard:** When a URL is copied, the clipboard manager fetches the page's Open Graph metadata (title, description, og:image, favicon) and displays a rich preview card instead of a bare URL string.
+
+**Expected card anatomy:**
 
 ```
-[Clipboard Monitoring]
-    |
-    |-- (required by all features below) -->
-    |
-    +-- [History Persistence (DB)]
-    |       |
-    |       +-- [Search] -- (enhanced by) --> [Label/Tag System]
-    |       |       |
-    |       |       +-- [Keyboard Navigation in Results]
-    |       |
-    |       +-- [History Retention Settings]
-    |       |
-    |       +-- [Delete Individual / Clear All]
-    |       |
-    |       +-- [Favorite/Pin Items]
-    |
-    +-- [Content Type Detection]
-    |       |
-    |       +-- [Rich Previews (Images)]
-    |       |       |
-    |       |       +-- [Image Disk Storage + Thumbnails]
-    |       |
-    |       +-- [Rich Previews (Code + Syntax Highlighting)]
-    |       |
-    |       +-- [Rich Previews (URL Cards)]
-    |       |       |
-    |       |       +-- [URL Metadata Fetching (Open Graph)]
-    |       |
-    |       +-- [Rich Previews (Color Swatches)]
-    |       |
-    |       +-- [Source App Tracking]
-    |
-    +-- [History Panel UI (Sidebar)]
-    |       |
-    |       +-- [Animated Panel Transitions]
-    |       |
-    |       +-- [Configurable Sidebar Position]
-    |       |
-    |       +-- [Drag-and-Drop from Panel]
-    |       |
-    |       +-- [Keyboard-Driven Navigation]
-    |
-    +-- [Paste-Back Mechanism]
-            |
-            +-- [Hotkey Paste (Cmd+1-9)]
-            |
-            +-- [Paste as Plain Text]
-            |
-            +-- [Configurable Paste Behavior (direct vs. copy-then-paste)]
-
-[Menu Bar App] -- (independent, parallel) --> [Launch at Login]
-
-[Settings Window]
-    |
-    +-- [History Retention Settings]
-    +-- [Sidebar Position Config]
-    +-- [Paste Behavior Config]
-    +-- [Hotkey Configuration]
++-------------------------------+
+| [favicon] Page Title          |
+| example.com                   |
+| +---------------------------+ |
+| |     [og:image header]     | |
+| +---------------------------+ |
++-------------------------------+
 ```
 
-### Dependency Notes
+**Fetch flow (established pattern):**
 
-- **Everything requires Clipboard Monitoring:** This is the foundation. Without reliable monitoring, nothing else works.
-- **History Persistence requires Clipboard Monitoring:** Items must be captured before they can be stored.
-- **Search requires History Persistence:** You search over stored items, not the live clipboard.
-- **Rich Previews require Content Type Detection:** Must know what type of content an item is before rendering the appropriate preview.
-- **Image Thumbnails require Image Disk Storage:** Thumbnails are generated from stored images; the storage strategy must exist first.
-- **URL Preview Cards require URL Metadata Fetching:** Optional enhancement; cards can show just the URL if fetching fails.
-- **Paste-Back is independent of UI:** The mechanism works regardless of whether the user triggers it from the panel, a hotkey, or keyboard navigation.
-- **Hotkey Paste (Cmd+1-9) requires Paste-Back:** Uses the same underlying paste simulation, just triggered differently.
-- **Label System enhances Search:** Labels are a search/filter dimension, not a prerequisite. Search can work without labels, labels make search more powerful.
-- **Settings Window depends on having configurable features:** Build settings as features that need configuration are implemented.
+1. URL is captured by ClipboardMonitor
+2. Async metadata fetch fires immediately (non-blocking)
+3. Card renders immediately with URL-only fallback (globe icon + URL text, like current URLCardView)
+4. When metadata arrives, card updates to show title, favicon, og:image
+5. Metadata is cached in the model so subsequent renders are instant
+6. On fetch failure: card stays in fallback state permanently (no retry)
 
-## MVP Definition
+**What to fetch:**
 
-### Launch With (v1)
+| Metadata | Source | Priority | Fallback |
+|----------|--------|----------|----------|
+| Page title | `<title>` tag or `og:title` meta | MUST | Domain name (e.g., "github.com") |
+| Favicon | `<link rel="icon">` or `/favicon.ico` | SHOULD | Globe SF Symbol (current behavior) |
+| Header image | `og:image` meta tag | NICE | No image shown |
+| Domain name | Extracted from URL | MUST | Raw URL |
 
-Minimum viable product -- what's needed for a usable clipboard manager that validates the screen-edge panel concept.
+**How to fetch (native, no external dependencies):**
 
-- [x] Clipboard monitoring (text, images, URLs, files) -- core purpose
-- [x] History persistence (local DB, survives restart) -- useless without this
-- [x] Screen-edge sliding panel UI -- the core differentiator to validate
-- [x] Basic text previews + image thumbnails -- must show what's in history
-- [x] Search across history -- essential once history exceeds ~20 items
-- [x] Paste-back into active app (double-click or Enter) -- the core action
-- [x] Hotkey to open panel -- power user access pattern
-- [x] Duplicate detection -- prevents cluttered history
-- [x] Delete individual items + clear all -- privacy baseline
-- [x] Menu bar residence + launch at login -- always-running daemon pattern
-- [x] History retention settings -- storage management
-- [x] Always-dark theme -- ship one polished look
+```swift
+// URLSession for HTML fetching
+let (data, _) = try await URLSession.shared.data(from: url)
+let html = String(data: data, encoding: .utf8)
 
-### Add After Validation (v1.x)
+// Parse <meta property="og:title" content="...">
+// Parse <meta property="og:image" content="...">
+// Parse <link rel="icon" href="...">
+// Simple regex or string scanning -- no need for a full HTML parser
+```
 
-Features to add once core panel experience is working and stable.
+**Favicon fetching patterns:**
+1. **Google Favicon API** (simplest): `https://www.google.com/s2/favicons?domain=example.com&sz=32` -- single HTTP call, returns 32px PNG. Reliable but requires network access and depends on Google.
+2. **Direct /favicon.ico**: Fetch `https://example.com/favicon.ico`. Works for ~70% of sites.
+3. **Parse HTML**: Find `<link rel="icon" ...>` and fetch that URL. Most reliable but requires two fetches.
+4. **Apple's favicon via WebKit**: Use a WKWebView to load the page. Heavy, not recommended for a clipboard manager.
 
-- [ ] Hotkey paste (Cmd+1-9) -- add when paste-back mechanism is proven reliable
-- [ ] Label/tag organization -- add when users accumulate enough history to need organization
-- [ ] Configurable sidebar position -- add when single-position panel is stable
-- [ ] Code syntax highlighting -- add after content type detection is solid
-- [ ] Color swatch detection -- add alongside code detection
-- [ ] Paste as plain text -- add when users request it (they will)
-- [ ] Favorite/pin items -- add when retention limits cause users to lose important items
-- [ ] Keyboard-driven navigation -- add when panel UX is finalized
-- [ ] Animated panel transitions -- polish pass after core is working
-- [ ] Source app tracking -- add when content type detection is mature
+**Recommendation: Use a lightweight HTML parser approach.** Fetch the page HTML once, extract og:title, og:image, and favicon link from meta/link tags using regex, then fetch the favicon image. Cache aggressively. If the page does not respond within 3-5 seconds, fall back to URL-only card. This avoids external service dependencies and is the pattern PastePal uses.
 
-### Future Consideration (v2+)
+**Model changes needed:**
+- Add `urlTitle: String?` to ClipboardItem
+- Add `urlFaviconPath: String?` (stored on disk like thumbnails)
+- Add `urlImagePath: String?` (og:image, stored on disk)
+- Add `urlDomain: String?` (extracted from URL, for display)
+- Add `urlMetadataFetched: Bool` (flag to avoid re-fetching on failure)
 
-Features to defer until product-market fit is established.
+**Network considerations (critical for this app):**
+- App is not sandboxed, so URLSession works without entitlements
+- Fetching must be non-blocking: async/await with structured concurrency
+- Respect timeouts: 5 second max per URL fetch
+- Rate limit: max 2-3 concurrent fetches to avoid overwhelming the system
+- Do NOT fetch for private/internal URLs (192.168.x.x, localhost, etc.)
+- Do NOT fetch for URLs from password managers (isConcealed)
+- User should be able to disable URL fetching in settings
 
-- [ ] URL preview cards with metadata -- requires network fetching, caching; defer until core is rock solid
-- [ ] Drag-and-drop from panel -- nice but not essential; paste-back covers the core need
-- [ ] Allow/ignore app lists -- privacy enhancement, not needed at launch
-- [ ] iCloud sync -- entirely separate scope if ever
-- [ ] Merge/combine items -- niche power feature
-- [ ] Import/export history -- data portability, defer to v2
+### Table Stakes for URL Previews
 
-## Feature Prioritization Matrix
+| Requirement | Why Expected | Complexity | Notes |
+|-------------|--------------|------------|-------|
+| Show page title instead of raw URL | The raw URL is meaningless for most pages; title gives context | MEDIUM | Requires HTML fetch + parse |
+| Show domain name | Tells user which site the URL is from | LOW | `URL(string:)?.host` extraction |
+| Graceful fallback on failure | Network may be down; page may not have OG tags | LOW | Current URLCardView is the fallback |
+| Non-blocking fetch | Must not freeze UI or slow clipboard capture | MEDIUM | async/await on background task |
+| Cache results | Same URL copied again should not re-fetch | LOW | Store in ClipboardItem model fields |
 
-| Feature | User Value | Implementation Cost | Priority | Phase |
-|---------|------------|---------------------|----------|-------|
-| Clipboard monitoring (all types) | HIGH | MEDIUM | P1 | v1 |
-| History persistence | HIGH | MEDIUM | P1 | v1 |
-| Screen-edge panel UI | HIGH | HIGH | P1 | v1 |
-| Search | HIGH | MEDIUM | P1 | v1 |
-| Paste-back | HIGH | HIGH | P1 | v1 |
-| Global hotkey | HIGH | LOW | P1 | v1 |
-| Menu bar + launch at login | HIGH | LOW | P1 | v1 |
-| Duplicate detection | MEDIUM | LOW | P1 | v1 |
-| Delete/clear history | MEDIUM | LOW | P1 | v1 |
-| History retention settings | MEDIUM | LOW | P1 | v1 |
-| Basic image thumbnails | HIGH | MEDIUM | P1 | v1 |
-| Hotkey paste (Cmd+1-9) | HIGH | MEDIUM | P2 | v1.x |
-| Label/tag system | MEDIUM | MEDIUM | P2 | v1.x |
-| Configurable sidebar position | MEDIUM | MEDIUM | P2 | v1.x |
-| Code syntax highlighting | MEDIUM | HIGH | P2 | v1.x |
-| Paste as plain text | MEDIUM | LOW | P2 | v1.x |
-| Favorite/pin items | MEDIUM | LOW | P2 | v1.x |
-| Keyboard navigation | HIGH | MEDIUM | P2 | v1.x |
-| Color swatch detection | LOW | MEDIUM | P2 | v1.x |
-| Animated transitions | MEDIUM | MEDIUM | P2 | v1.x |
-| Source app tracking | LOW | MEDIUM | P2 | v1.x |
-| URL preview cards | LOW | HIGH | P3 | v2+ |
-| Drag-and-drop | LOW | MEDIUM | P3 | v2+ |
-| Allow/ignore apps | MEDIUM | MEDIUM | P3 | v2+ |
-| Merge/combine | LOW | MEDIUM | P3 | v2+ |
+### Differentiators for URL Previews
 
-**Priority key:**
-- P1: Must have for launch
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
+| Feature | Value | Complexity | Notes |
+|---------|-------|------------|-------|
+| Favicon display | Visual site identification at a glance | MEDIUM | Fetch + disk cache + async image loading |
+| og:image header | Makes URL cards visually rich, like link previews in Slack/iMessage | HIGH | Large image fetch + storage + thumbnail |
+| Click to open in browser | Tap URL card opens it in default browser | LOW | `NSWorkspace.shared.open(url)` |
 
-## Competitor Feature Analysis
+### Anti-Features for URL Previews
 
-| Feature | PastePal | Paste | Maccy | CopyClip 2 | Flycut | Raycast | Pastel Plan |
-|---------|----------|-------|-------|------------|--------|---------|-------------|
-| Text clipboard | Yes | Yes | Yes | Yes | Yes | Yes | Yes (v1) |
-| Image clipboard | Yes | Yes | No | No | No | Yes | Yes (v1) |
-| URL clipboard | Yes | Yes | Yes | Yes | No | Yes | Yes (v1) |
-| File clipboard | Yes | Yes | No | No | No | Yes | Yes (v1) |
-| Code detection | Basic | No | No | No | No | No | Yes (v1.x) |
-| Color detection | Yes | No | No | No | No | No | Yes (v1.x) |
-| Screen-edge panel | Yes | Yes (bottom) | No (popup) | No (menu) | No (menu) | No (launcher) | Yes (v1, configurable) |
-| Search | Yes | Yes | Yes | Basic | No | Yes | Yes (v1) |
-| Labels/Tags | Yes (labels) | Yes (pinboards) | No | No | No | No | Yes (v1.x) |
-| Hotkey paste (1-9) | Yes | No | No | Yes | No | No | Yes (v1.x) |
-| Paste as plain text | Yes | Yes | Yes | No | No | Yes | Yes (v1.x) |
-| Pin/Favorite | Yes | Yes (pinboards) | No | No | No | No | Yes (v1.x) |
-| iCloud sync | No | Yes | No | No | No | No | No (out of scope) |
-| Drag-and-drop | Yes | Yes | No | No | No | No | Maybe (v2+) |
-| Source app tracking | Yes | Yes | No | No | No | No | Maybe (v1.x) |
-| Keyboard navigation | Yes | Yes | Yes (excellent) | Basic | Basic | Yes | Yes (v1.x) |
-| Animated transitions | Yes | Yes | No | No | No | Yes | Yes (v1.x) |
-| Dark mode | Yes | Yes | System | System | System | System | Always dark |
-| Open source | No | No | Yes | No | Yes | No | TBD |
-| Price | ~$15 one-time | $1.99/mo | Free | $7.99 | Free | Free tier | TBD |
+| Anti-Feature | Why Avoid | Alternative |
+|--------------|-----------|-------------|
+| Full webpage screenshot/thumbnail | Extremely heavy (requires WebKit rendering), slow, storage-hungry | og:image is sufficient; most cards are small |
+| Link checking (detect dead links) | Adds latency, unreliable, not the app's job | Just show the URL; user can click to verify |
+| Auto-shorten URLs | Modifies clipboard content; violates user trust | Show full URL; let user paste as-is |
+| Metadata refresh on every view | Wastes bandwidth, adds latency | Fetch once at capture time, cache forever |
+| Fetching for every URL blindly | Privacy concern: user may copy sensitive URLs | Skip concealed items, skip local IPs, add settings toggle |
 
-### Competitive Positioning Analysis
+---
 
-**Pastel sits between Maccy (lightweight/free) and Paste (premium/subscription).**
+## 3. Color Value Detection + Visual Swatches
 
-- Against Maccy/Flycut/CopyClip: Pastel wins on rich previews, screen-edge panel, labels, and visual polish. These lightweight tools are text-focused popups.
-- Against Paste: Pastel competes on feature parity without the subscription model. Paste's main advantage is iCloud sync (which Pastel explicitly skips) and brand recognition.
-- Against PastePal: Pastel is most directly competitive. Need to match PastePal's core features and differentiate on configurability (sidebar position), polish, and developer-focused features (code highlighting).
-- Against Raycast/Alfred: These are launcher tools with clipboard as one feature. Pastel wins on dedicated UX, richer previews, and organization. Users who want a dedicated tool will choose Pastel.
+### How It Works in Clipboard Managers
 
-**Pastel's competitive edge should be:**
-1. Screen-edge panel that's faster and more configurable than PastePal's
-2. Better code/developer content handling than any competitor
-3. Keyboard-driven power user experience rivaling Maccy's speed
-4. No subscription, no cloud dependency
+**Detection approach:** Color detection is simpler than code detection because color formats have well-defined patterns. PastePal is the main competitor that does this. The detection runs against the text content of `.text` items.
+
+**Supported formats (priority order):**
+
+| Format | Regex Pattern | Example | Priority |
+|--------|--------------|---------|----------|
+| Hex 6-digit | `#[0-9A-Fa-f]{6}` | `#FF5733` | MUST |
+| Hex 3-digit | `#[0-9A-Fa-f]{3}` | `#F53` | MUST |
+| Hex 8-digit (with alpha) | `#[0-9A-Fa-f]{8}` | `#FF573380` | SHOULD |
+| rgb() | `rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)` | `rgb(255, 87, 51)` | MUST |
+| rgba() | `rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*[\d.]+\s*\)` | `rgba(255, 87, 51, 0.5)` | SHOULD |
+| hsl() | `hsl\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*\)` | `hsl(14, 100%, 60%)` | NICE |
+| Named CSS colors | Keyword match | `rebeccapurple`, `cornflowerblue` | DO NOT -- too many false positives |
+
+**Expected behavior:** When the copied text exactly matches or primarily consists of a color value, the card switches to a color preview mode. The key UX decision is: **show the color swatch alongside the text value, not instead of it.** Designers copy color values precisely because they need the text representation to paste somewhere. The swatch is additional context.
+
+**Card anatomy:**
+
+```
++----------------------------------+
+| [app icon]              2m ago   |
+| +--------+  #FF5733             |
+| | swatch |  rgb(255, 87, 51)    |
+| +--------+                      |
++----------------------------------+
+```
+
+**Detection criteria (important nuance):** The entire clipboard content should be a color value, OR the content should be very short (under ~30 characters) and contain a color value. Do NOT detect colors inside longer text like "Set the background to #FF5733 for the header." That should remain a text card. The threshold is: if the text, after trimming whitespace, matches a color pattern entirely, it is a color item.
+
+**Model changes needed:**
+- Add `.color` case to `ContentType` enum
+- Add `detectedColorHex: String?` to ClipboardItem (normalized 6-digit hex for rendering)
+- Card dispatcher routes `.color` to a new `ColorCardView`
+
+**SwiftUI swatch rendering:**
+
+```swift
+// Convert hex to SwiftUI Color
+Color(red: r/255, green: g/255, blue: b/255)
+
+// Render as a rounded rect swatch
+RoundedRectangle(cornerRadius: 6)
+    .fill(swatchColor)
+    .frame(width: 40, height: 40)
+    .overlay(
+        RoundedRectangle(cornerRadius: 6)
+            .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+    )
+```
+
+### Table Stakes for Color Swatches
+
+| Requirement | Why Expected | Complexity | Notes |
+|-------------|--------------|------------|-------|
+| Detect hex colors (#RGB, #RRGGBB) | Most common format; designers/developers use this constantly | LOW | Simple regex |
+| Detect rgb() values | Second most common format | LOW | Simple regex |
+| Visual swatch rendering | The entire point; without the visual, detection is meaningless | LOW | SwiftUI Color + RoundedRectangle |
+| Show text value alongside swatch | Users need the text to paste; swatch is supplementary | LOW | HStack layout |
+| Paste original text, not color object | User copied text, paste text. The swatch is display-only. | LOW | No change to paste behavior; textContent is pasted as-is |
+
+### Differentiators for Color Swatches
+
+| Feature | Value | Complexity | Notes |
+|---------|-------|------------|-------|
+| Detect rgba()/hsla() with alpha | Covers more formats; designers use alpha values | LOW | Extra regex patterns |
+| Show both hex and rgb representations | Copy hex, see rgb conversion and vice versa | LOW | Pure computation |
+| Checkerboard behind alpha swatches | Standard pattern for showing transparency | LOW | ZStack with checkerboard pattern behind color fill |
+| Copy in alternate format (context menu) | Right-click to copy as hex when original was rgb | MEDIUM | Adds context menu action; useful for designers |
+
+### Anti-Features for Color Swatches
+
+| Anti-Feature | Why Avoid | Alternative |
+|--------------|-----------|-------------|
+| Color picker / editor | Different product (Digital Color Meter, Sip); modifying clipboard content is out of scope | Read-only swatch display |
+| Detect colors inside long text | Too many false positives; "Page 3 is #1 in sales" matches hex pattern | Only detect when entire content is a color value |
+| Named CSS color detection | "red", "blue", "green" etc. would match common English words, causing false positives | Stick to syntactic formats (#hex, rgb(), hsl()) |
+| Palette generation (complementary colors, etc.) | Feature creep; this is a clipboard manager, not a design tool | Just show what was copied |
+| Color space conversion (P3, CMYK, etc.) | Niche; adds complexity for minimal value | Stick to sRGB display |
+
+---
+
+## 4. Cmd+1-9 Direct Paste Hotkeys
+
+### How It Works in Clipboard Managers
+
+**The paradigm:** CopyLess 2 pioneered this. PastePal adopted it. The concept: register global hotkeys for Cmd+1 through Cmd+9. Each corresponds to the Nth most recent clipboard item. Pressing the hotkey pastes that item directly into the active app without opening the clipboard panel.
+
+**Expected behavior (critical details):**
+
+1. Cmd+1 = most recent item (same as "paste last")
+2. Cmd+2 = second most recent
+3. ...
+4. Cmd+9 = ninth most recent
+5. The hotkeys work globally, regardless of whether the panel is open
+6. The panel does NOT open when using these hotkeys
+7. Items are ordered by timestamp descending (same as panel order)
+8. Paste behavior respects the same settings as panel paste (direct paste vs. copy-to-clipboard)
+
+**Implementation approach with KeyboardShortcuts:**
+
+The existing codebase uses `KeyboardShortcuts` (sindresorhus) for the panel toggle hotkey. The same library can register Cmd+1 through Cmd+9. However, there is a critical consideration:
+
+**Conflict risk:** Cmd+1 through Cmd+9 are commonly used by other applications:
+- Browsers: Cmd+1-9 switch tabs
+- Finder: Cmd+1-4 switch view modes
+- Many editors: Cmd+1-9 switch tabs or panels
+
+**The standard solution (used by CopyLess 2 and PastePal):** Use a **modifier combination** that does not conflict. Common choices:
+
+| Modifier | Conflict Risk | Ergonomics | Notes |
+|----------|---------------|------------|-------|
+| Cmd+1-9 | HIGH -- conflicts with browser tabs, Finder | Best | Requires careful conflict management; can steal shortcuts from active app |
+| Ctrl+1-9 | LOW -- rarely used by macOS apps | Good | Safe default; some terminal emulators use Ctrl+1-9 |
+| Opt+1-9 | MEDIUM -- some apps use Option for special characters | Medium | Types special characters on some keyboard layouts |
+| Cmd+Shift+1-9 | LOW | Acceptable | Longer reach but safe |
+| Custom (user-configurable) | NONE | Best | Complex to implement; KeyboardShortcuts supports this |
+
+**Recommendation: Default to Ctrl+1-9 with the option to disable.** Ctrl+1-9 has the lowest conflict risk and is ergonomically comfortable. Expose a toggle in Settings to enable/disable the feature entirely (some users may not want global number hotkeys). Do NOT default to Cmd+1-9 -- stealing browser tab switching would immediately frustrate users.
+
+**Implementation flow:**
+
+```
+1. Register global hotkeys: Ctrl+1 through Ctrl+9 via KeyboardShortcuts
+2. On hotkey press:
+   a. Fetch the Nth most recent item from SwiftData
+   b. Call AppState.paste(item:) with that item
+   c. PasteService handles pasteboard write + CGEvent Cmd+V
+3. Panel stays closed (or closes if open)
+```
+
+**Data access pattern:** The hotkey handler needs to query SwiftData for the Nth item:
+
+```swift
+var descriptor = FetchDescriptor<ClipboardItem>(
+    sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+)
+descriptor.fetchLimit = n  // 1-9
+descriptor.fetchOffset = n - 1  // 0-based offset
+let items = try modelContext.fetch(descriptor)
+guard let item = items.first else { return }
+```
+
+**KeyboardShortcuts registration (9 shortcuts):**
+
+```swift
+extension KeyboardShortcuts.Name {
+    static let paste1 = Self("paste1", default: .init(.one, modifiers: [.control]))
+    static let paste2 = Self("paste2", default: .init(.two, modifiers: [.control]))
+    // ... through paste9
+}
+```
+
+### Table Stakes for Cmd+1-9 Hotkeys
+
+| Requirement | Why Expected | Complexity | Notes |
+|-------------|--------------|------------|-------|
+| Global hotkeys that work from any app | The entire point is bypassing the panel | MEDIUM | KeyboardShortcuts library handles this |
+| Items ordered by recency (most recent = 1) | Matches mental model: "1 = last thing I copied" | LOW | FetchDescriptor with timestamp sort |
+| Same paste behavior as panel | Consistency; user expects Cmd+V simulation or copy-to-clipboard based on setting | LOW | Reuse existing PasteService.paste() |
+| Panel does NOT open | This is the quick-paste path; opening panel defeats the purpose | LOW | Do not call panelController.toggle() |
+| Visual/audio feedback that paste happened | Without the panel visible, user needs confirmation something happened | MEDIUM | Brief menu bar icon flash, or system notification sound; subtle but important |
+| Enable/disable toggle in Settings | Not all users want global number hotkeys; must be opt-in or easily disabled | LOW | @AppStorage boolean + conditional hotkey registration |
+
+### Differentiators for Cmd+1-9 Hotkeys
+
+| Feature | Value | Complexity | Notes |
+|---------|-------|------------|-------|
+| Tooltip/HUD showing what will be pasted | Brief floating overlay near cursor showing item 1-9 content before pasting | HIGH | Requires custom window management; deferred |
+| Configurable modifier key | Let users choose between Ctrl, Cmd, Opt, Cmd+Shift | MEDIUM | KeyboardShortcuts supports custom modifiers; good UX win |
+| Number overlay on panel cards | When panel IS open, show "1", "2"... badges on first 9 cards | LOW | Visual hint of hotkey mapping; easy to implement |
+
+### Anti-Features for Cmd+1-9 Hotkeys
+
+| Anti-Feature | Why Avoid | Alternative |
+|--------------|-----------|-------------|
+| Cmd+1-9 as default modifier | Conflicts with browser tab switching, Finder view modes; would frustrate users immediately | Use Ctrl+1-9 or Cmd+Shift+1-9 as default |
+| More than 9 hotkeys (Cmd+0, Cmd+10+) | Diminishing returns; users cannot remember positions beyond ~5 | Cap at 9; for deeper items, use the panel |
+| Custom per-slot assignment | "Cmd+1 always pastes my email signature" -- this is snippet/template functionality, not clipboard history | Slots always map to Nth most recent; for fixed content, use pinned items (v1.2) |
+| Hotkeys active when panel is open | Confusing: does Cmd+3 paste the 3rd item or interact with the panel? | Hotkeys should work identically whether panel is open or closed |
+
+---
+
+## 5. Label Emoji + Expanded Color Palette
+
+### How It Works in Clipboard Managers
+
+**Current state (Pastel v1.0):**
+- Label model: `name: String`, `colorName: String`, `sortOrder: Int`
+- LabelColor enum: 8 colors (red, orange, yellow, green, blue, purple, pink, gray)
+- Chip bar shows: `[colored dot] Label Name`
+- Settings: click color dot to recolor via menu
+- Context menu: assign label with colored dot + name
+
+**Proposed v1.1 enhancements:**
+1. Expand color palette from 8 to 12 colors
+2. Add optional emoji per label that replaces the color dot when set
+
+### Expanded Color Palette (8 -> 12)
+
+**Standard expanded palette for label systems (matches Apple Notes, Reminders, Finder tags):**
+
+| Color | Why Include | New? |
+|-------|-------------|------|
+| Red | Urgency, errors, important | Existing |
+| Orange | Warnings, attention | Existing |
+| Yellow | Highlights, caution | Existing |
+| Green | Success, approved, safe | Existing |
+| Blue | Default, general, info | Existing |
+| Purple | Creative, special | Existing |
+| Pink | Personal, playful | Existing |
+| Gray | Archived, neutral | Existing |
+| Teal | Design, development | NEW |
+| Indigo | Deep category, formal | NEW |
+| Mint | Fresh, secondary green | NEW |
+| Brown | Reference, documentation | NEW |
+
+**SwiftUI Color availability for new colors:**
+- `.teal` -- available macOS 13+ (HIGH confidence)
+- `.indigo` -- available macOS 13+ (HIGH confidence)
+- `.mint` -- available macOS 13+ (HIGH confidence)
+- `.brown` -- available macOS 13+ (HIGH confidence)
+
+All four new colors are native SwiftUI Color constants on macOS 14 (Pastel's target). No custom hex definitions needed.
+
+**Model impact:** No model changes needed. `colorName` is already a String. Just add new cases to `LabelColor` enum.
+
+### Label Emoji
+
+**Expected behavior (per PROJECT.md decision):** "Either emoji OR color, not both -- keeps chips clean."
+
+**When emoji is NOT set:**
+```
+[colored dot] Label Name
+```
+
+**When emoji IS set:**
+```
+[emoji] Label Name
+```
+
+The emoji replaces the color dot entirely. The chip background/border can still use the label's color for filtering highlight state.
+
+**Implementation pattern:**
+
+```swift
+// Label model gets an optional emoji field
+@Model
+final class Label {
+    var name: String
+    var colorName: String
+    var sortOrder: Int
+    var emoji: String?  // NEW: single emoji character, nil = use color dot
+    // ...
+}
+```
+
+**Emoji picker UX options:**
+
+1. **System emoji picker** (NSApp.orderFrontCharacterPalette): The standard macOS emoji picker, triggered by Ctrl+Cmd+Space or programmatically. Reliable but launches a separate window.
+
+2. **Inline emoji grid**: A small grid of preset emojis (20-30 common ones) in the label settings row. Simpler, more contained UX. Popular choices for productivity labels: folders, tags, bookmarks, stars, hearts, fire, lightning, etc.
+
+3. **Text field**: Let user type or paste any emoji into a small text field. Simplest implementation but worst UX (users may not know how to type emoji).
+
+**Recommendation: Inline preset grid with a "more" button that opens the system picker.** This gives quick access to common productivity emojis while allowing full emoji access for power users. The preset grid should include 15-20 emojis like:
+
+```
+Work: briefcase, laptop, wrench, gear, rocket
+Personal: heart, star, fire, sparkles, rainbow
+Categories: folder, bookmark, tag, pin, flag
+Status: checkmark, warning, clock, eye, bell
+```
+
+**Clearing the emoji:** A clear/remove button (small "x" or circle-slash) to revert to color dot mode. Essential UX -- users must be able to undo an emoji choice.
+
+**Where emoji appears (every surface that currently shows the color dot):**
+1. Chip bar in panel
+2. Context menu label assignment
+3. Card label indicator (if shown)
+4. Settings label row
+
+### Table Stakes for Label Enhancements
+
+| Requirement | Why Expected | Complexity | Notes |
+|-------------|--------------|------------|-------|
+| Expanded color palette (10-12 colors) | 8 feels limiting; Apple's own tag systems offer more | LOW | Add enum cases + SwiftUI Colors |
+| Optional emoji per label | Visual differentiation beyond color; accessibility win (color-blind users) | MEDIUM | Model field + emoji picker UI |
+| Emoji replaces color dot (not additive) | Keep chips clean; PROJECT.md decision | LOW | Conditional rendering in chip/context menu |
+| Clear/remove emoji option | Users must be able to undo | LOW | UI button + set emoji to nil |
+| Backwards-compatible (existing labels keep working) | Adding emoji field must not break existing labels | LOW | Optional field defaults to nil |
+
+### Differentiators for Label Enhancements
+
+| Feature | Value | Complexity | Notes |
+|---------|-------|------------|-------|
+| System emoji picker access | Full Unicode emoji support, not just presets | LOW | `NSApp.orderFrontCharacterPalette(nil)` |
+| Emoji in context menu | Labels with emoji show the emoji in right-click menu | LOW | Replace circle with Text(emoji) in menu |
+| Animated emoji on hover | Subtle scale/bounce on chip hover | LOW | SwiftUI animation; delightful polish |
+
+### Anti-Features for Label Enhancements
+
+| Anti-Feature | Why Avoid | Alternative |
+|--------------|-----------|-------------|
+| Custom hex color input | Adds UI complexity; 12 preset colors is sufficient for label categorization | Curated palette of 12 |
+| Gradient label colors | Visual complexity; does not add organizational value | Solid colors only |
+| Multiple emoji per label | Clutters chips; single emoji is the identifier | One emoji max |
+| Auto-assign emoji based on label name | Would often guess wrong; user intent matters | Manual emoji selection |
+| Custom icon upload | Way over-scoped; emoji covers this need | System emoji only |
+
+---
+
+## Feature Dependencies on Existing v1.0 Codebase
+
+### What New Features Build On
+
+| New Feature | Depends On (existing) | Integration Point | Migration Risk |
+|-------------|----------------------|-------------------|----------------|
+| Code detection | ClipboardMonitor.processPasteboardContent() | Secondary classification after `.text` type | LOW -- additive logic |
+| Code highlighting | ClipboardCardView contentPreview switch | New case in switch + new CodeCardView | LOW -- new view, no changes to existing |
+| Code highlighting | ContentType enum | Add `.code` case | MEDIUM -- must handle in all switch statements |
+| URL previews | URLCardView | Replace or enhance existing view | LOW -- enhances existing view |
+| URL metadata fetch | ClipboardMonitor (async post-capture) | New async service triggered after URL item saved | LOW -- new service, no changes to monitor flow |
+| URL metadata storage | ClipboardItem model | New optional String fields | MEDIUM -- SwiftData migration needed |
+| Color detection | ClipboardMonitor.processPasteboardContent() | Secondary classification after `.text` type | LOW -- additive logic |
+| Color swatches | ClipboardCardView contentPreview switch | New case in switch + new ColorCardView | LOW -- new view |
+| Color detection | ContentType enum | Add `.color` case | MEDIUM -- same as code; handle in all switches |
+| Cmd+1-9 hotkeys | AppState.setupPanel() | Register 9 additional KeyboardShortcuts | LOW -- additive |
+| Cmd+1-9 hotkeys | PasteService.paste() | Reuse existing paste flow | LOW -- no changes to PasteService |
+| Cmd+1-9 hotkeys | KeyboardShortcuts library | 9 new shortcut names | LOW -- library already integrated |
+| Label emoji | Label model | New optional String field | MEDIUM -- SwiftData migration |
+| Label emoji | ChipBarView, LabelSettingsView, ClipboardCardView context menu | Conditional rendering at emoji/dot decision points | LOW -- presentation changes |
+| Expanded palette | LabelColor enum | Add 4 new cases | LOW -- enum extension |
+
+### SwiftData Migration Considerations
+
+Adding fields to `ClipboardItem` and `Label` will trigger SwiftData's automatic lightweight migration:
+
+- Adding optional fields (`detectedLanguage: String?`, `urlTitle: String?`, `emoji: String?`, etc.) is a lightweight migration (no data transformation)
+- Adding a new enum case to ContentType is safe because it is stored as String (existing items remain `.text`, `.url`, etc.)
+- Existing items will have `nil` for all new optional fields -- this is correct behavior
+
+**Risk:** SwiftData's automatic migration should handle this. If it does not (rare but possible for complex changes), a manual migration or database reset may be needed. Test migration with a populated v1.0 database.
+
+---
+
+## Complexity Summary
+
+| Feature | Detection | Storage | UI | Network | Total | Phase Recommendation |
+|---------|-----------|---------|----|---------|----|---------------------|
+| Code highlighting | HIGH | LOW | MEDIUM | NONE | HIGH | Phase 1 or 2 -- needs library evaluation |
+| URL preview cards | LOW | MEDIUM | MEDIUM | HIGH | HIGH | Phase 2 or 3 -- network adds risk |
+| Color swatches | LOW | LOW | LOW | NONE | LOW | Phase 1 -- quick win |
+| Cmd+1-9 hotkeys | N/A | N/A | LOW | NONE | MEDIUM | Phase 1 -- independent feature |
+| Label emoji + colors | N/A | LOW | MEDIUM | NONE | LOW-MEDIUM | Phase 1 -- quick win |
+
+**Recommended ordering:**
+1. **Label emoji + expanded palette** -- lowest risk, smallest scope, immediate visual impact
+2. **Color swatches** -- low complexity, no dependencies, completes the "detection" story
+3. **Cmd+1-9 hotkeys** -- independent of rich content; high user value
+4. **Code highlighting** -- higher complexity but no network; can evaluate Highlightr
+5. **URL preview cards** -- highest risk due to network; do last so other features are stable
+
+---
 
 ## Sources
 
-- PastePal app features: Based on training data knowledge of PastePal (pastepal.app), MEDIUM confidence
-- Paste app features: Based on training data knowledge of Paste (pasteapp.io), MEDIUM confidence
-- Maccy features: Based on training data knowledge of Maccy (maccy.app, open source on GitHub), MEDIUM confidence
-- CopyClip 2 features: Based on training data knowledge (Mac App Store listing), MEDIUM confidence
-- Flycut features: Based on training data knowledge (GitHub: TermiT/Flycut), MEDIUM confidence
-- Raycast clipboard: Based on training data knowledge of Raycast clipboard history feature, MEDIUM confidence
-- Alfred clipboard: Based on training data knowledge of Alfred Powerpack clipboard history, MEDIUM confidence
+- Apple Developer Documentation: NSPasteboard, URLSession, SwiftData migration (HIGH confidence -- stable Apple APIs)
+- Highlightr library (github.com/raspu/Highlightr): Training data knowledge (MEDIUM confidence -- verify current maintenance status and version before adopting)
+- KeyboardShortcuts library (github.com/sindresorhus/KeyboardShortcuts): Already in project, known working (HIGH confidence)
+- PastePal feature set: Training data knowledge (MEDIUM confidence -- features may have changed)
+- CopyLess 2 Cmd+1-9 paradigm: Training data knowledge (MEDIUM confidence)
+- SwiftUI Color constants (.teal, .indigo, .mint, .brown): Training data knowledge of macOS 13+ availability (HIGH confidence -- Apple framework constants are stable)
+- Open Graph Protocol (ogp.me): Well-established standard, unlikely to have changed (HIGH confidence)
 
-**Confidence note:** All competitor analysis is based on training data through May 2025. WebSearch and WebFetch were unavailable for live verification. Feature sets may have changed since then. Recommend manually checking competitor websites before finalizing roadmap decisions.
+**Gaps requiring phase-specific research:**
+- Highlightr: Current version, macOS compatibility, Swift 6 concurrency safety, bundle size impact. Verify before adopting.
+- URL metadata fetching: Test with real-world URLs to calibrate timeout, error handling, and edge cases (redirects, paywalls, SPAs that render client-side).
+- KeyboardShortcuts Ctrl+1-9: Verify library supports Control modifier; test conflict behavior on macOS.
 
 ---
-*Feature research for: macOS Clipboard Manager (Pastel)*
-*Researched: 2026-02-05*
+*Feature research for: Pastel v1.1 -- Rich Content & Enhanced Paste*
+*Researched: 2026-02-06*
