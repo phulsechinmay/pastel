@@ -51,44 +51,60 @@ struct ChipBarView: View {
     private func labelChip(for label: Label) -> some View {
         let isActive = selectedLabel?.persistentModelID == label.persistentModelID
 
-        Button {
+        HStack(spacing: 4) {
+            if let emoji = label.emoji, !emoji.isEmpty {
+                Text(emoji)
+                    .font(.system(size: 10))
+            } else {
+                Circle()
+                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                    .frame(width: 8, height: 8)
+            }
+
+            Text(label.name)
+                .font(.caption)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            isActive
+                ? Color.accentColor.opacity(0.3)
+                : Color.white.opacity(0.1),
+            in: Capsule()
+        )
+        .overlay(
+            Capsule()
+                .strokeBorder(
+                    isActive ? Color.accentColor.opacity(0.6) : Color.clear,
+                    lineWidth: 1
+                )
+        )
+        .contentShape(Capsule())
+        .onTapGesture {
             if isActive {
                 selectedLabel = nil
             } else {
                 selectedLabel = label
             }
-        } label: {
+        }
+        .draggable(label.persistentModelID.asTransferString) {
             HStack(spacing: 4) {
                 if let emoji = label.emoji, !emoji.isEmpty {
-                    Text(emoji)
-                        .font(.system(size: 10))
+                    Text(emoji).font(.system(size: 10))
                 } else {
                     Circle()
                         .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
                         .frame(width: 8, height: 8)
                 }
-
                 Text(label.name)
                     .font(.caption)
                     .lineLimit(1)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(
-                isActive
-                    ? Color.accentColor.opacity(0.3)
-                    : Color.white.opacity(0.1),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(
-                        isActive ? Color.accentColor.opacity(0.6) : Color.clear,
-                        lineWidth: 1
-                    )
-            )
+            .background(Color.accentColor.opacity(0.4), in: Capsule())
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Create Chip
