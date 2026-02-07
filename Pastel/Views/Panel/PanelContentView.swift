@@ -20,6 +20,8 @@ struct PanelContentView: View {
     @State private var debouncedSearchText = ""
     @State private var selectedLabel: Label? = nil
     @State private var selectedIndex: Int? = nil
+    @State private var isShiftHeld = false
+    @State private var flagsMonitor: Any?
 
     private enum PanelFocus: Hashable {
         case cardList
@@ -102,6 +104,7 @@ struct PanelContentView: View {
                 searchText: debouncedSearchText,
                 selectedLabelID: selectedLabel?.persistentModelID,
                 selectedIndex: $selectedIndex,
+                isShiftHeld: isShiftHeld,
                 onPaste: { item in pasteItem(item) },
                 onPastePlainText: { item in pastePlainTextItem(item) },
                 onTypeToSearch: { char in
@@ -120,6 +123,17 @@ struct PanelContentView: View {
                 isSearchFocused = false
                 panelFocus = .cardList
             }
+            flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                isShiftHeld = event.modifierFlags.contains(.shift)
+                return event
+            }
+        }
+        .onDisappear {
+            if let monitor = flagsMonitor {
+                NSEvent.removeMonitor(monitor)
+                flagsMonitor = nil
+            }
+            isShiftHeld = false
         }
         .onChange(of: panelActions.showCount) { _, _ in
             isSearchFocused = false

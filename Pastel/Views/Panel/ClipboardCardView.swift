@@ -37,11 +37,15 @@ struct ClipboardCardView: View {
     /// Whether a label chip is currently being dragged over this card.
     var isDropTarget: Bool
 
-    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, isDropTarget: Bool = false, onPaste: (() -> Void)? = nil) {
+    /// Whether the Shift key is currently held (for dynamic badge display).
+    var isShiftHeld: Bool
+
+    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, isDropTarget: Bool = false, isShiftHeld: Bool = false, onPaste: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
         self.badgePosition = badgePosition
         self.isDropTarget = isDropTarget
+        self.isShiftHeld = isShiftHeld
         self.onPaste = onPaste
     }
 

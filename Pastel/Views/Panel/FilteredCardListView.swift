@@ -23,6 +23,7 @@ struct FilteredCardListView: View {
     @State private var dropTargetIndex: Int? = nil
 
     @Binding var selectedIndex: Int?
+    var isShiftHeld: Bool
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
     var onTypeToSearch: ((Character) -> Void)?
@@ -37,6 +38,7 @@ struct FilteredCardListView: View {
         searchText: String,
         selectedLabelID: PersistentIdentifier?,
         selectedIndex: Binding<Int?>,
+        isShiftHeld: Bool = false,
         onPaste: @escaping (ClipboardItem) -> Void,
         onPastePlainText: @escaping (ClipboardItem) -> Void,
         onTypeToSearch: ((Character) -> Void)? = nil
@@ -72,6 +74,7 @@ struct FilteredCardListView: View {
             order: .reverse
         )
         _selectedIndex = selectedIndex
+        self.isShiftHeld = isShiftHeld
         self.onPaste = onPaste
         self.onPastePlainText = onPastePlainText
         self.onTypeToSearch = onTypeToSearch
@@ -100,7 +103,8 @@ struct FilteredCardListView: View {
                                     item: item,
                                     isSelected: selectedIndex == index,
                                     badgePosition: badge,
-                                    isDropTarget: dropTargetIndex == index
+                                    isDropTarget: dropTargetIndex == index,
+                                    isShiftHeld: isShiftHeld
                                 )
                                 .frame(width: 260, height: 195)
                                 .clipped()
@@ -149,7 +153,8 @@ struct FilteredCardListView: View {
                                     item: item,
                                     isSelected: selectedIndex == index,
                                     badgePosition: badge,
-                                    isDropTarget: dropTargetIndex == index
+                                    isDropTarget: dropTargetIndex == index,
+                                    isShiftHeld: isShiftHeld
                                 )
                                 .onTapGesture(count: 2) {
                                     onPaste(item)
