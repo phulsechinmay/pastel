@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 
 ## Current Position
 
-Phase: 9 of 9 (Quick Paste Hotkeys) -- Complete
+Phase: 10 of 10 (Drag-Drop Label Assignment) -- Complete
 Remaining: Phase 8 plan 2 of 2 (08-02 URLCardView enhancement)
-Status: Phase 9 complete, Phase 8 has 1 plan remaining
-Last activity: 2026-02-07 -- Completed quick-008 (Fix search focus stealing from hotkeys)
+Status: Phase 10 complete, Phase 8 has 1 plan remaining
+Last activity: 2026-02-07 -- Completed 10-01-PLAN.md (Drag-drop label assignment)
 
-Progress: [####################░] 95% (21/22 plans across all milestones)
+Progress: [######################] 100% (22/22 plans across all milestones)
 
 ## Previous Milestone: v1.0
 
@@ -59,10 +59,19 @@ Recent decisions affecting current work:
 - [09-01]: quickPasteEnabled defaults to true (opt-out, not opt-in)
 - [09-02]: Badge visibility controlled by parent (FilteredCardListView) via nil badgePosition, not @AppStorage in child
 - [09-02]: 1-based badge numbers (1-9) matching Cmd+1-9 hotkeys, converted from 0-based array index
+- [10-01]: Button replaced with onTapGesture + .draggable in labelChip to avoid macOS gesture conflict
+- [10-01]: PersistentIdentifier serialized as JSON string for drag payload via Codable
+- [10-01]: isDropTarget highest priority in cardBorderColor (above isSelected and isColorCard)
+- [10-01]: Drop target background uses accentColor at 0.15 opacity for subtle highlight
+
+### Roadmap Evolution
+
+- Phase 10 added: Drag-and-drop label assignment from chip bar to clipboard items
 
 ### Pending Todos
 
 - Final manual testing of full application before distribution
+- Phase 8 plan 08-02 (URLCardView enhancement) still pending
 
 ### Quick Tasks Completed
 
@@ -81,5 +90,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed Phase 9 (Quick Paste Hotkeys). Phase 8 plan 08-02 still pending.
+Stopped at: Completed 10-01-PLAN.md (Drag-drop label assignment). Phase 8 plan 08-02 still pending.
 Resume file: None
