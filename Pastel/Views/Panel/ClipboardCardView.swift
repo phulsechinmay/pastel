@@ -63,10 +63,6 @@ struct ClipboardCardView: View {
                         if let emoji = label.emoji, !emoji.isEmpty {
                             Text(emoji)
                                 .font(.system(size: 9))
-                        } else {
-                            Circle()
-                                .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                                .frame(width: 6, height: 6)
                         }
                         Text(label.name)
                             .font(.caption2)
@@ -76,9 +72,7 @@ struct ClipboardCardView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(
-                        isColorCard
-                            ? colorCardTextColor.opacity(0.15)
-                            : Color.white.opacity(0.1),
+                        cardLabelChipBackground(label),
                         in: Capsule()
                     )
                 }
@@ -143,7 +137,13 @@ struct ClipboardCardView: View {
                         try? modelContext.save()
                     } label: {
                         HStack {
-                            Text(labelDisplayText(label))
+                            if let emoji = label.emoji, !emoji.isEmpty {
+                                Text("\(emoji) \(label.name)")
+                            } else {
+                                Image(systemName: "circle.fill")
+                                    .foregroundStyle(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                                Text(label.name)
+                            }
                             if item.label?.persistentModelID == label.persistentModelID {
                                 Spacer()
                                 Image(systemName: "checkmark")
@@ -193,13 +193,13 @@ struct ClipboardCardView: View {
         try? modelContext.save()
     }
 
-    /// Returns a display string for the label in context menus.
-    /// Emoji labels show "emoji name"; color-dot labels show just the name.
-    private func labelDisplayText(_ label: Label) -> String {
+    /// Label chip background on cards: label color for non-emoji labels, standard for emoji.
+    private func cardLabelChipBackground(_ label: Label) -> Color {
         if let emoji = label.emoji, !emoji.isEmpty {
-            return "\(emoji) \(label.name)"
+            return isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1)
         } else {
-            return label.name
+            let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
+            return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.25)
         }
     }
 

@@ -55,10 +55,6 @@ struct ChipBarView: View {
             if let emoji = label.emoji, !emoji.isEmpty {
                 Text(emoji)
                     .font(.system(size: 10))
-            } else {
-                Circle()
-                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                    .frame(width: 8, height: 8)
             }
 
             Text(label.name)
@@ -68,9 +64,7 @@ struct ChipBarView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-            isActive
-                ? Color.accentColor.opacity(0.3)
-                : Color.white.opacity(0.1),
+            chipBackground(isActive: isActive, label: label),
             in: Capsule()
         )
         .overlay(
@@ -92,10 +86,6 @@ struct ChipBarView: View {
             HStack(spacing: 4) {
                 if let emoji = label.emoji, !emoji.isEmpty {
                     Text(emoji).font(.system(size: 10))
-                } else {
-                    Circle()
-                        .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                        .frame(width: 8, height: 8)
                 }
                 Text(label.name)
                     .font(.caption)
@@ -103,7 +93,19 @@ struct ChipBarView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.accentColor.opacity(0.4), in: Capsule())
+            .background(chipBackground(isActive: false, label: label), in: Capsule())
+        }
+    }
+
+    /// Chip background: label color for non-emoji labels, standard for emoji labels.
+    private func chipBackground(isActive: Bool, label: Label) -> Color {
+        if let emoji = label.emoji, !emoji.isEmpty {
+            // Emoji labels use standard chip background
+            return isActive ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.1)
+        } else {
+            // Color labels use the label color as background
+            let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
+            return isActive ? labelColor.opacity(0.5) : labelColor.opacity(0.3)
         }
     }
 

@@ -114,10 +114,12 @@ private struct LabelRow: View {
                 if let emoji = label.emoji, !emoji.isEmpty {
                     Text(emoji)
                         .font(.system(size: 14))
+                        .frame(width: 20, height: 20)
                 } else {
                     Circle()
                         .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
                         .frame(width: 14, height: 14)
+                        .frame(width: 20, height: 20)
                 }
             }
             .buttonStyle(.plain)
