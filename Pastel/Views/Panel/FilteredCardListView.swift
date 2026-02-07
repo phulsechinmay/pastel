@@ -17,9 +17,11 @@ struct FilteredCardListView: View {
 
     @Query private var items: [ClipboardItem]
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
+    @AppStorage("quickPasteEnabled") private var quickPasteEnabled: Bool = true
 
     @Binding var selectedIndex: Int?
     var onPaste: (ClipboardItem) -> Void
+    var onPastePlainText: (ClipboardItem) -> Void
 
     /// Whether the panel is on a horizontal edge (top/bottom), requiring horizontal card layout.
     private var isHorizontal: Bool {
@@ -31,7 +33,8 @@ struct FilteredCardListView: View {
         searchText: String,
         selectedLabelID: PersistentIdentifier?,
         selectedIndex: Binding<Int?>,
-        onPaste: @escaping (ClipboardItem) -> Void
+        onPaste: @escaping (ClipboardItem) -> Void,
+        onPastePlainText: @escaping (ClipboardItem) -> Void
     ) {
         let predicate: Predicate<ClipboardItem>
 
@@ -65,6 +68,7 @@ struct FilteredCardListView: View {
         )
         _selectedIndex = selectedIndex
         self.onPaste = onPaste
+        self.onPastePlainText = onPastePlainText
     }
 
     var body: some View {
@@ -165,6 +169,30 @@ struct FilteredCardListView: View {
             if let index = selectedIndex, index < items.count {
                 onPaste(items[index])
             }
+            return .handled
+        }
+        .onKeyPress(characters: .decimalDigits) { keyPress in
+            // Only handle when Command is held and quick paste is enabled
+            guard quickPasteEnabled, keyPress.modifiers.contains(.command) else { return .ignored }
+
+            // Extract digit 1-9 (ignore 0)
+            guard let digit = keyPress.characters.first,
+                  let number = digit.wholeNumberValue,
+                  number >= 1, number <= 9 else { return .ignored }
+
+            let index = number - 1  // Convert 1-based to 0-based
+            guard index < items.count else { return .ignored }
+
+            let item = items[index]
+
+            if keyPress.modifiers.contains(.shift) {
+                // Cmd+Shift+N: Plain text paste
+                onPastePlainText(item)
+            } else {
+                // Cmd+N: Normal paste (preserving formatting)
+                onPaste(item)
+            }
+
             return .handled
         }
         .onAppear {

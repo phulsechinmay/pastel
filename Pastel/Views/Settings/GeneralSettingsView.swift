@@ -18,6 +18,7 @@ struct GeneralSettingsView: View {
     @AppStorage("historyRetention") private var retentionDays: Int = 90
     @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.paste.rawValue
     @AppStorage("fetchURLMetadata") private var fetchURLMetadata: Bool = true
+    @AppStorage("quickPasteEnabled") private var quickPasteEnabled: Bool = true
 
     var body: some View {
         ScrollView {
@@ -32,11 +33,17 @@ struct GeneralSettingsView: View {
 
                 Divider()
 
-                // 2. Panel toggle hotkey
+                // 2. Panel toggle hotkey + Quick paste
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Hotkey")
                         .font(.headline)
                     KeyboardShortcuts.Recorder("Panel Toggle Hotkey:", name: .togglePanel)
+
+                    Toggle("Quick paste with \u{2318}1-9 while panel is open", isOn: $quickPasteEnabled)
+                        .toggleStyle(.switch)
+                    Text("Use \u{2318}N to paste the Nth item, \u{2318}\u{21E7}N to paste as plain text.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Divider()

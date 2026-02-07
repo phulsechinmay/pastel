@@ -95,7 +95,8 @@ struct PanelContentView: View {
                 searchText: debouncedSearchText,
                 selectedLabelID: selectedLabel?.persistentModelID,
                 selectedIndex: $selectedIndex,
-                onPaste: { item in pasteItem(item) }
+                onPaste: { item in pasteItem(item) },
+                onPastePlainText: { item in pastePlainTextItem(item) }
             )
             .id("\(debouncedSearchText)\(selectedLabel?.persistentModelID.hashValue ?? 0)\(appState.itemCount)")
         }
@@ -112,5 +113,9 @@ struct PanelContentView: View {
 
     private func pasteItem(_ item: ClipboardItem) {
         panelActions.pasteItem?(item)
+    }
+
+    private func pastePlainTextItem(_ item: ClipboardItem) {
+        panelActions.pastePlainTextItem?(item)
     }
 }
