@@ -78,7 +78,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Code and Color Detection** - Detect code snippets and color values at capture time with syntax-highlighted and swatch card views
 - [ ] **Phase 8: URL Preview Cards** - Auto-fetch URL metadata and render rich preview cards with title, favicon, and og:image
 - [x] **Phase 9: Quick Paste Hotkeys** - Cmd+1-9 pastes the Nth item while panel is open, with position badges
-- [ ] **Phase 10: Drag-and-Drop Label Assignment** - Drag label chips from the chip bar onto clipboard items to assign labels
+- [x] **Phase 10: Drag-and-Drop Label Assignment** - Drag label chips from the chip bar onto clipboard items to assign labels
 
 ## Phase Details
 
@@ -168,4 +168,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10
 | 7. Code and Color Detection | v1.1 | 3/3 | Complete | 2026-02-07 |
 | 8. URL Preview Cards | v1.1 | 1/2 | In progress | - |
 | 9. Quick Paste Hotkeys | v1.1 | 2/2 | Complete | 2026-02-07 |
-| 10. Drag-and-Drop Label Assignment | v1.1 | 0/1 | Planned | - |
+| 10. Drag-and-Drop Label Assignment | v1.1 | 1/1 | Complete | 2026-02-07 |
