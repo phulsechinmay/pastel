@@ -2,42 +2,25 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-05)
+See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** All 5 phases complete. v1 implementation finished.
+**Current focus:** Milestone v1.1 — Rich Content & Enhanced Paste
 
 ## Current Position
 
-Phase: 5 of 5 (Settings and Polish)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-07 -- Completed quick/003-PLAN.md (fix horizontal header and search/label filtering)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-07 — Milestone v1.1 started
 
-Progress: [██████████] 100% (13/13 plans)
+Progress: [░░░░░░░░░░] 0%
 
-## Performance Metrics
+## Previous Milestone: v1.0
 
-**Velocity:**
-- Total plans completed: 13
-- Average duration: 2.8min
-- Total execution time: 37min
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-clipboard-capture-and-storage | 3/3 | 13min | 4.3min |
-| 02-sliding-panel | 2/2 | 5min | 2.5min |
-| 03-paste-back-and-hotkeys | 2/2 | 5min | 2.5min |
-| 04-organization | 3/3 | 7min | 2.3min |
-| 05-settings-and-polish | 2/2 | 7min | 3.5min |
-
-**Recent Trend:**
-- Last 5 plans: 04-02 (2min), 04-03 (2min), 05-01 (4min), 05-02 (3min)
-- Trend: stable
-
-*Updated after each plan completion*
+- 29/29 requirements delivered across 5 phases (13 plans)
+- Total execution time: ~37 min
+- 3 quick tasks completed post-v1.0
 
 ## Accumulated Context
 
@@ -96,18 +79,18 @@ Recent decisions affecting current work:
 - [05-02]: Direction-aware key handlers return .ignored for non-matching axis
 - [quick-001]: Automatic code signing with DEVELOPMENT_TEAM in project.yml for stable TCC identity
 - [quick-002]: UserDefaults.standard in PasteService (non-view class), copy-only mode skips accessibility check, default is .paste
-- [quick-003]: Nil-guard + force-unwrap pattern in #Predicate instead of optional chaining ?? false (SwiftData SQL generation bug)
+- [quick-003]: SwiftData #Predicate optionals: use ?.method() == true pattern (force-unwrap unsupported, ?? generates TERNARY SQL)
+- [quick-003]: @Query .id() must include ALL filter inputs (search text, label, itemCount) to force view recreation
 
 ### Pending Todos
 
-- Phase 1 checkpoint verification: user should build and run the app to verify all 5 content types captured correctly (see 01-03-SUMMARY.md checkpoint notes)
 - Final manual testing of full application before distribution
 
 ### Blockers/Concerns
 
-- None. All builds verified with xcodebuild. All 13 plans executed successfully.
+- None.
 
-### Quick Tasks Completed
+### Quick Tasks Completed (v1.0)
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
@@ -117,6 +100,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-07T00:52:41Z
-Stopped at: Completed quick/003-PLAN.md (fix horizontal header and search/label filtering)
+Last session: 2026-02-07
+Stopped at: Starting milestone v1.1
 Resume file: None
