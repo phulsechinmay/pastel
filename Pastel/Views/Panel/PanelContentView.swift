@@ -31,9 +31,10 @@ struct PanelContentView: View {
             if isHorizontal {
                 // Horizontal mode: single inline row with header, search, chips, and gear
                 HStack(spacing: 8) {
-                    Text("Pastel")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
+                    Image("PastelLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 38)
 
                     SearchFieldView(searchText: $searchText)
                         .frame(maxWidth: 200)
@@ -61,9 +62,10 @@ struct PanelContentView: View {
             } else {
                 // Vertical mode: header on top, search and chips stacked below
                 HStack {
-                    Text("Pastel")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
+                    Image("PastelLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 38)
                     Spacer()
                     Button {
                         if let container = appState.modelContainer {
