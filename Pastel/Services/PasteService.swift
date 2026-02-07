@@ -84,6 +84,48 @@ final class PasteService {
         }
     }
 
+    /// Paste a clipboard item as plain text (RTF stripped) into the frontmost app.
+    ///
+    /// Follows the same flow as `paste()` but uses `writeToPasteboardPlainText(item:)` which
+    /// omits the `.rtf` data type, causing receiving apps to fall back to plain text styling.
+    /// For non-text content types (url, image, file), delegates to normal `writeToPasteboard(item:)`.
+    func pastePlainText(
+        item: ClipboardItem,
+        clipboardMonitor: ClipboardMonitor,
+        panelController: PanelController
+    ) {
+        let behaviorRaw = UserDefaults.standard.string(forKey: "pasteBehavior") ?? PasteBehavior.paste.rawValue
+        let behavior = PasteBehavior(rawValue: behaviorRaw) ?? .paste
+
+        if behavior == .copy {
+            writeToPasteboardPlainText(item: item)
+            clipboardMonitor.skipNextChange = true
+            panelController.hide()
+            logger.info("Copy-only mode (plain text) -- wrote to pasteboard, skipping Cmd+V simulation")
+            return
+        }
+
+        guard AccessibilityService.isGranted else {
+            logger.warning("Accessibility permission not granted -- plain text paste blocked")
+            return
+        }
+
+        if IsSecureEventInputEnabled() {
+            logger.warning("Secure input is active -- writing plain text to pasteboard only (user must Cmd+V manually)")
+            writeToPasteboardPlainText(item: item)
+            clipboardMonitor.skipNextChange = true
+            return
+        }
+
+        writeToPasteboardPlainText(item: item)
+        clipboardMonitor.skipNextChange = true
+        panelController.hide()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            Self.simulatePaste()
+        }
+    }
+
     // MARK: - Pasteboard Writing
 
     /// Write the clipboard item's content to NSPasteboard.general, preserving all representations.
@@ -151,6 +193,35 @@ final class PasteService {
         }
 
         logger.info("Wrote \(item.type.rawValue) content to pasteboard")
+    }
+
+    /// Write the clipboard item's content to NSPasteboard.general WITHOUT RTF data.
+    ///
+    /// For text-based types (.text, .richText, .code, .color), omits `.rtf` so receiving
+    /// apps fall back to plain text styling. For non-text types (.url, .image, .file),
+    /// delegates to `writeToPasteboard(item:)` since these have no RTF to strip.
+    private func writeToPasteboardPlainText(item: ClipboardItem) {
+        // Non-text types have no RTF -- use normal pasteboard write
+        switch item.type {
+        case .url, .image, .file:
+            writeToPasteboard(item: item)
+            return
+        case .text, .richText, .code, .color:
+            break
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        // Write string and HTML only -- NO .rtf data
+        if let text = item.textContent {
+            pasteboard.setString(text, forType: .string)
+        }
+        if let html = item.htmlContent {
+            pasteboard.setString(html, forType: .html)
+        }
+
+        logger.info("Wrote \(item.type.rawValue) content to pasteboard (plain text, RTF stripped)")
     }
 
     // MARK: - CGEvent Paste Simulation

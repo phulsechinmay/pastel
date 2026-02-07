@@ -61,6 +61,11 @@ final class AppState {
             self?.paste(item: item)
         }
 
+        // Wire plain text paste callback: SwiftUI -> PanelActions -> onPastePlainTextItem -> AppState.pastePlainText -> PasteService
+        panelController.onPastePlainTextItem = { [weak self] item in
+            self?.pastePlainText(item: item)
+        }
+
         // Register global hotkey for panel toggle
         KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in
             MainActor.assumeIsolated {
@@ -156,5 +161,14 @@ final class AppState {
     func paste(item: ClipboardItem) {
         guard let clipboardMonitor else { return }
         pasteService.paste(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
+    }
+
+    /// Paste a clipboard item as plain text (RTF stripped) into the frontmost app.
+    ///
+    /// Delegates to PasteService.pastePlainText which omits RTF data from the pasteboard,
+    /// causing receiving apps to fall back to their default text styling.
+    func pastePlainText(item: ClipboardItem) {
+        guard let clipboardMonitor else { return }
+        pasteService.pastePlainText(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
     }
 }

@@ -10,6 +10,7 @@ import OSLog
 @MainActor @Observable
 final class PanelActions {
     var pasteItem: ((ClipboardItem) -> Void)?
+    var pastePlainTextItem: ((ClipboardItem) -> Void)?
 }
 
 /// Manages the lifecycle of the sliding clipboard panel: creation, show/hide
@@ -51,6 +52,10 @@ final class PanelController {
     /// Callback invoked when a SwiftUI view triggers a paste action.
     /// Set by AppState during setupPanel() to wire into PasteService.
     var onPasteItem: ((ClipboardItem) -> Void)?
+
+    /// Callback invoked when a SwiftUI view triggers a plain text paste action.
+    /// Set by AppState during setupPanel() to wire into PasteService.pastePlainText.
+    var onPastePlainTextItem: ((ClipboardItem) -> Void)?
 
     /// Whether the panel is currently visible on screen.
     var isVisible: Bool {
@@ -102,8 +107,9 @@ final class PanelController {
             createPanel()
         }
 
-        // Sync paste callback to panelActions (in case it was set after panel creation)
+        // Sync paste callbacks to panelActions (in case they were set after panel creation)
         panelActions.pasteItem = onPasteItem
+        panelActions.pastePlainTextItem = onPastePlainTextItem
 
         guard let panel else { return }
 
@@ -226,8 +232,9 @@ final class PanelController {
 
         slidingPanel.contentView = visualEffectView
 
-        // Sync paste callback into panelActions before creating SwiftUI view
+        // Sync paste callbacks into panelActions before creating SwiftUI view
         panelActions.pasteItem = onPasteItem
+        panelActions.pastePlainTextItem = onPastePlainTextItem
 
         // Host SwiftUI content inside the visual effect view
         let contentView = PanelContentView()
