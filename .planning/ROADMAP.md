@@ -128,19 +128,20 @@ Plans:
 - [ ] 08-02-PLAN.md -- Enhanced URLCardView (source app + timestamp header, og:image preview, favicon + title footer), Settings toggle to disable fetching, image cleanup in RetentionService
 
 ### Phase 9: Quick Paste Hotkeys
-**Goal**: Users can paste recent clipboard items instantly via Cmd+Shift+1-9 without opening the panel, with visual position badges on cards
+**Goal**: Users can paste recent clipboard items instantly via Cmd+1-9 while the panel is open, with visual position badges on cards
 **Depends on**: Phase 6 (model), Phase 8 (all card types complete for badge layout)
-**Requirements**: PAST-10, PAST-11, PAST-12
+**Requirements**: PAST-10, PAST-10b, PAST-11, PAST-12
 **Success Criteria** (what must be TRUE):
-  1. User presses Cmd+Shift+1 and the most recent clipboard item is pasted into the active app without the panel appearing
-  2. User presses Cmd+Shift+5 and the 5th most recent item is pasted correctly
-  3. User opens the panel and the first 9 cards show position number badges (1-9) in their corners
-  4. User disables quick paste hotkeys in Settings and Cmd+Shift+1-9 no longer triggers paste
+  1. User opens panel and presses Cmd+1, the most recent clipboard item is pasted into the active app
+  2. User opens panel and presses Cmd+5, the 5th most recent item is pasted correctly
+  3. User opens the panel and the first 9 cards show position number badges (⌘ 1-9) in their bottom-right corners
+  4. User disables quick paste hotkeys in Settings and Cmd+1-9 no longer triggers paste and badges disappear
+  5. User presses Cmd+Shift+3 and the 3rd item is pasted as plain text (RTF stripped)
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md -- KeyboardShortcuts.Name definitions (quickPaste1-9), quickPaste(index:) on AppState, pasteWithoutPanel flow in PasteService, Settings toggle
-- [ ] 09-02-PLAN.md -- Position number badges (1-9) on first 9 panel cards, badge visibility tied to hotkey enabled state
+- [ ] 09-01-PLAN.md -- Quick paste .onKeyPress handlers (Cmd+1-9 normal, Cmd+Shift+1-9 plain text), pastePlainText on PasteService, Settings toggle under Hotkey section
+- [ ] 09-02-PLAN.md -- Keycap-style position badges (⌘ 1-9) on first 9 panel cards, badge visibility tied to quickPasteEnabled setting
 
 ## Progress
 
