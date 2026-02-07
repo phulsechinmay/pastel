@@ -51,33 +51,56 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **INFR-03**: Settings window accessible from menu bar
 - [x] **INFR-04**: Images stored on disk with thumbnails, not in database
 
+## v1.1 Requirements
+
+Requirements for v1.1 milestone: Rich Content & Enhanced Paste.
+
+### Rich Content — Code Detection
+
+- [ ] **RICH-01**: App detects code snippets via multi-signal heuristic and classifies them as `.code` ContentType
+- [ ] **RICH-02**: Code cards show syntax-highlighted previews with auto-detected language (via Highlightr)
+- [ ] **RICH-03**: Code cards display a language badge (e.g., "Swift", "Python")
+
+### Rich Content — Color Detection
+
+- [ ] **RICH-04**: App detects standalone color values (hex, rgb, hsl) and classifies them as `.color` ContentType
+- [ ] **RICH-05**: Color cards show a visual swatch alongside the original color text
+
+### Rich Content — URL Previews
+
+- [ ] **RICH-06**: App auto-fetches URL metadata (title, favicon, og:image) after URL item is captured
+- [ ] **RICH-07**: URL cards show source app icon + timestamp header, og:image preview, and favicon + title footer
+- [ ] **RICH-08**: URL metadata fetch is non-blocking with graceful fallback to plain URL card on failure
+- [ ] **RICH-09**: Settings toggle to disable URL metadata fetching
+
+### Enhanced Paste — Quick Paste Hotkeys
+
+- [ ] **PAST-10**: Cmd+Shift+1-9 pastes the Nth most recent item without opening the panel
+- [ ] **PAST-11**: Settings toggle to enable/disable quick paste hotkeys (enabled by default)
+- [ ] **PAST-12**: First 9 panel cards show position number badges (1-9) when hotkeys are enabled
+
+### Label Enhancements
+
+- [x] **LABL-01**: Label color palette expanded from 8 to 12 colors (add teal, indigo, brown, mint)
+- [x] **LABL-02**: Labels support optional emoji that replaces the color dot in chips and card headers
+- [x] **LABL-03**: Label settings view provides emoji input (system emoji picker accessible via keyboard)
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
 ### Enhanced Paste
 
-- **PAST-10**: User can paste via Cmd+1-9 hotkeys for the latest 9 items without opening panel
-- **PAST-11**: Configurable paste behavior (paste directly vs copy-then-paste) in settings
-- **PAST-12**: User can paste as plain text (strip formatting)
-
-### Rich Content
-
-- **RICH-01**: App detects code snippets and shows syntax-highlighted previews
-- **RICH-02**: App detects color values (hex, rgb, hsl) and shows color swatches
-- **RICH-03**: URL cards show page title and favicon from metadata
-- **RICH-04**: Cards show source app icon/name for each clipboard item
+- **PAST-20**: User can paste as plain text (strip formatting)
 
 ### History Management
 
-- **HIST-01**: User can configure history retention (1 day, 1 week, 1 month, 1 year, all time)
-- **HIST-02**: User can pin/favorite items that persist beyond retention limits
-- **HIST-03**: User can drag-and-drop items from panel into other apps
+- **HIST-01**: User can pin/favorite items that persist beyond retention limits
+- **HIST-02**: User can drag-and-drop items from panel into other apps
 
 ### Privacy
 
 - **PRIV-01**: User can configure allow/ignore app lists for clipboard monitoring
-- **PRIV-02**: App detects concealed clipboard types (passwords) and auto-expires them
 
 ### Data
 
@@ -136,12 +159,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFR-02 | Phase 5 | Complete |
 | INFR-03 | Phase 5 | Complete |
 | INFR-04 | Phase 1 | Complete |
+| LABL-01 | Phase 6 | Complete |
+| LABL-02 | Phase 6 | Complete |
+| LABL-03 | Phase 6 | Complete |
+| RICH-01 | Phase 7 | Pending |
+| RICH-02 | Phase 7 | Pending |
+| RICH-03 | Phase 7 | Pending |
+| RICH-04 | Phase 7 | Pending |
+| RICH-05 | Phase 7 | Pending |
+| RICH-06 | Phase 8 | Pending |
+| RICH-07 | Phase 8 | Pending |
+| RICH-08 | Phase 8 | Pending |
+| RICH-09 | Phase 8 | Pending |
+| PAST-10 | Phase 9 | Pending |
+| PAST-11 | Phase 9 | Pending |
+| PAST-12 | Phase 9 | Pending |
 
-**Coverage:**
+**v1.0 Coverage:**
 - v1 requirements: 29 total
 - Mapped to phases: 29
 - Unmapped: 0
 
+**v1.1 Coverage:**
+- v1.1 requirements: 15 total
+- Mapped to phases: 15
+- Unmapped: 0
+
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-06 after roadmap creation*
+*Last updated: 2026-02-07 after v1.1 roadmap creation*

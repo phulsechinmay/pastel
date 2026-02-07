@@ -1,35 +1,19 @@
 # Roadmap: Pastel
 
-## Overview
+## Milestones
 
-Pastel is a native macOS clipboard manager built with Swift and SwiftUI. The roadmap delivers the core value -- clipboard history one hotkey away with instant paste-back -- through five phases. Each phase delivers a coherent, verifiable capability: silent clipboard capture, visual browsing, paste-back into active apps, organization at scale, and user configuration. The ordering is strictly dependency-driven: you cannot browse what has not been captured, cannot paste what has not been displayed, and cannot configure what has not been built.
+- v1.0 MVP - Phases 1-5 (shipped 2026-02-06)
+- v1.1 Rich Content & Enhanced Paste - Phases 6-9 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: Clipboard Capture and Storage** - Silently capture all clipboard content and persist across restarts
-- [x] **Phase 2: Sliding Panel** - Browse clipboard history in a visually rich screen-edge panel
-- [x] **Phase 3: Paste-Back and Hotkeys** - Instantly paste any item into the active app via hotkey and keyboard
-- [x] **Phase 4: Organization** - Search, label, filter, and manage clipboard history
-- [x] **Phase 5: Settings and Polish** - Configure panel position, launch behavior, and preferences
-
-## Phase Details
+<details>
+<summary>v1.0 MVP (Phases 1-5) - SHIPPED 2026-02-06</summary>
 
 ### Phase 1: Clipboard Capture and Storage
 **Goal**: App runs invisibly in the menu bar, captures everything the user copies (text, images, URLs, files), deduplicates, and persists history to disk across app and system restarts
 **Depends on**: Nothing (first phase)
 **Requirements**: CLIP-01, CLIP-02, CLIP-03, CLIP-04, CLIP-05, CLIP-06, INFR-01, INFR-04
-**Success Criteria** (what must be TRUE):
-  1. User copies text in any app and it appears in stored clipboard history
-  2. User copies an image and a thumbnail is saved to disk (not in the database)
-  3. User copies a URL or file reference and it is captured as the correct content type
-  4. User quits and relaunches the app and all previous clipboard history is still present
-  5. User copies the same text twice consecutively and only one entry appears in history
 **Plans**: 3 plans
 
 Plans:
@@ -41,12 +25,6 @@ Plans:
 **Goal**: Users can visually browse their clipboard history in a screen-edge sliding panel with rich card previews for each content type, using an always-dark theme
 **Depends on**: Phase 1
 **Requirements**: PNUI-01, PNUI-02, PNUI-05, PNUI-06, PNUI-07, PNUI-08, PNUI-10
-**Success Criteria** (what must be TRUE):
-  1. Panel slides in from the screen edge with smooth animation and slides out when dismissed
-  2. Text items show a readable text preview in their card
-  3. Image items show a thumbnail preview in their card
-  4. URL items are visually distinct from plain text items
-  5. File items show the file name or path in their card
 **Plans**: 2 plans
 
 Plans:
@@ -57,12 +35,6 @@ Plans:
 **Goal**: Users can summon the panel with a global hotkey and paste any clipboard item into the currently active app without the panel stealing focus
 **Depends on**: Phase 2
 **Requirements**: PAST-01, PAST-02, PAST-03, PNUI-04, PNUI-09
-**Success Criteria** (what must be TRUE):
-  1. User presses a global hotkey and the panel appears over the active app
-  2. User double-clicks a card and its content is pasted into the app that was active before the panel appeared
-  3. User navigates cards with arrow keys and presses Enter to paste the selected item
-  4. Panel does not steal focus from the active app (non-activating window)
-  5. On first launch, user is guided through Accessibility permission with a clear explanation of why it is needed
 **Plans**: 2 plans
 
 Plans:
@@ -73,11 +45,6 @@ Plans:
 **Goal**: Users can search, label, filter, and manage their clipboard history so it remains useful as it grows
 **Depends on**: Phase 3
 **Requirements**: ORGN-01, ORGN-02, ORGN-03, ORGN-04, ORGN-05, ORGN-06
-**Success Criteria** (what must be TRUE):
-  1. User types in a search field and results filter to matching clipboard items in real time
-  2. User creates a label, assigns it to items, and can filter the panel view by that label using a chip bar
-  3. User can delete an individual clipboard item and it disappears from history
-  4. User can clear all clipboard history at once
 **Plans**: 3 plans
 
 Plans:
@@ -89,25 +56,105 @@ Plans:
 **Goal**: Users can configure Pastel to fit their workflow -- panel position, launch at login, and all preferences accessible from a settings window
 **Depends on**: Phase 4
 **Requirements**: INFR-02, INFR-03, PNUI-03
-**Success Criteria** (what must be TRUE):
-  1. User opens a Settings window from the menu bar icon and can view/change all preferences
-  2. User can change the panel position to any screen edge (top, left, right, bottom) and the panel appears at the new position
-  3. User can enable launch at login and the app starts automatically after system restart
 **Plans**: 2 plans
 
 Plans:
 - [x] 05-01-PLAN.md -- Settings window infrastructure, General tab (launch at login, hotkey recorder, panel position picker, retention), PanelEdge enum, PanelController 4-edge refactor, RetentionService
 - [x] 05-02-PLAN.md -- Labels tab with full CRUD, horizontal panel layout adaptation for top/bottom edges, keyboard nav direction swap
 
+</details>
+
+### v1.1 Rich Content & Enhanced Paste (In Progress)
+
+**Milestone Goal:** Enrich clipboard cards with syntax highlighting, color swatches, and URL previews; add Cmd+Shift+1-9 direct paste hotkeys; upgrade label system with color palette and emoji support.
+
+**Phase Numbering:**
+- Integer phases (6, 7, 8, 9): Planned milestone work
+- Decimal phases (7.1, 7.2): Urgent insertions (marked with INSERTED)
+
+Decimal phases appear between their surrounding integers in numeric order.
+
+- [x] **Phase 6: Data Model and Label Enhancements** - Extend schema for rich content and ship label emoji with expanded color palette
+- [ ] **Phase 7: Code and Color Detection** - Detect code snippets and color values at capture time with syntax-highlighted and swatch card views
+- [ ] **Phase 8: URL Preview Cards** - Auto-fetch URL metadata and render rich preview cards with title, favicon, and og:image
+- [ ] **Phase 9: Quick Paste Hotkeys** - Cmd+Shift+1-9 pastes the Nth item without opening the panel
+
+## Phase Details
+
+### Phase 6: Data Model and Label Enhancements
+**Goal**: Schema is extended for all v1.1 features and users see an upgraded label system with 12 colors and optional emoji on chips
+**Depends on**: Phase 5 (v1.0 complete)
+**Requirements**: LABL-01, LABL-02, LABL-03
+**Success Criteria** (what must be TRUE):
+  1. User opens label settings and sees 12 color options (including teal, indigo, brown, mint) instead of the original 8
+  2. User assigns an emoji to a label and the emoji replaces the color dot in chip bar and card headers
+  3. User opens the system emoji picker from label settings to choose an emoji
+  4. Existing v1.0 clipboard history and labels load without data loss after schema migration
+**Plans**: 2 plans
+
+Plans:
+- [x] 06-01-PLAN.md -- SwiftData schema migration (new optional fields on ClipboardItem, new ContentType cases, Label emoji field), LabelColor enum expansion, migration validation
+- [x] 06-02-PLAN.md -- Label emoji UI (emoji input in LabelSettingsView, emoji-or-dot rendering in ChipBarView and card headers, system picker integration)
+
+### Phase 7: Code and Color Detection
+**Goal**: Copied code snippets display with syntax highlighting and language badges, and copied color values display with visual swatches
+**Depends on**: Phase 6
+**Requirements**: RICH-01, RICH-02, RICH-03, RICH-04, RICH-05
+**Success Criteria** (what must be TRUE):
+  1. User copies a code snippet (e.g., a Swift function) and the panel card shows syntax-highlighted preview with a language badge
+  2. User copies a hex color value like #FF5733 and the panel card shows a colored swatch rectangle alongside the text
+  3. User copies rgb(255, 87, 51) and it is detected as a color with the same swatch treatment
+  4. User copies plain prose and it remains a normal text card (no false positive code or color detection)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 07-01-PLAN.md -- CodeDetectionService (multi-signal heuristic), ColorDetectionService (hex/rgb/hsl regex), detection wired into ClipboardMonitor
+- [ ] 07-02-PLAN.md -- Highlightr SPM dependency, CodeCardView (syntax-highlighted preview, language badge, monospaced font, async caching)
+- [ ] 07-03-PLAN.md -- ColorSwatchView / ColorCardView, updated ClipboardCardView routing for .code and .color types
+
+### Phase 8: URL Preview Cards
+**Goal**: URL clipboard items auto-fetch page metadata and display rich preview cards with title, favicon, and og:image, with graceful fallback on failure
+**Depends on**: Phase 7
+**Requirements**: RICH-06, RICH-07, RICH-08, RICH-09
+**Success Criteria** (what must be TRUE):
+  1. User copies a URL and within seconds the card updates to show the page title and favicon
+  2. User copies a URL with og:image metadata and the card displays the preview image above the title
+  3. User copies a URL while offline or to a non-responsive server and the card falls back to the existing plain URL display
+  4. User disables URL metadata fetching in Settings and newly copied URLs remain plain URL cards
+**Plans**: 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md -- URLMetadataService (LPMetadataProvider, 5s timeout, async fire-and-forget), favicon/og:image disk caching via ImageStorageService, skip logic for private/local URLs
+- [ ] 08-02-PLAN.md -- Enhanced URLCardView (source app + timestamp header, og:image preview, favicon + title footer), Settings toggle to disable fetching, image cleanup in RetentionService
+
+### Phase 9: Quick Paste Hotkeys
+**Goal**: Users can paste recent clipboard items instantly via Cmd+Shift+1-9 without opening the panel, with visual position badges on cards
+**Depends on**: Phase 6 (model), Phase 8 (all card types complete for badge layout)
+**Requirements**: PAST-10, PAST-11, PAST-12
+**Success Criteria** (what must be TRUE):
+  1. User presses Cmd+Shift+1 and the most recent clipboard item is pasted into the active app without the panel appearing
+  2. User presses Cmd+Shift+5 and the 5th most recent item is pasted correctly
+  3. User opens the panel and the first 9 cards show position number badges (1-9) in their corners
+  4. User disables quick paste hotkeys in Settings and Cmd+Shift+1-9 no longer triggers paste
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md -- KeyboardShortcuts.Name definitions (quickPaste1-9), quickPaste(index:) on AppState, pasteWithoutPanel flow in PasteService, Settings toggle
+- [ ] 09-02-PLAN.md -- Position number badges (1-9) on first 9 panel cards, badge visibility tied to hotkey enabled state
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Clipboard Capture and Storage | 3/3 | Complete | 2026-02-06 |
-| 2. Sliding Panel | 2/2 | Complete | 2026-02-06 |
-| 3. Paste-Back and Hotkeys | 2/2 | Complete | 2026-02-06 |
-| 4. Organization | 3/3 | Complete | 2026-02-06 |
-| 5. Settings and Polish | 2/2 | Complete | 2026-02-06 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Clipboard Capture and Storage | v1.0 | 3/3 | Complete | 2026-02-06 |
+| 2. Sliding Panel | v1.0 | 2/2 | Complete | 2026-02-06 |
+| 3. Paste-Back and Hotkeys | v1.0 | 2/2 | Complete | 2026-02-06 |
+| 4. Organization | v1.0 | 3/3 | Complete | 2026-02-06 |
+| 5. Settings and Polish | v1.0 | 2/2 | Complete | 2026-02-06 |
+| 6. Data Model and Label Enhancements | v1.1 | 2/2 | Complete | 2026-02-07 |
+| 7. Code and Color Detection | v1.1 | 0/3 | Not started | - |
+| 8. URL Preview Cards | v1.1 | 0/2 | Not started | - |
+| 9. Quick Paste Hotkeys | v1.1 | 0/2 | Not started | - |
