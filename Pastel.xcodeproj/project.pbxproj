@@ -12,6 +12,7 @@
 		C3D4E5F60718293A4B5C6D7E /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C3D4E5F60718293A4B5C6D7F /* HighlightSwift */; };
 		D4E5F6071829304B5C6D7E8F /* CodeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6071829304B5C6D7E90 /* CodeCardView.swift */; };
 		E5F6071829304B5C6D7E8FA1 /* ColorCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F6071829304B5C6D7E8FA2 /* ColorCardView.swift */; };
+		F8A1B2C3D4E50617182930B1 /* URLMetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1B2C3D4E50617182930B2 /* URLMetadataService.swift */; };
 		04769AF24E5670F5A628D811 /* ClipboardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59995DCA4628743D59C35FFA /* ClipboardItem.swift */; };
 		0718766F684C890B0D3CC008 /* LabelColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A1A38C2FA151019789426E /* LabelColor.swift */; };
 		0E86EEAF47C438D35E602BE4 /* AccessibilityPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1291C4BDF0D13A50048E2CAE /* AccessibilityPromptView.swift */; };
@@ -99,6 +100,7 @@
 		D4E5F6071829304B5C6D7E90 /* CodeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeCardView.swift; sourceTree = "<group>"; };
 		E5F6071829304B5C6D7E8FA2 /* ColorCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorCardView.swift; sourceTree = "<group>"; };
 		E931197AB3A47AD6193B9FF1 /* URLCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLCardView.swift; sourceTree = "<group>"; };
+		F8A1B2C3D4E50617182930B2 /* URLMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLMetadataService.swift; sourceTree = "<group>"; };
 		F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -189,6 +191,7 @@
 				C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */,
 				4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */,
 				ADA2DA3D25FB59CE37228411 /* RetentionService.swift */,
+				F8A1B2C3D4E50617182930B2 /* URLMetadataService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -383,6 +386,7 @@
 				61787566D6E9AF8D7887C7A4 /* SlidingPanel.swift in Sources */,
 				61FC3644E015576CBEB288A7 /* StatusPopoverView.swift in Sources */,
 				3ADFAC504957D459F381AFB2 /* TextCardView.swift in Sources */,
+				F8A1B2C3D4E50617182930B1 /* URLMetadataService.swift in Sources */,
 				8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

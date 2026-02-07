@@ -136,6 +136,59 @@ final class ImageStorageService: Sendable {
         imagesDirectory.appendingPathComponent(filename)
     }
 
+    /// Save favicon image data to disk for URL metadata caching.
+    ///
+    /// - Parameter data: Raw image data (favicon from LPMetadataProvider).
+    /// - Returns: Filename on success (e.g., "UUID_favicon.png"), nil on failure.
+    func saveFavicon(data: Data) async -> String? {
+        await withCheckedContinuation { continuation in
+            backgroundQueue.async { [imagesDirectory] in
+                let filename = "\(UUID().uuidString)_favicon.png"
+                let url = imagesDirectory.appendingPathComponent(filename)
+                do {
+                    try data.write(to: url)
+                    Self.logger.info("Saved favicon: \(filename)")
+                    continuation.resume(returning: filename)
+                } catch {
+                    Self.logger.warning("Failed to save favicon: \(error.localizedDescription)")
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+
+    /// Save og:image preview data to disk for URL metadata caching.
+    ///
+    /// Downscales images wider than 1920px for storage efficiency.
+    ///
+    /// - Parameter data: Raw image data (og:image from LPMetadataProvider).
+    /// - Returns: Filename on success (e.g., "UUID_preview.png"), nil on failure.
+    func savePreviewImage(data: Data) async -> String? {
+        await withCheckedContinuation { continuation in
+            backgroundQueue.async { [imagesDirectory] in
+                let filename = "\(UUID().uuidString)_preview.png"
+                let url = imagesDirectory.appendingPathComponent(filename)
+
+                // Downscale large og:images (cap at 1920px wide)
+                let imageData: Data
+                if let downscaled = Self.downscaleIfNeeded(data: data, maxSize: 1920) {
+                    imageData = downscaled
+                } else {
+                    imageData = data
+                }
+
+                do {
+                    try imageData.write(to: url)
+                    Self.logger.info("Saved preview image: \(filename)")
+                    continuation.resume(returning: filename)
+                } catch {
+                    Self.logger.warning("Failed to save preview image: \(error.localizedDescription)")
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+
     /// Compute a fast hash of image data for deduplication.
     ///
     /// Hashes only the first 4096 bytes for speed -- sufficient to distinguish
