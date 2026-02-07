@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 Phase: 10 of 10 (Drag-Drop Label Assignment) -- Complete
 Remaining: Phase 8 plan 2 of 2 (08-02 URLCardView enhancement)
 Status: Phase 10 complete, Phase 8 has 1 plan remaining
-Last activity: 2026-02-07 -- Completed 10-01-PLAN.md (Drag-drop label assignment)
+Last activity: 2026-02-07 -- Completed quick-010 (Card footer and dynamic badges)
 
 Progress: [######################░] 96% (22/23 plans across all milestones)
 
@@ -63,6 +63,10 @@ Recent decisions affecting current work:
 - [10-01]: PersistentIdentifier serialized as JSON string for drag payload via Codable
 - [10-01]: isDropTarget highest priority in cardBorderColor (above isSelected and isColorCard)
 - [10-01]: Drop target background uses accentColor at 0.15 opacity for subtle highlight
+- [quick-010]: Local NSEvent monitor (not global) for Shift key tracking -- avoids Accessibility permission
+- [quick-010]: CGImageSource for image dimensions -- reads metadata without decoding full image
+- [quick-010]: Image dimensions loaded lazily via .task to avoid per-render disk reads
+- [quick-010]: Badge opacity 0.5 (dimmer than old 0.7) since no background to contrast against
 
 ### Roadmap Evolution
 
@@ -82,6 +86,7 @@ Recent decisions affecting current work:
 | 006 | Fix URL card banner centering | 2026-02-07 | 95dfa7c | [006-fix-url-card-banner-centering](./quick/006-fix-url-card-banner-centering/) |
 | 007 | Fix panel focus for quick paste hotkeys | 2026-02-07 | ecf5481 | [007-fix-panel-focus-for-quick-paste-hotkeys](./quick/007-fix-panel-focus-for-quick-paste-hotkeys/) |
 | 008 | Fix search focus stealing from hotkeys | 2026-02-07 | d00825f | [008-fix-search-focus-stealing-from-hotkeys](./quick/008-fix-search-focus-stealing-from-hotkeys/) |
+| 010 | Card footer with metadata + dynamic shift badges | 2026-02-07 | 6f7e5f8 | [010-card-footer-and-dynamic-badges](./quick/010-card-footer-and-dynamic-badges/) |
 
 ### Blockers/Concerns
 
@@ -90,5 +95,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 10-01-PLAN.md (Drag-drop label assignment). Phase 8 plan 08-02 still pending.
+Stopped at: Completed quick-010 (Card footer and dynamic badges). Phase 8 plan 08-02 still pending.
 Resume file: None
