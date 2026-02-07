@@ -1,13 +1,12 @@
+@preconcurrency import HighlightSwift
 import Foundation
 
-/// Detects code snippets in clipboard text using a multi-signal heuristic pre-filter.
+/// Detects code snippets in clipboard text using a multi-signal heuristic pre-filter,
+/// then performs async language detection and syntax highlighting via HighlightSwift.
 ///
 /// Two-phase detection:
-/// 1. `looksLikeCode(_:)` -- fast synchronous heuristic (this plan)
-/// 2. `detectLanguage(_:)` -- async HighlightSwift detection (stub; implemented in Plan 07-02)
-///
-/// The heuristic scores text across 5 signals (punctuation density, keywords, indentation,
-/// line endings, identifier patterns). A score >= 3 indicates likely code.
+/// 1. `looksLikeCode(_:)` -- fast synchronous heuristic
+/// 2. `detectLanguage(_:)` -- async HighlightSwift detection with relevance >= 5 threshold
 struct CodeDetectionService {
 
     // MARK: - Synchronous Heuristic Pre-filter
@@ -66,21 +65,57 @@ struct CodeDetectionService {
         return score >= 3
     }
 
-    // MARK: - Async Language Detection (Stub)
+    // MARK: - Async Language Detection
 
     /// Detects the programming language of the given text using HighlightSwift.
     ///
-    /// **Stub implementation** -- returns nil. Will be implemented in Plan 07-02 when
-    /// the HighlightSwift SPM dependency is added.
+    /// Uses highlight.js auto-detection via `Highlight().request()`. Only returns
+    /// a result when the relevance score meets the threshold (>= 5) to avoid
+    /// false positives on short prose.
     ///
     /// - Parameter text: The code text to analyze.
     /// - Returns: A tuple of (language identifier, relevance score), or nil if not detected.
     static func detectLanguage(_ text: String) async -> (language: String, relevance: Int)? {
-        // TODO: Plan 07-02 -- add HighlightSwift dependency and implement:
-        // let highlight = Highlight()
-        // let result = try await highlight.request(text)
-        // guard result.relevance >= 5 else { return nil }
-        // return (result.language, result.relevance)
-        return nil
+        do {
+            let highlight = Highlight()
+            let result = try await highlight.request(text)
+            guard result.relevance >= 5 else { return nil }
+            return (result.language, result.relevance)
+        } catch {
+            return nil
+        }
+    }
+}
+
+// MARK: - Highlight Cache
+
+/// Actor-based cache for syntax-highlighted `AttributedString` values, keyed by content hash.
+///
+/// Prevents re-highlighting when scrolling through code cards. Limited to 200 entries
+/// with simple oldest-first eviction.
+actor HighlightCache {
+    static let shared = HighlightCache()
+
+    private var cache: [String: AttributedString] = [:]
+    private var insertionOrder: [String] = []
+    private let maxEntries = 200
+
+    /// Retrieve a cached highlighted AttributedString by content hash.
+    func get(_ hash: String) -> AttributedString? {
+        cache[hash]
+    }
+
+    /// Store a highlighted AttributedString keyed by content hash.
+    func set(_ hash: String, value: AttributedString) {
+        if cache[hash] == nil {
+            insertionOrder.append(hash)
+        }
+        cache[hash] = value
+
+        // Evict oldest entries when cache exceeds limit
+        while cache.count > maxEntries, let oldest = insertionOrder.first {
+            insertionOrder.removeFirst()
+            cache.removeValue(forKey: oldest)
+        }
     }
 }
