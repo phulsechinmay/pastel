@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 Phase: 9 of 9 (Quick Paste Hotkeys) -- Complete
 Remaining: Phase 8 plan 2 of 2 (08-02 URLCardView enhancement)
 Status: Phase 9 complete, Phase 8 has 1 plan remaining
-Last activity: 2026-02-07 -- Completed Phase 9 (09-01 + 09-02)
+Last activity: 2026-02-07 -- Completed quick-007 (Fix panel focus for quick paste hotkeys)
 
 Progress: [####################░] 95% (21/22 plans across all milestones)
 
@@ -20,7 +20,7 @@ Progress: [####################░] 95% (21/22 plans across all milestones)
 
 - 29/29 requirements delivered across 5 phases (13 plans)
 - Total execution time: ~37 min
-- 6 quick tasks completed post-v1.0
+- 7 quick tasks completed post-v1.0
 
 ## Accumulated Context
 
@@ -51,6 +51,7 @@ Recent decisions affecting current work:
 - [08-01]: loadImageData @MainActor for Swift 6 strict concurrency with NSItemProvider
 - [08-01]: UserDefaults "fetchURLMetadata" defaults to true via nil coalescing
 - [quick-006]: Center-crop banner via direct Image + scaledToFill + aspectRatio(.fill) + clipped -- no GeometryReader needed
+- [quick-007]: panel.makeKey() after orderFrontRegardless() gives panel key window status for immediate .onKeyPress
 - [09-01]: Cmd+1-9 for normal paste, Cmd+Shift+1-9 for plain text (Cmd+N is more natural primary action)
 - [09-01]: writeToPasteboardPlainText omits .rtf only, keeps .string and .html
 - [09-01]: Non-text types (url, image, file) delegate to normal writeToPasteboard -- no RTF to strip
@@ -69,6 +70,7 @@ Recent decisions affecting current work:
 | 004 | Unified color/emoji label menu in settings | 2026-02-07 | a4687e2 | [004-unified-color-emoji-label-menu](./quick/004-unified-color-emoji-label-menu/) |
 | 005 | Card label chips and emoji menu fix | 2026-02-07 | 41861c0 | [005-card-label-chips-and-emoji-menu-fix](./quick/005-card-label-chips-and-emoji-menu-fix/) |
 | 006 | Fix URL card banner centering | 2026-02-07 | 95dfa7c | [006-fix-url-card-banner-centering](./quick/006-fix-url-card-banner-centering/) |
+| 007 | Fix panel focus for quick paste hotkeys | 2026-02-07 | ecf5481 | [007-fix-panel-focus-for-quick-paste-hotkeys](./quick/007-fix-panel-focus-for-quick-paste-hotkeys/) |
 
 ### Blockers/Concerns
 
