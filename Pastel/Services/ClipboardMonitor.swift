@@ -185,6 +185,12 @@ final class ClipboardMonitor {
 
         case .image:
             return // Handled above, but needed for exhaustive switch
+
+        case .code, .color:
+            // Detection happens post-capture in Phase 7.
+            // ClipboardMonitor never assigns these types directly;
+            // classifyContent() only returns .text/.richText/.url/.image/.file.
+            return
         }
 
         // Skip if no content was actually read

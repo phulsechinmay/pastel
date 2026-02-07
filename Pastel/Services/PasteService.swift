@@ -142,6 +142,12 @@ final class PasteService {
                 let fileURL = URL(fileURLWithPath: filePath)
                 pasteboard.writeObjects([fileURL as NSURL])
             }
+
+        case .code, .color:
+            // Code snippets and color values are stored as text
+            if let text = item.textContent {
+                pasteboard.setString(text, forType: .string)
+            }
         }
 
         logger.info("Wrote \(item.type.rawValue) content to pasteboard")
