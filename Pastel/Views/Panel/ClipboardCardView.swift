@@ -42,6 +42,27 @@ struct ClipboardCardView: View {
 
             // Content preview (full-width)
             contentPreview
+
+            // Label chip (only shown when a label is assigned)
+            if let label = item.label {
+                HStack(spacing: 3) {
+                    if let emoji = label.emoji, !emoji.isEmpty {
+                        Text(emoji)
+                            .font(.system(size: 9))
+                    } else {
+                        Circle()
+                            .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                            .frame(width: 6, height: 6)
+                    }
+                    Text(label.name)
+                        .font(.caption2)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.white.opacity(0.1), in: Capsule())
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -71,16 +92,9 @@ struct ClipboardCardView: View {
                         try? modelContext.save()
                     } label: {
                         HStack {
-                            if let emoji = label.emoji, !emoji.isEmpty {
-                                Text(emoji)
-                                    .font(.system(size: 10))
-                            } else {
-                                Circle()
-                                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                                    .frame(width: 8, height: 8)
-                            }
-                            Text(label.name)
+                            Text(labelDisplayText(label))
                             if item.label?.persistentModelID == label.persistentModelID {
+                                Spacer()
                                 Image(systemName: "checkmark")
                             }
                         }
@@ -121,6 +135,16 @@ struct ClipboardCardView: View {
         )
         modelContext.delete(item)
         try? modelContext.save()
+    }
+
+    /// Returns a display string for the label in context menus.
+    /// Emoji labels show "emoji name"; color-dot labels show just the name.
+    private func labelDisplayText(_ label: Label) -> String {
+        if let emoji = label.emoji, !emoji.isEmpty {
+            return "\(emoji) \(label.name)"
+        } else {
+            return label.name
+        }
     }
 
     // MARK: - Private Views
