@@ -75,7 +75,7 @@ Plans:
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 6: Data Model and Label Enhancements** - Extend schema for rich content and ship label emoji with expanded color palette
-- [ ] **Phase 7: Code and Color Detection** - Detect code snippets and color values at capture time with syntax-highlighted and swatch card views
+- [x] **Phase 7: Code and Color Detection** - Detect code snippets and color values at capture time with syntax-highlighted and swatch card views
 - [ ] **Phase 8: URL Preview Cards** - Auto-fetch URL metadata and render rich preview cards with title, favicon, and og:image
 - [ ] **Phase 9: Quick Paste Hotkeys** - Cmd+Shift+1-9 pastes the Nth item without opening the panel
 
@@ -108,9 +108,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- ColorDetectionService (hex/rgb/hsl regex), CodeDetectionService (multi-signal heuristic), detection wired into ClipboardMonitor
-- [ ] 07-02-PLAN.md -- HighlightSwift SPM dependency, CodeCardView (syntax-highlighted preview, language badge, monospaced font, async caching), fire-and-forget language detection
-- [ ] 07-03-PLAN.md -- ColorCardView (swatch + text), updated ClipboardCardView routing for .code and .color types
+- [x] 07-01-PLAN.md -- ColorDetectionService (hex/rgb/hsl regex), CodeDetectionService (multi-signal heuristic), detection wired into ClipboardMonitor
+- [x] 07-02-PLAN.md -- HighlightSwift SPM dependency, CodeCardView (syntax-highlighted preview, language badge, monospaced font, async caching), fire-and-forget language detection
+- [x] 07-03-PLAN.md -- ColorCardView (swatch + text), updated ClipboardCardView routing for .code and .color types
 
 ### Phase 8: URL Preview Cards
 **Goal**: URL clipboard items auto-fetch page metadata and display rich preview cards with title, favicon, and og:image, with graceful fallback on failure
@@ -155,6 +155,6 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9
 | 4. Organization | v1.0 | 3/3 | Complete | 2026-02-06 |
 | 5. Settings and Polish | v1.0 | 2/2 | Complete | 2026-02-06 |
 | 6. Data Model and Label Enhancements | v1.1 | 2/2 | Complete | 2026-02-07 |
-| 7. Code and Color Detection | v1.1 | 0/3 | Not started | - |
+| 7. Code and Color Detection | v1.1 | 3/3 | Complete | 2026-02-07 |
 | 8. URL Preview Cards | v1.1 | 0/2 | Not started | - |
 | 9. Quick Paste Hotkeys | v1.1 | 0/2 | Not started | - |

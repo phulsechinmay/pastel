@@ -57,14 +57,14 @@ Requirements for v1.1 milestone: Rich Content & Enhanced Paste.
 
 ### Rich Content — Code Detection
 
-- [ ] **RICH-01**: App detects code snippets via multi-signal heuristic and classifies them as `.code` ContentType
-- [ ] **RICH-02**: Code cards show syntax-highlighted previews with auto-detected language (via Highlightr)
-- [ ] **RICH-03**: Code cards display a language badge (e.g., "Swift", "Python")
+- [x] **RICH-01**: App detects code snippets via multi-signal heuristic and classifies them as `.code` ContentType
+- [x] **RICH-02**: Code cards show syntax-highlighted previews with auto-detected language (via HighlightSwift)
+- [x] **RICH-03**: Code cards display a language badge (e.g., "Swift", "Python")
 
 ### Rich Content — Color Detection
 
-- [ ] **RICH-04**: App detects standalone color values (hex, rgb, hsl) and classifies them as `.color` ContentType
-- [ ] **RICH-05**: Color cards show a visual swatch alongside the original color text
+- [x] **RICH-04**: App detects standalone color values (hex, rgb, hsl) and classifies them as `.color` ContentType
+- [x] **RICH-05**: Color cards show a visual swatch alongside the original color text
 
 ### Rich Content — URL Previews
 
@@ -162,11 +162,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LABL-01 | Phase 6 | Complete |
 | LABL-02 | Phase 6 | Complete |
 | LABL-03 | Phase 6 | Complete |
-| RICH-01 | Phase 7 | Pending |
-| RICH-02 | Phase 7 | Pending |
-| RICH-03 | Phase 7 | Pending |
-| RICH-04 | Phase 7 | Pending |
-| RICH-05 | Phase 7 | Pending |
+| RICH-01 | Phase 7 | Complete |
+| RICH-02 | Phase 7 | Complete |
+| RICH-03 | Phase 7 | Complete |
+| RICH-04 | Phase 7 | Complete |
+| RICH-05 | Phase 7 | Complete |
 | RICH-06 | Phase 8 | Pending |
 | RICH-07 | Phase 8 | Pending |
 | RICH-08 | Phase 8 | Pending |
@@ -187,4 +187,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-07 after v1.1 roadmap creation*
+*Last updated: 2026-02-07 after Phase 7 completion*

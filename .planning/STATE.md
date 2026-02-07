@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.1 -- Phase 7: Code and Color Detection
+**Current focus:** Milestone v1.1 -- Phase 8: URL Preview Cards
 
 ## Current Position
 
-Phase: 7 of 9 (Code and Color Detection)
-Plan: 1 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-07 -- Completed 07-01-PLAN.md (Detection Services)
+Phase: 8 of 9 (URL Preview Cards)
+Plan: 0 of 2 in current phase
+Status: Not started
+Last activity: 2026-02-07 -- Completed Phase 7 (Code and Color Detection)
 
-Progress: [#############░░░░░░░] 73% (16/22 plans across all milestones)
+Progress: [################░░░░] 82% (19/22 plans across all milestones)
 
 ## Previous Milestone: v1.0
 
@@ -31,21 +31,22 @@ Recent decisions affecting current work:
 
 - [Roadmap v1.1]: 4-phase structure (6-9) derived from 15 requirements across 5 categories
 - [Roadmap v1.1]: Schema migration in Phase 6 first -- all subsequent phases depend on new model fields
-- [Roadmap v1.1]: Highlightr for syntax highlighting (verify Swift 6 compat before adding SPM dependency)
 - [Roadmap v1.1]: Cmd+Shift+1-9 (not Cmd+1-9) for quick paste to avoid browser/editor hotkey conflicts
 - [Roadmap v1.1]: All new SwiftData fields optional with nil defaults for lightweight migration
 - [06-01]: All new ClipboardItem fields Optional with nil defaults -- no VersionedSchema needed
 - [06-01]: ContentType .code/.color routed to TextCardView as placeholder until Phase 7
 - [06-01]: LabelColor new cases appended after existing 8 for raw value stability
-- [06-02]: Emoji field between color dot menu and name in LabelRow for compact layout
-- [06-02]: orderFrontCharacterPalette with 0.1s FocusState delay for correct field targeting
 - [06-02]: Emoji-or-dot pattern: `if let emoji = label.emoji, !emoji.isEmpty` across all renderers
 - [quick-004]: Unified palette popover replaces separate color Menu + emoji TextField + smiley Button in LabelRow
-- [quick-005]: Color dot Circle dropped from context menu labels -- macOS NSMenu unreliable with shapes; concatenated text used instead
+- [quick-005]: Color dot Circle dropped from context menu labels -- macOS NSMenu unreliable with shapes
 - [07-01]: Swift Regex wholeMatch for all color patterns -- prevents false positives from embedded values
 - [07-01]: Code heuristic score >= 3 threshold (out of max 7) balances sensitivity vs false positives
-- [07-01]: detectLanguage stub returns nil until HighlightSwift added in Plan 07-02
 - [07-01]: Detection order: color first, code second (prevents rgb() from triggering code heuristic)
+- [07-02]: HighlightSwift 1.1.0 via SPM -- builds cleanly with Swift 6
+- [07-02]: Keyword-based language hints correct highlight.js misdetections for Swift/Python/JS/Rust/Go
+- [07-02]: .dark(.atomOne) theme for syntax highlighting matches always-dark panel
+- [07-03]: Full-card color background instead of small swatch -- more visually striking
+- [07-03]: WCAG luminance check for header text contrast on color cards
 
 ### Pending Todos
 
@@ -60,10 +61,10 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- Highlightr Swift 6 compatibility and current maintenance status need verification in Phase 7
+None currently.
 
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 07-01-PLAN.md (Detection Services)
+Stopped at: Completed Phase 7 (Code and Color Detection)
 Resume file: None
