@@ -80,7 +80,7 @@ private struct LabelRow: View {
     @Bindable var label: Label
     @Environment(\.modelContext) private var modelContext
     @State private var isEditing = false
-    @FocusState private var isEmojiFieldFocused: Bool
+    @State private var showingPalette = false
 
     var onDelete: () -> Void
 
@@ -98,21 +98,9 @@ private struct LabelRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Color dot with recolor menu
-            Menu {
-                ForEach(LabelColor.allCases, id: \.self) { color in
-                    Button {
-                        label.colorName = color.rawValue
-                        try? modelContext.save()
-                    } label: {
-                        HStack {
-                            Circle()
-                                .fill(color.color)
-                                .frame(width: 10, height: 10)
-                            Text(color.rawValue.capitalized)
-                        }
-                    }
-                }
+            // Unified color + emoji palette button
+            Button {
+                showingPalette.toggle()
             } label: {
                 if let emoji = label.emoji, !emoji.isEmpty {
                     Text(emoji)
@@ -123,30 +111,9 @@ private struct LabelRow: View {
                         .frame(width: 14, height: 14)
                 }
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
-            // Emoji input
-            HStack(spacing: 2) {
-                TextField("", text: emojiBinding)
-                    .textFieldStyle(.plain)
-                    .frame(width: 24)
-                    .multilineTextAlignment(.center)
-                    .focused($isEmojiFieldFocused)
-
-                Button {
-                    isEmojiFieldFocused = true
-                    // Small delay to ensure TextField gains focus before picker opens
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        NSApp.orderFrontCharacterPalette(nil)
-                    }
-                } label: {
-                    Image(systemName: "face.smiling")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Open emoji picker (or press Ctrl+Cmd+Space in the emoji field)")
+            .buttonStyle(.plain)
+            .popover(isPresented: $showingPalette, arrowEdge: .trailing) {
+                colorEmojiPalette
             }
 
             // Name field (click to edit)
@@ -178,5 +145,62 @@ private struct LabelRow: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
+    }
+
+    // MARK: - Color + Emoji Palette Popover
+
+    private var colorEmojiPalette: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 6x2 color grid (same layout as ChipBarView)
+            let columns = Array(repeating: GridItem(.fixed(20), spacing: 6), count: 6)
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(LabelColor.allCases, id: \.self) { labelColor in
+                    Circle()
+                        .fill(labelColor.color)
+                        .frame(width: 20, height: 20)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(
+                                    label.colorName == labelColor.rawValue
+                                        ? Color.white : Color.clear,
+                                    lineWidth: 2
+                                )
+                        )
+                        .onTapGesture {
+                            label.colorName = labelColor.rawValue
+                            label.emoji = nil
+                            try? modelContext.save()
+                            showingPalette = false
+                        }
+                }
+            }
+
+            Divider()
+
+            // Emoji row
+            HStack(spacing: 6) {
+                Text("Emoji")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                TextField("", text: emojiBinding)
+                    .textFieldStyle(.plain)
+                    .frame(width: 24)
+                    .multilineTextAlignment(.center)
+                Button {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NSApp.orderFrontCharacterPalette(nil)
+                    }
+                } label: {
+                    Image(systemName: "face.smiling")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open emoji picker")
+            }
+        }
+        .padding(10)
+        .frame(width: 160)
     }
 }
