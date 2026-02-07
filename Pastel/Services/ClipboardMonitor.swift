@@ -187,14 +187,38 @@ final class ClipboardMonitor {
             return // Handled above, but needed for exhaustive switch
 
         case .code, .color:
-            // Detection happens post-capture in Phase 7.
-            // ClipboardMonitor never assigns these types directly;
-            // classifyContent() only returns .text/.richText/.url/.image/.file.
-            return
+            // These are never returned by classifyContent(), but handle defensively
+            let result = pasteboard.readTextContent()
+            textContent = result.text
+            htmlContent = result.html
+            rtfData = result.rtfData
+            byteCount = result.byteCount
+            primaryContent = result.text ?? ""
         }
 
         // Skip if no content was actually read
         guard !primaryContent.isEmpty else { return }
+
+        // --- Content detection: color first, then code ---
+        var detectedContentType = contentType
+        var detectedColorHex: String? = nil
+        var detectedLanguage: String? = nil
+
+        // Skip detection for concealed items (password managers)
+        if !isConcealed {
+            // Color detection first (prevents rgb() from matching as code)
+            if let colorHex = ColorDetectionService.detectColor(primaryContent) {
+                detectedContentType = .color
+                detectedColorHex = colorHex
+            }
+            // Code detection only if not already classified as color, URL, image, or file
+            else if (contentType == .text || contentType == .richText),
+                    CodeDetectionService.looksLikeCode(primaryContent) {
+                detectedContentType = .code
+                // Language detection is async -- will be wired in Plan 07-02
+                // For now, detectedLanguage stays nil
+            }
+        }
 
         // Capture source app
         let sourceApp = NSWorkspace.shared.frontmostApplication
@@ -214,7 +238,7 @@ final class ClipboardMonitor {
             textContent: textContent,
             htmlContent: htmlContent,
             rtfData: rtfData,
-            contentType: contentType,
+            contentType: detectedContentType,
             timestamp: .now,
             sourceAppBundleID: sourceAppBundleID,
             sourceAppName: sourceAppName,
@@ -227,13 +251,15 @@ final class ClipboardMonitor {
             expiresAt: isConcealed ? Date.now.addingTimeInterval(60) : nil,
             contentHash: contentHash
         )
+        item.detectedColorHex = detectedColorHex
+        item.detectedLanguage = detectedLanguage
 
         modelContext.insert(item)
 
         do {
             try modelContext.save()
             itemCount += 1
-            Self.logger.info("Captured \(contentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes)")
+            Self.logger.info("Captured \(detectedContentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes)")
 
             // Schedule expiration for concealed items (password managers)
             if isConcealed {
