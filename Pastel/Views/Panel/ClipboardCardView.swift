@@ -114,8 +114,10 @@ struct ClipboardCardView: View {
                 LinearGradient(
                     colors: [dominantColor.opacity(0.5), .clear],
                     startPoint: .top,
-                    endPoint: .init(x: 0.5, y: 0.28)
+                    endPoint: .bottom
                 )
+                .frame(height: 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .allowsHitTesting(false)
             }
