@@ -87,20 +87,17 @@ struct URLCardView: View {
     private var enrichedState: some View {
         VStack(alignment: .leading, spacing: 6) {
             if hasBannerSizedImage, let bannerImage {
-                // Full-width banner for large og:images
-                GeometryReader { geo in
-                    let w = geo.size.width
-                    let h = w / 2
-                    Image(nsImage: bannerImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: w, height: h)
-                        .position(x: w / 2, y: h / 2)
-                        .clipped()
-                }
-                .aspectRatio(2 / 1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .transition(.opacity)
+                // Full-width banner for large og:images (overlay centers content naturally)
+                Color.clear
+                    .aspectRatio(2 / 1, contentMode: .fit)
+                    .overlay {
+                        Image(nsImage: bannerImage)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .transition(.opacity)
             } else if bannerImage != nil || faviconImage != nil {
                 // Small og:image or favicon only — show centered at natural size
                 let displayImage = faviconImage ?? bannerImage
