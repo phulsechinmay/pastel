@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 Phase: 5 of 5 (Settings and Polish)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-02-06 -- Completed quick/002-PLAN.md (add paste behavior setting)
+Last activity: 2026-02-07 -- Completed quick/003-PLAN.md (fix horizontal header and search/label filtering)
 
 Progress: [██████████] 100% (13/13 plans)
 
@@ -96,6 +96,7 @@ Recent decisions affecting current work:
 - [05-02]: Direction-aware key handlers return .ignored for non-matching axis
 - [quick-001]: Automatic code signing with DEVELOPMENT_TEAM in project.yml for stable TCC identity
 - [quick-002]: UserDefaults.standard in PasteService (non-view class), copy-only mode skips accessibility check, default is .paste
+- [quick-003]: Nil-guard + force-unwrap pattern in #Predicate instead of optional chaining ?? false (SwiftData SQL generation bug)
 
 ### Pending Todos
 
@@ -112,9 +113,10 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 001 | Fix code signing for TCC persistence | 2026-02-06 | 2106f94 | [001-fix-code-signing-for-tcc-persistence](./quick/001-fix-code-signing-for-tcc-persistence/) |
 | 002 | Add paste behavior setting (Paste/Copy/Copy+Paste) | 2026-02-06 | ac64b61 | [002-add-paste-behavior-setting](./quick/002-add-paste-behavior-setting/) |
+| 003 | Fix horizontal header and search/label filtering | 2026-02-07 | 9e6f47a | [003-fix-horizontal-header-and-search-label-filtering](./quick/003-fix-horizontal-header-and-search-label-filtering/) |
 
 ## Session Continuity
 
-Last session: 2026-02-06T23:59:30Z
-Stopped at: Completed quick/002-PLAN.md (add paste behavior setting)
+Last session: 2026-02-07T00:52:41Z
+Stopped at: Completed quick/003-PLAN.md (fix horizontal header and search/label filtering)
 Resume file: None
