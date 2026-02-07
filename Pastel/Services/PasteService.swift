@@ -78,8 +78,8 @@ final class PasteService {
         // 5. Hide panel
         panelController.hide()
 
-        // 6. Simulate Cmd+V after 50ms delay (mandatory: gives macOS time to route focus back)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        // 6. Simulate Cmd+V after 250ms delay (must exceed 200ms panel hide animation for focus to restore)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             Self.simulatePaste()
         }
     }
