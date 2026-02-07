@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 Phase: 10 of 10 (Drag-Drop Label Assignment) -- Complete
 Remaining: Phase 8 plan 2 of 2 (08-02 URLCardView enhancement)
 Status: Phase 10 complete, Phase 8 has 1 plan remaining
-Last activity: 2026-02-07 -- Completed quick-010 (Card footer and dynamic badges)
+Last activity: 2026-02-07 -- Completed quick-012 (Three visual fixes)
 
 Progress: [######################░] 96% (22/23 plans across all milestones)
 
@@ -88,6 +88,8 @@ Recent decisions affecting current work:
 | 008 | Fix search focus stealing from hotkeys | 2026-02-07 | d00825f | [008-fix-search-focus-stealing-from-hotkeys](./quick/008-fix-search-focus-stealing-from-hotkeys/) |
 | 009 | Fix type-to-search cursor (NSViewRepresentable) | 2026-02-07 | 3b1dc2f | [009-fix-type-to-search-cursor](./quick/009-fix-type-to-search-cursor/) |
 | 010 | Card footer with metadata + dynamic shift badges | 2026-02-07 | 6f7e5f8 | [010-card-footer-and-dynamic-badges](./quick/010-card-footer-and-dynamic-badges/) |
+| 011 | Label styling + dominant color header | 2026-02-07 | 9050869 | [011-label-styling-and-icon-color-header](./quick/011-label-styling-and-icon-color-header/) |
+| 012 | Context menu colors, gradient visibility, wrapping chip bar | 2026-02-07 | c8b979a | [012-three-visual-fixes](./quick/012-three-visual-fixes/) |
 
 ### Blockers/Concerns
 
