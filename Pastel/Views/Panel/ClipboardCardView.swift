@@ -112,9 +112,9 @@ struct ClipboardCardView: View {
             if !isColorCard,
                let dominantColor = AppIconColorService.shared.dominantColor(forBundleID: item.sourceAppBundleID) {
                 LinearGradient(
-                    colors: [dominantColor.opacity(0.4), .clear],
+                    colors: [dominantColor.opacity(0.5), .clear],
                     startPoint: .top,
-                    endPoint: .init(x: 0.5, y: 0.6)
+                    endPoint: .init(x: 0.5, y: 0.28)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .allowsHitTesting(false)
