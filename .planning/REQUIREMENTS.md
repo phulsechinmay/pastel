@@ -68,10 +68,10 @@ Requirements for v1.1 milestone: Rich Content & Enhanced Paste.
 
 ### Rich Content — URL Previews
 
-- [ ] **RICH-06**: App auto-fetches URL metadata (title, favicon, og:image) after URL item is captured
-- [ ] **RICH-07**: URL cards show source app icon + timestamp header, og:image preview, and favicon + title footer
-- [ ] **RICH-08**: URL metadata fetch is non-blocking with graceful fallback to plain URL card on failure
-- [ ] **RICH-09**: Settings toggle to disable URL metadata fetching
+- [x] **RICH-06**: App auto-fetches URL metadata (title, favicon, og:image) after URL item is captured
+- [x] **RICH-07**: URL cards show source app icon + timestamp header, og:image preview, and favicon + title footer
+- [x] **RICH-08**: URL metadata fetch is non-blocking with graceful fallback to plain URL card on failure
+- [x] **RICH-09**: Settings toggle to disable URL metadata fetching
 
 ### Enhanced Paste — Quick Paste Hotkeys
 
@@ -168,10 +168,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RICH-03 | Phase 7 | Complete |
 | RICH-04 | Phase 7 | Complete |
 | RICH-05 | Phase 7 | Complete |
-| RICH-06 | Phase 8 | Pending |
-| RICH-07 | Phase 8 | Pending |
-| RICH-08 | Phase 8 | Pending |
-| RICH-09 | Phase 8 | Pending |
+| RICH-06 | Phase 8 | Complete |
+| RICH-07 | Phase 8 | Complete |
+| RICH-08 | Phase 8 | Complete |
+| RICH-09 | Phase 8 | Complete |
 | PAST-10 | Phase 9 | Complete |
 | PAST-10b | Phase 9 | Complete |
 | PAST-11 | Phase 9 | Complete |
@@ -189,4 +189,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-07 after Phase 9 completion*
+*Last updated: 2026-02-07 after v1.1 milestone completion*

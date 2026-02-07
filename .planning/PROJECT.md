@@ -8,18 +8,19 @@ Pastel is a native macOS clipboard manager that saves everything you copy and ma
 
 Clipboard history is always one hotkey away, with instant paste-back into any app.
 
-## Current Milestone: v1.1 Rich Content & Enhanced Paste
+## Current Milestone: v1.2 Storage & Security
 
-**Goal:** Enrich clipboard cards with syntax highlighting, color swatches, and URL previews; add Cmd+1-9 direct paste hotkeys; upgrade label system with color palette and emoji support.
+**Goal:** Optimize storage usage with compression and deduplication, provide visibility into space consumption, and let users protect sensitive clipboard items with manual redaction.
 
 **Target features:**
-- Code snippet detection with syntax-highlighted previews
-- Color value detection (hex/rgb) with visual swatches
-- URL preview cards with auto-fetched Open Graph metadata (title, favicon, header image)
-- Source app icon refinements on cards
-- Cmd+1-9 hotkeys to paste Nth most recent item without opening panel
-- Preset color palette for labels (8-12 colors)
-- Optional emoji per label (replaces color dot when set)
+- Image compression and storage optimization
+- Content deduplication across clipboard history
+- Storage dashboard showing usage by content type
+- Storage management tools (purge by category, compact database)
+- Manual "mark as sensitive" action on clipboard items
+- Redacted/blurred display for sensitive items in panel
+- Click-to-reveal interaction for sensitive content
+- Optional shorter auto-expiry for sensitive items
 
 ## Requirements
 
@@ -27,7 +28,7 @@ Clipboard history is always one hotkey away, with instant paste-back into any ap
 
 - [x] Clipboard monitoring — capture text, images, URLs, files
 - [x] Clipboard history sidebar — screen-edge sliding panel triggered by hotkey
-- [x] Label system — create labels, assign to items, filter by label chips
+- [x] Label system — create labels, assign to items, filter by label chips, drag-and-drop assignment
 - [x] Search — full-text search across clipboard history, combinable with label filters
 - [x] Paste-back — double-click or Enter to paste items into active app
 - [x] Configurable paste behavior — paste directly, copy to clipboard, or copy+paste
@@ -39,10 +40,15 @@ Clipboard history is always one hotkey away, with instant paste-back into any ap
 - [x] Always-dark theme
 - [x] Keyboard navigation — arrow keys + Enter to select and paste
 - [x] Accessibility onboarding — guided permission request on first launch
+- [x] Code snippet detection — syntax-highlighted previews with language badges
+- [x] Color value detection — hex/rgb/hsl with visual swatches
+- [x] URL metadata fetching — auto-fetch title, favicon, og:image
+- [x] Quick paste hotkeys — Cmd+1-9 and Cmd+Shift+1-9 with position badges
+- [x] Label enhancements — 12 colors, optional emoji, emoji picker
 
 ### Active
 
-See REQUIREMENTS.md for v1.1 milestone requirements.
+See REQUIREMENTS.md for v1.2 milestone requirements.
 
 ### Out of Scope
 
@@ -52,9 +58,9 @@ See REQUIREMENTS.md for v1.1 milestone requirements.
 - Import/export — defer to v2
 - Allow/ignore app lists — defer to v2
 - Light mode / system-adaptive theme — always dark
-- Paste as plain text — defer to v1.2
-- Drag-and-drop from panel — defer to v1.2
-- Pinned/favorite items — defer to v1.2
+- Paste as plain text — defer to v1.3
+- Drag-and-drop from panel — defer to v1.3
+- Pinned/favorite items — defer to v1.3
 
 ## Context
 
@@ -66,6 +72,7 @@ See REQUIREMENTS.md for v1.1 milestone requirements.
 - Screen-edge panel uses NSPanel with .nonactivatingPanel style mask
 - SwiftData for persistence (macOS 14+ target)
 - v1.0 complete with 29 requirements delivered across 5 phases
+- v1.1 complete with 15 requirements delivered across 5 phases (6-10)
 
 ## Constraints
 
@@ -91,9 +98,11 @@ See REQUIREMENTS.md for v1.1 milestone requirements.
 | CGEvent Cmd+V paste-back | Reliable paste simulation, requires Accessibility permission | ✓ Good |
 | XcodeGen project management | project.yml is source of truth, reproducible builds | ✓ Good |
 | Automatic code signing | Stable TCC identity across Xcode rebuilds | ✓ Good |
-| Preset label color palette | Simple, clean UX — 8-12 named colors | — Pending |
-| Emoji replaces color dot | Either emoji OR color, not both — keeps chips clean | — Pending |
-| Auto-fetch URL metadata | Fetch on copy with fallback to plain card on failure | — Pending |
+| Preset label color palette | Simple, clean UX — 12 named colors | ✓ Good |
+| Emoji replaces color dot | Either emoji OR color, not both — keeps chips clean | ✓ Good |
+| Auto-fetch URL metadata | Fetch on copy with fallback to plain card on failure | ✓ Good |
+| Manual sensitive marking | User decides what's sensitive, not heuristics | — Pending |
+| Image compression for storage | Reduce disk footprint without losing paste quality | — Pending |
 
 ---
-*Last updated: 2026-02-07 after v1.1 milestone start*
+*Last updated: 2026-02-07 after v1.2 milestone start*
