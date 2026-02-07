@@ -89,9 +89,11 @@ struct FilteredCardListView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: 8) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
                                 ClipboardCardView(
                                     item: item,
-                                    isSelected: selectedIndex == index
+                                    isSelected: selectedIndex == index,
+                                    badgePosition: badge
                                 )
                                 .frame(width: 260, height: 195)
                                 .clipped()
@@ -121,9 +123,11 @@ struct FilteredCardListView: View {
                     ScrollView {
                         LazyVStack(spacing: 8) {
                             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
                                 ClipboardCardView(
                                     item: item,
-                                    isSelected: selectedIndex == index
+                                    isSelected: selectedIndex == index,
+                                    badgePosition: badge
                                 )
                                 .id(index)
                                 .onTapGesture(count: 2) {
