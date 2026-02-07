@@ -18,6 +18,16 @@ struct ChipBarView: View {
     @State private var showingCreateLabel = false
     @State private var newLabelName = ""
     @State private var newLabelColor: LabelColor = .blue
+    @State private var newLabelEmoji: String?
+    @FocusState private var isHiddenEmojiFieldFocused: Bool
+
+    /// Curated label-friendly emojis for quick selection.
+    private static let curatedEmojis: [String] = [
+        "📌", "📎", "📝", "📋", "📂", "💡",
+        "⭐", "❤️", "🔥", "🎯", "🏷️", "🔖",
+        "✅", "❌", "⚡", "🎨", "🔧", "🐛",
+        "💬", "📧", "🔒", "🌟", "💎", "🚀"
+    ]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -87,6 +97,7 @@ struct ChipBarView: View {
         Button {
             newLabelName = ""
             newLabelColor = .blue
+            newLabelEmoji = nil
             showingCreateLabel = true
         } label: {
             Text("+")
@@ -122,15 +133,68 @@ struct ChipBarView: View {
                         .overlay(
                             Circle()
                                 .strokeBorder(
-                                    newLabelColor == labelColor ? Color.white : Color.clear,
+                                    newLabelEmoji == nil && newLabelColor == labelColor
+                                        ? Color.white : Color.clear,
                                     lineWidth: 2
                                 )
                         )
                         .onTapGesture {
                             newLabelColor = labelColor
+                            newLabelEmoji = nil
                         }
                 }
             }
+
+            Divider()
+
+            // Emoji header
+            Text("Emoji")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            // Curated emoji grid (same 6-column layout)
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(Self.curatedEmojis, id: \.self) { emoji in
+                    Text(emoji)
+                        .font(.system(size: 16))
+                        .frame(width: 20, height: 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(newLabelEmoji == emoji ? Color.white.opacity(0.2) : Color.clear)
+                        )
+                        .onTapGesture {
+                            newLabelEmoji = emoji
+                        }
+                }
+
+                // "..." fallback for full system emoji picker
+                Button {
+                    isHiddenEmojiFieldFocused = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NSApp.orderFrontCharacterPalette(nil)
+                    }
+                } label: {
+                    Text("...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help("More emojis")
+            }
+
+            // Hidden TextField to receive system emoji picker input
+            TextField("", text: Binding(
+                get: { newLabelEmoji ?? "" },
+                set: { newValue in
+                    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    newLabelEmoji = trimmed.isEmpty ? nil : String(trimmed.prefix(1))
+                }
+            ))
+            .focused($isHiddenEmojiFieldFocused)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .allowsHitTesting(false)
 
             HStack {
                 Button("Cancel") {
@@ -159,7 +223,8 @@ struct ChipBarView: View {
         let newLabel = Label(
             name: trimmedName,
             colorName: newLabelColor.rawValue,
-            sortOrder: maxOrder + 1
+            sortOrder: maxOrder + 1,
+            emoji: newLabelEmoji
         )
 
         modelContext.insert(newLabel)

@@ -81,8 +81,17 @@ private struct LabelRow: View {
     @Environment(\.modelContext) private var modelContext
     @State private var isEditing = false
     @State private var showingPalette = false
+    @FocusState private var isHiddenEmojiFieldFocused: Bool
 
     var onDelete: () -> Void
+
+    /// Curated label-friendly emojis for quick selection.
+    private static let curatedEmojis: [String] = [
+        "📌", "📎", "📝", "📋", "📂", "💡",
+        "⭐", "❤️", "🔥", "🎯", "🏷️", "🔖",
+        "✅", "❌", "⚡", "🎨", "🔧", "🐛",
+        "💬", "📧", "🔒", "🌟", "💎", "🚀"
+    ]
 
     /// Binding that truncates emoji input to a single grapheme cluster.
     private var emojiBinding: Binding<String> {
@@ -177,30 +186,52 @@ private struct LabelRow: View {
 
             Divider()
 
-            // Emoji row
-            HStack(spacing: 6) {
-                Text("Emoji")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                TextField("", text: emojiBinding)
-                    .textFieldStyle(.plain)
-                    .frame(width: 24)
-                    .multilineTextAlignment(.center)
+            // Emoji header
+            Text("Emoji")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            // Curated emoji grid (same 6-column layout as colors)
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(Self.curatedEmojis, id: \.self) { emoji in
+                    Text(emoji)
+                        .font(.system(size: 16))
+                        .frame(width: 20, height: 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(label.emoji == emoji ? Color.white.opacity(0.2) : Color.clear)
+                        )
+                        .onTapGesture {
+                            label.emoji = emoji
+                            try? modelContext.save()
+                            showingPalette = false
+                        }
+                }
+
+                // "..." fallback for full system emoji picker
                 Button {
+                    isHiddenEmojiFieldFocused = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         NSApp.orderFrontCharacterPalette(nil)
                     }
                 } label: {
-                    Image(systemName: "face.smiling")
-                        .font(.system(size: 12))
+                    Text("...")
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
-                .help("Open emoji picker")
+                .help("More emojis")
             }
+
+            // Hidden TextField to receive system emoji picker input
+            TextField("", text: emojiBinding)
+                .focused($isHiddenEmojiFieldFocused)
+                .frame(width: 0, height: 0)
+                .opacity(0)
+                .allowsHitTesting(false)
         }
         .padding(10)
-        .frame(width: 160)
+        .frame(width: 170)
     }
 }
