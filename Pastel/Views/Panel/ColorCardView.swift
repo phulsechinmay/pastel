@@ -24,7 +24,7 @@ struct ColorCardView: View {
         VStack(alignment: .leading, spacing: 2) {
             // Large hex title
             Text("#\(item.detectedColorHex ?? "------")")
-                .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                .font(.system(size: 28, weight: .bold, design: .monospaced))
 
             // Original format subtitle (for rgb/hsl)
             if showsOriginalSubtitle {
