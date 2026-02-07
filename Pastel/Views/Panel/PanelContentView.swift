@@ -116,6 +116,11 @@ struct PanelContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .defaultFocus($panelFocus, .cardList)
+        .onAppear {
+            DispatchQueue.main.async {
+                panelFocus = .cardList
+            }
+        }
         .onChange(of: panelActions.showCount) { _, _ in
             panelFocus = .cardList
         }
