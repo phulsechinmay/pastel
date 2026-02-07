@@ -31,9 +31,13 @@ struct ClipboardCardView: View {
         contrastingColor(forHex: item.detectedColorHex)
     }
 
-    init(item: ClipboardItem, isSelected: Bool = false, onPaste: (() -> Void)? = nil) {
+    /// 1-based position badge number (1–9), or nil to hide badge.
+    var badgePosition: Int?
+
+    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, onPaste: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
+        self.badgePosition = badgePosition
         self.onPaste = onPaste
     }
 
@@ -89,6 +93,12 @@ struct ClipboardCardView: View {
                 .strokeBorder(cardBorderColor, lineWidth: 1.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .bottomTrailing) {
+            if let badgePosition {
+                KeycapBadge(number: badgePosition)
+                    .padding(6)
+            }
+        }
         .onHover { hovering in
             isHovered = hovering
         }
@@ -230,5 +240,33 @@ struct ClipboardCardView: View {
         } else {
             return 80
         }
+    }
+}
+
+// MARK: - KeycapBadge
+
+/// Keyboard key-style badge showing a quick paste shortcut (e.g., "\u{2318} 1").
+/// Mimics a physical keycap with rounded rect background and subtle border.
+struct KeycapBadge: View {
+    let number: Int  // 1-9
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text("\u{2318}")  // ⌘ symbol
+                .font(.system(size: 9, weight: .medium))
+            Text("\(number)")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+        }
+        .foregroundStyle(.white.opacity(0.7))
+        .padding(.horizontal, 5)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.white.opacity(0.15))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .strokeBorder(.white.opacity(0.1), lineWidth: 0.5)
+        )
     }
 }
