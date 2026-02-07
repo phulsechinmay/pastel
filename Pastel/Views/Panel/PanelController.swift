@@ -94,7 +94,7 @@ final class PanelController {
 
         let edge = currentEdge
         let screen = screenWithMouse()
-        let screenFrame = screen.frame
+        let screenFrame = screen.visibleFrame
 
         // If the panel exists but orientation changed (vertical<->horizontal), recreate it.
         if let existingPanel = panel {
@@ -138,8 +138,8 @@ final class PanelController {
         guard let panel, panel.isVisible else { return }
 
         let edge = currentEdge
-        let screenFrame = panel.screen?.frame
-            ?? NSScreen.main?.frame
+        let screenFrame = panel.screen?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
 
         let offScreen = edge.offScreenFrame(screenFrame: screenFrame)

@@ -17,7 +17,7 @@ final class SlidingPanel: NSPanel {
 
         // Floating behavior -- always visible above regular windows
         isFloatingPanel = true
-        level = .statusBar
+        level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
 
