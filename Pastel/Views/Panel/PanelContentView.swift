@@ -95,7 +95,7 @@ struct PanelContentView: View {
                 selectedIndex: $selectedIndex,
                 onPaste: { item in pasteItem(item) }
             )
-            .id(appState.itemCount)
+            .id("\(debouncedSearchText)\(selectedLabel?.persistentModelID.hashValue ?? 0)\(appState.itemCount)")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: searchText) {
