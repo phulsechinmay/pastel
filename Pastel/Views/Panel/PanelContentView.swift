@@ -35,6 +35,13 @@ struct PanelContentView: View {
         return !edge.isVertical
     }
 
+    /// Top padding to clear the menu bar / notch on MacBook screens when panel is at the top edge.
+    private var topSafeInset: CGFloat {
+        guard PanelEdge(rawValue: panelEdgeRaw) == .top,
+              let screen = NSScreen.main else { return 0 }
+        return screen.frame.maxY - screen.visibleFrame.maxY
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if isHorizontal {
@@ -116,6 +123,7 @@ struct PanelContentView: View {
             .focused($panelFocus, equals: .cardList)
             .id("\(debouncedSearchText)\(selectedLabel?.persistentModelID.hashValue ?? 0)\(appState.itemCount)")
         }
+        .padding(.top, topSafeInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .defaultFocus($panelFocus, .cardList)
         .onAppear {

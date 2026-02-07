@@ -24,6 +24,7 @@ struct ClipboardCardView: View {
 
     @State private var isHovered = false
     @State private var imageDimensions: String?
+    @State private var dominantColor: Color?
 
     /// Whether this card is a color item (entire card uses the detected color).
     private var isColorCard: Bool { item.type == .color }
@@ -107,19 +108,19 @@ struct ClipboardCardView: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: cardMinHeight, maxHeight: 195, alignment: .topLeading)
         .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(alignment: .top) {
-            if !isColorCard,
-               let dominantColor = AppIconColorService.shared.dominantColor(forBundleID: item.sourceAppBundleID) {
-                LinearGradient(
-                    colors: [dominantColor.opacity(0.5), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 40)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .allowsHitTesting(false)
+        .background {
+            ZStack(alignment: .top) {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(cardBackground)
+                if !isColorCard, let dominantColor {
+                    LinearGradient(
+                        colors: [dominantColor.opacity(0.5), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
             }
         }
         .overlay(
@@ -128,6 +129,11 @@ struct ClipboardCardView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .task {
+            // Load dominant color for header gradient (deferred to avoid blocking panel open)
+            if !isColorCard {
+                dominantColor = AppIconColorService.shared.dominantColor(forBundleID: item.sourceAppBundleID)
+            }
+
             guard item.type == .image, let path = item.imagePath else { return }
             let fileURL = ImageStorageService.shared.resolveImageURL(path)
             guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
@@ -228,7 +234,7 @@ struct ClipboardCardView: View {
             return isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1)
         } else {
             let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
-            return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.4)
+            return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.45)
         }
     }
 
