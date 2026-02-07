@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 Phase: 7 of 9 (Code and Color Detection)
 Plan: 0 of 3 in current phase
 Status: Ready to plan
-Last activity: 2026-02-07 -- Completed quick task 004: Unified color/emoji label menu
+Last activity: 2026-02-07 -- Completed quick task 005: Card label chips and emoji menu fix
 
 Progress: [############░░░░░░░░] 68% (15/22 plans across all milestones)
 
@@ -20,7 +20,7 @@ Progress: [############░░░░░░░░] 68% (15/22 plans across all mil
 
 - 29/29 requirements delivered across 5 phases (13 plans)
 - Total execution time: ~37 min
-- 4 quick tasks completed post-v1.0
+- 5 quick tasks completed post-v1.0
 
 ## Accumulated Context
 
@@ -41,6 +41,7 @@ Recent decisions affecting current work:
 - [06-02]: orderFrontCharacterPalette with 0.1s FocusState delay for correct field targeting
 - [06-02]: Emoji-or-dot pattern: `if let emoji = label.emoji, !emoji.isEmpty` across all renderers
 - [quick-004]: Unified palette popover replaces separate color Menu + emoji TextField + smiley Button in LabelRow
+- [quick-005]: Color dot Circle dropped from context menu labels -- macOS NSMenu unreliable with shapes; concatenated text used instead
 
 ### Pending Todos
 
@@ -51,6 +52,7 @@ Recent decisions affecting current work:
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 004 | Unified color/emoji label menu in settings | 2026-02-07 | a4687e2 | [004-unified-color-emoji-label-menu](./quick/004-unified-color-emoji-label-menu/) |
+| 005 | Card label chips and emoji menu fix | 2026-02-07 | f9037ee | [005-card-label-chips-and-emoji-menu-fix](./quick/005-card-label-chips-and-emoji-menu-fix/) |
 
 ### Blockers/Concerns
 
@@ -59,5 +61,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Quick task 004 complete, ready for Phase 7
+Stopped at: Quick task 005 complete, ready for Phase 7
 Resume file: None
