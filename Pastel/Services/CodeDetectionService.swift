@@ -67,23 +67,72 @@ struct CodeDetectionService {
 
     // MARK: - Async Language Detection
 
-    /// Detects the programming language of the given text using HighlightSwift.
+    /// Detects the programming language of the given text using HighlightSwift,
+    /// supplemented by keyword-based hints to correct common highlight.js misdetections.
     ///
-    /// Uses highlight.js auto-detection via `Highlight().request()`. Only returns
-    /// a result when the relevance score meets the threshold (>= 5) to avoid
-    /// false positives on short prose.
+    /// highlight.js auto-detection can misidentify languages (e.g., Swift as SCSS).
+    /// Keyword hints check for strong language-specific signals and override when
+    /// the auto-detected language seems wrong.
     ///
     /// - Parameter text: The code text to analyze.
     /// - Returns: A tuple of (language identifier, relevance score), or nil if not detected.
     static func detectLanguage(_ text: String) async -> (language: String, relevance: Int)? {
+        // Check keyword hints first for strong language signals
+        let hintedLanguage = languageHint(for: text)
+
         do {
             let highlight = Highlight()
             let result = try await highlight.request(text)
-            guard result.relevance >= 5 else { return nil }
+
+            // If we have a keyword hint and highlight.js returned something different,
+            // prefer the keyword hint (highlight.js often misdetects Swift as SCSS, etc.)
+            if let hint = hintedLanguage, result.language != hint {
+                return (hint, max(result.relevance, 5))
+            }
+
+            // Accept highlight.js result if relevance is reasonable
+            guard result.relevance >= 3 else { return nil }
             return (result.language, result.relevance)
         } catch {
+            // If highlight.js failed but we have a keyword hint, use it
+            if let hint = hintedLanguage {
+                return (hint, 5)
+            }
             return nil
         }
+    }
+
+    // MARK: - Keyword-based Language Hints
+
+    /// Checks for strong language-specific keyword patterns that indicate a particular language.
+    /// Returns nil if no strong signal is found.
+    private static func languageHint(for text: String) -> String? {
+        // Swift: func/let/var/guard/struct/enum/protocol with Swift-style syntax
+        let swiftKeywords = ["func ", "guard ", "struct ", "enum ", "protocol ", "@Observable", "@MainActor", "@State ", "@Binding ", "-> "]
+        let swiftCount = swiftKeywords.filter { text.contains($0) }.count
+        if swiftCount >= 2 { return "swift" }
+
+        // Python: def/elif/except/self./print(
+        let pythonKeywords = ["def ", "elif ", "except ", "self.", "print(", "import ", "__init__", "lambda "]
+        let pythonCount = pythonKeywords.filter { text.contains($0) }.count
+        if pythonCount >= 2 { return "python" }
+
+        // JavaScript/TypeScript: const/=>/===/.then(/async function
+        let jsKeywords = ["=> ", "=== ", "!== ", ".then(", "async function", "console.log", "require(", "export "]
+        let jsCount = jsKeywords.filter { text.contains($0) }.count
+        if jsCount >= 2 { return "javascript" }
+
+        // Rust: fn /let mut/impl /pub fn/->
+        let rustKeywords = ["fn ", "let mut ", "impl ", "pub fn ", "&self", "::new(", "unwrap()"]
+        let rustCount = rustKeywords.filter { text.contains($0) }.count
+        if rustCount >= 2 { return "rust" }
+
+        // Go: func (/ := /package /fmt./go func
+        let goKeywords = [":= ", "package ", "fmt.", "go func", "func (", "interface{"]
+        let goCount = goKeywords.filter { text.contains($0) }.count
+        if goCount >= 2 { return "go" }
+
+        return nil
     }
 }
 

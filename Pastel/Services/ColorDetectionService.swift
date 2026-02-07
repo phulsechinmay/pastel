@@ -20,6 +20,9 @@ struct ColorDetectionService {
         // Try hex patterns first: #RGB, #RRGGBB
         if let hex = matchHex(trimmed) { return hex }
 
+        // Try bare hex: RGB, RRGGBB (without #)
+        if let hex = matchBareHex(trimmed) { return hex }
+
         // Try rgb()/rgba()
         if let hex = matchRGB(trimmed) { return hex }
 
@@ -38,6 +41,19 @@ struct ColorDetectionService {
         let hex = String(match.1)
         if hex.count == 3 {
             // Expand #RGB to RRGGBB by doubling each character
+            return hex.map { "\($0)\($0)" }.joined().uppercased()
+        }
+        return hex.uppercased()
+    }
+
+    // MARK: - Bare Hex Matching
+
+    /// Match bare hex color values without # prefix: RGB or RRGGBB (case-insensitive).
+    private static func matchBareHex(_ text: String) -> String? {
+        let bareHexPattern = /^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
+        guard let match = text.wholeMatch(of: bareHexPattern) else { return nil }
+        let hex = String(match.1)
+        if hex.count == 3 {
             return hex.map { "\($0)\($0)" }.joined().uppercased()
         }
         return hex.uppercased()

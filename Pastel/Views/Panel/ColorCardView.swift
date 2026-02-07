@@ -2,13 +2,10 @@ import SwiftUI
 
 /// Card content for `.color` clipboard items.
 ///
-/// Displays a 32x32 color swatch alongside the original color text.
-/// If the original text is a non-hex format (rgb, hsl), shows the
-/// normalized hex value as a secondary label below the text.
-/// Falls back to a gray swatch if `detectedColorHex` is nil or malformed.
-///
-/// In horizontal panel mode (top/bottom edges), increases line limit
-/// to fill the taller fixed-height cards.
+/// Renders the entire card background as the detected color with a large
+/// monospaced hex title overlaid. The hex text uses a contrasting color
+/// (white or black) for readability. For non-hex formats (rgb, hsl),
+/// the original text is shown as a smaller subtitle.
 struct ColorCardView: View {
 
     let item: ClipboardItem
@@ -20,7 +17,6 @@ struct ColorCardView: View {
     }
 
     /// Parses the 6-digit hex string (no #) into a SwiftUI Color.
-    /// Falls back to gray if the hex is nil or unparseable.
     private var swatchColor: Color {
         guard let hex = item.detectedColorHex, hex.count == 6 else {
             return .gray
@@ -35,47 +31,61 @@ struct ColorCardView: View {
         )
     }
 
-    /// Whether the original text is a non-hex format (rgb/hsl) that
-    /// warrants showing the normalized hex as a subtitle.
-    private var showsHexSubtitle: Bool {
+    /// Returns white or black text based on the luminance of the detected color.
+    private var contrastingTextColor: Color {
+        guard let hex = item.detectedColorHex, hex.count == 6 else {
+            return .white
+        }
+        let scanner = Scanner(string: hex)
+        var rgb: UInt64 = 0
+        guard scanner.scanHexInt64(&rgb) else { return .white }
+        let r = Double((rgb >> 16) & 0xFF) / 255.0
+        let g = Double((rgb >> 8) & 0xFF) / 255.0
+        let b = Double(rgb & 0xFF) / 255.0
+        // Relative luminance (WCAG formula)
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return luminance > 0.5 ? .black : .white
+    }
+
+    /// Whether the original text is a non-hex format that warrants a subtitle.
+    private var showsOriginalSubtitle: Bool {
         guard let text = item.textContent?.trimmingCharacters(in: .whitespacesAndNewlines) else {
             return false
         }
-        // If the original text doesn't start with '#', it's rgb/hsl format
-        return !text.hasPrefix("#")
-    }
-
-    /// The normalized hex value formatted with a '#' prefix for display.
-    private var normalizedHexDisplay: String {
-        guard let hex = item.detectedColorHex else { return "" }
-        return "#\(hex)"
+        let upper = text.uppercased()
+        let hexDisplay = "#\(item.detectedColorHex ?? "")"
+        // Show subtitle if the original text isn't just the hex value
+        return upper != hexDisplay.uppercased() && upper != (item.detectedColorHex ?? "").uppercased()
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            // Color swatch
-            RoundedRectangle(cornerRadius: 6)
+        ZStack {
+            // Full card background color
+            RoundedRectangle(cornerRadius: 8)
                 .fill(swatchColor)
-                .frame(width: 32, height: 32)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-                )
 
-            // Text content
+            // Subtle border for very dark colors
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+
+            // Text overlay
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.textContent ?? "")
-                    .font(.system(.callout, design: .monospaced))
-                    .lineLimit(isHorizontal ? 4 : 2)
-                    .foregroundStyle(.primary)
+                // Large hex title
+                Text("#\(item.detectedColorHex ?? "------")")
+                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(contrastingTextColor)
 
-                if showsHexSubtitle {
-                    Text(normalizedHexDisplay)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                // Original format subtitle (for rgb/hsl)
+                if showsOriginalSubtitle {
+                    Text(item.textContent ?? "")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(contrastingTextColor.opacity(0.7))
+                        .lineLimit(1)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
