@@ -45,6 +45,12 @@ Key decisions from v1.1 carrying forward:
 
 - Final manual testing of full application before distribution
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 014 | Create onboarding flow with accessibility permissions, hotkey setup, and quick settings | 2026-02-08 | bbcddb3 | [014-onboarding-flow-accessibility-hotkey-settings](./quick/014-onboarding-flow-accessibility-hotkey-settings/) |
+
 ### Blockers/Concerns
 
 None currently.
