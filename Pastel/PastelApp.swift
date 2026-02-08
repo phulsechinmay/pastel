@@ -32,7 +32,10 @@ struct PastelApp: App {
                 .modelContainer(modelContainer)
                 .frame(width: 260)
         } label: {
-            Image(systemName: "clipboard")
+            Image("MenuBarIcon")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 18)
         }
         .menuBarExtraStyle(.window)
     }

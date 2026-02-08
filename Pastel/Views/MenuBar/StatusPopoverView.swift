@@ -1,24 +1,16 @@
 import SwiftUI
 import SwiftData
+import KeyboardShortcuts
 
 struct StatusPopoverView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
 
     @State private var showingClearConfirmation = false
+    @State private var panelShortcutDescription: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 8) {
-                Image(systemName: "clipboard.fill")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                Text("Pastel")
-                    .font(.headline)
-                Spacer()
-            }
-
             // Monitoring toggle (bound through ClipboardMonitor)
             Toggle("Monitoring", isOn: Binding(
                 get: { appState.clipboardMonitor?.isMonitoring ?? false },
@@ -27,17 +19,19 @@ struct StatusPopoverView: View {
             .toggleStyle(.switch)
             .controlSize(.small)
 
-            // Show History panel button
+            // Show Panel button
             Button(action: {
                 appState.togglePanel()
             }) {
                 HStack(spacing: 6) {
                     Image(systemName: "clipboard.fill")
-                    Text("Show History")
+                    Text("Show Panel")
                     Spacer()
-                    Text("\u{21E7}\u{2318}V")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let desc = panelShortcutDescription {
+                        Text(desc)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .buttonStyle(.plain)
@@ -53,7 +47,7 @@ struct StatusPopoverView: View {
             }) {
                 HStack {
                     Image(systemName: "gearshape")
-                    Text("Settings...")
+                    Text("Settings")
                     Spacer()
                 }
             }
@@ -102,5 +96,8 @@ struct StatusPopoverView: View {
             .keyboardShortcut("q", modifiers: .command)
         }
         .padding()
+        .onAppear {
+            panelShortcutDescription = KeyboardShortcuts.getShortcut(for: .togglePanel)?.description
+        }
     }
 }
