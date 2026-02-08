@@ -21,7 +21,7 @@ struct PastelApp: App {
         state.setup(modelContext: container.mainContext)
         state.setupPanel(modelContainer: container)
         state.modelContainer = container
-        state.checkAccessibilityOnLaunch()
+        state.handleFirstLaunch()
         self._appState = State(initialValue: state)
     }
 

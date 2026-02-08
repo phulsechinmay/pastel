@@ -84,7 +84,10 @@ final class AppState {
         panelController.toggle()
     }
 
-    // MARK: - Accessibility Onboarding
+    // MARK: - Onboarding & Accessibility
+
+    /// Controller for the first-launch onboarding window.
+    private var onboardingController = OnboardingWindowController.shared
 
     /// NSWindow for the accessibility permission onboarding prompt.
     private var accessibilityWindow: NSWindow?
@@ -120,6 +123,23 @@ final class AppState {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.accessibilityWindow = window
+    }
+
+    /// Handle first-launch onboarding or subsequent accessibility check.
+    ///
+    /// On first launch (hasCompletedOnboarding is false): show full onboarding.
+    /// On subsequent launches: if accessibility not granted, show the simple AccessibilityPromptView.
+    /// If accessibility is already granted on subsequent launches: no-op.
+    func handleFirstLaunch() {
+        let hasCompleted = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+
+        if !hasCompleted {
+            // First launch: show full onboarding
+            onboardingController.showOnboarding(appState: self)
+        } else {
+            // Subsequent launch: just check accessibility
+            checkAccessibilityOnLaunch()
+        }
     }
 
     /// Clear all clipboard history: delete all items, clean up image files, reset item count.
