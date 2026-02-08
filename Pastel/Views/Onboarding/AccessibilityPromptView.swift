@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Onboarding view that explains why Accessibility permission is needed
+/// Onboarding view that explains why PostEvent permission is needed
 /// and provides buttons to grant it.
 ///
 /// Shown as a standalone NSWindow at app launch when permission is not granted.
-/// Polls `AXIsProcessTrusted()` every second and auto-dismisses when granted.
+/// Polls `CGPreflightPostEventAccess()` every second and auto-dismisses when granted.
 struct AccessibilityPromptView: View {
     var onDismiss: () -> Void = {}
     @State private var isChecking = false

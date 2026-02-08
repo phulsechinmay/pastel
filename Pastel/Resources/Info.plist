@@ -18,9 +18,13 @@
 	<string>6.0</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>Pastel needs Accessibility permission to paste clipboard items into other apps using keyboard simulation. Without this, you can browse history but must paste manually with Cmd+V.</string>
 </dict>
 </plist>

@@ -44,6 +44,7 @@
 		CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */; };
 		D1A2B3C4E5F60718293A4B5C /* PasteBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* PasteBehavior.swift */; };
 		D3022838FBC0C60D3B9FBCC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7CA38A9FD4344A6EBC84615B /* Assets.xcassets */; };
+		D3022839FBC0C60D3B9FBCCA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7B6FC5181BA6D8C3F714E835 /* PrivacyInfo.xcprivacy */; };
 		D4E5F6071829304B5C6D7E8F /* CodeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6071829304B5C6D7E90 /* CodeCardView.swift */; };
 		D6F7C0FF5984EC498B94BCC3 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C99DE2608198777D57CA9B /* EmptyStateView.swift */; };
 		D784DF24180305D270E7DDED /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595BAEC04C890C9BF73C4F5D /* AppState.swift */; };
@@ -82,6 +83,7 @@
 		71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		76EB886434FC096E9A770705 /* PanelEdge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelEdge.swift; sourceTree = "<group>"; };
 		7B6FC5171BA6D8C3F714E834 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7B6FC5181BA6D8C3F714E835 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7CA38A9FD4344A6EBC84615B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		9C7F8E05C490820A909E5D51 /* Label.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Label.swift; sourceTree = "<group>"; };
@@ -263,6 +265,7 @@
 				7CA38A9FD4344A6EBC84615B /* Assets.xcassets */,
 				7B6FC5171BA6D8C3F714E834 /* Info.plist */,
 				DACD70AAF6888EBA275AC2BE /* Pastel.entitlements */,
+				7B6FC5181BA6D8C3F714E835 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -308,12 +311,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
-				TargetAttributes = {
-					8EBF09BA40104D6CB43A961F = {
-						DevelopmentTeam = QLSJ39DRSH;
-						ProvisioningStyle = Automatic;
-					};
-				};
 			};
 			buildConfigurationList = 5A8B1C26A723555E9D7D5F1F /* Build configuration list for PBXProject "Pastel" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -344,6 +341,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D3022838FBC0C60D3B9FBCC9 /* Assets.xcassets in Resources */,
+				D3022839FBC0C60D3B9FBCCA /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -420,12 +418,15 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Pastel/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pastel - Clipboard Manager";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
 			};
@@ -502,12 +503,15 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Pastel/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pastel - Clipboard Manager";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
 			};

@@ -1,34 +1,39 @@
 import ApplicationServices
 import AppKit
+import CoreGraphics
 
-/// Accessibility permission check and request for CGEvent paste simulation.
+/// PostEvent permission check and request for CGEvent paste simulation.
 ///
-/// CGEvent posting requires Accessibility permission. This service provides:
+/// CGEvent.post requires the PostEvent TCC permission (kTCCServicePostEvent),
+/// which is separate from full Accessibility (kTCCServiceAccessibility).
+/// PostEvent IS compatible with App Sandbox — full Accessibility is NOT.
+///
+/// We check both `AXIsProcessTrusted()` and `CGPreflightPostEventAccess()` because
+/// the System Settings UI grants all three TCC services together, and
+/// `AXIsProcessTrusted()` reflects changes immediately while
+/// `CGPreflightPostEventAccess()` caches per-process and may need a restart.
+///
 /// - `isGranted`: cheap check, call before every paste (permission can be revoked at any time)
-/// - `requestPermission()`: triggers the macOS system dialog
+/// - `requestPermission()`: triggers the macOS system dialog for PostEvent access
 /// - `openAccessibilitySettings()`: opens System Settings directly to the Accessibility pane
 @MainActor
 enum AccessibilityService {
 
-    /// Whether Accessibility permission is currently granted.
+    /// Whether PostEvent permission is currently granted.
     ///
-    /// This is a cheap call -- do NOT cache the result.
-    /// Users can revoke permission at any time via System Settings.
+    /// Checks both AX (instant TCC refresh) and PostEvent (correct entitlement).
+    /// System Settings grants both together, so either returning true is sufficient.
     static var isGranted: Bool {
-        AXIsProcessTrusted()
+        AXIsProcessTrusted() || CGPreflightPostEventAccess()
     }
 
-    /// Request Accessibility permission, showing the macOS system dialog.
+    /// Request PostEvent permission, showing the macOS system dialog.
     ///
     /// - Returns: `true` if permission is already granted, `false` if the user
     ///   needs to grant it via System Settings.
     @discardableResult
     static func requestPermission() -> Bool {
-        // Use the string key directly to avoid Swift 6 concurrency warning
-        // on kAXTrustedCheckOptionPrompt (shared mutable state)
-        let promptKey = "AXTrustedCheckOptionPrompt" as CFString
-        let options = [promptKey: true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+        CGRequestPostEventAccess()
     }
 
     /// Open System Settings directly to the Accessibility privacy pane.
