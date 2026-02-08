@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
-Last activity: 2026-02-07 — Milestone v1.2 started
+Last activity: 2026-02-08 — Completed quick task 014 (onboarding flow)
 
 ## Previous Milestones
 
@@ -39,6 +39,7 @@ Key decisions from v1.1 carrying forward:
 - [08-01]: LPMetadataProvider created locally per fetch (not Sendable)
 - [09-01]: Cmd+1-9 for normal paste, Cmd+Shift+1-9 for plain text
 - [10-01]: PersistentIdentifier serialized as JSON string for drag payload via Codable
+- [quick-014]: First-launch onboarding gate via UserDefaults hasCompletedOnboarding key; handleFirstLaunch() routes between onboarding and accessibility-only prompt
 
 ### Pending Todos
 
@@ -50,6 +51,6 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-07
-Stopped at: Starting milestone v1.2 (Storage & Security)
+Last session: 2026-02-08
+Stopped at: Completed quick task 014 (onboarding flow)
 Resume file: None
