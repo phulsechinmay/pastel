@@ -233,10 +233,11 @@ Plans:
   3. User clicks "Import" in Settings, selects a .pastel file, and items appear in their history with labels intact
   4. User imports a file with duplicate content and duplicates are skipped with a count shown (e.g., "Imported 200, skipped 50 duplicates")
   5. Import creates any labels from the file that do not already exist in the user's label set
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 15-01-PLAN.md -- TBD
+- [ ] 15-01-PLAN.md -- ImportExportService with Codable transfer structs, export/import logic, .pastel UTType registration
+- [ ] 15-02-PLAN.md -- Export/Import buttons in GeneralSettingsView Data section, NSSavePanel/NSOpenPanel, progress bar, result alerts
 
 ### Phase 16: Drag-and-Drop from Panel
 **Goal**: Users can drag clipboard items directly from the sliding panel into other macOS applications as a natural alternative to paste-back
@@ -273,6 +274,6 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 | 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 3/3 | Complete | 2026-02-09 |
 | 12. History Browser and Bulk Actions | v1.2 | 3/3 | Complete | 2026-02-08 |
 | 13. Paste as Plain Text | v1.3 | 1/1 | Complete | 2026-02-09 |
-| 14. App Ignore List | v1.3 | 0/2 | Not started | - |
-| 15. Import/Export | v1.3 | 0/TBD | Not started | - |
+| 14. App Ignore List | v1.3 | 2/2 | Complete | 2026-02-09 |
+| 15. Import/Export | v1.3 | 0/2 | Not started | - |
 | 16. Drag-and-Drop from Panel | v1.3 | 0/TBD | Not started | - |
