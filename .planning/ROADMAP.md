@@ -187,7 +187,7 @@ Plans:
 **Milestone Goal:** Complete core feature set with paste-as-plain-text support, privacy controls via app filtering, data portability through import/export, and drag-and-drop interaction from panel to other apps.
 
 - [ ] **Phase 13: Paste as Plain Text** - Context menu, Shift+Enter, and Shift+double-click for plain text pasting with HTML bug fix
-- [ ] **Phase 14: App Ignore List** - Privacy-focused app filtering to exclude specific apps from clipboard monitoring
+- [x] **Phase 14: App Ignore List** - Privacy-focused app filtering to exclude specific apps from clipboard monitoring
 - [ ] **Phase 15: Import/Export** - Data portability via custom .pastel format with duplicate-aware import
 - [ ] **Phase 16: Drag-and-Drop from Panel** - Native macOS drag of clipboard items from panel to other applications
 
@@ -220,8 +220,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md -- AppDiscoveryService (installed app scan, password manager detection), ClipboardMonitor ignore-list filtering
-- [ ] 14-02-PLAN.md -- PrivacySettingsView (ignore list table, search, add/remove), AppPickerView sheet, password manager prompt, Privacy tab in SettingsView
+- [x] 14-01-PLAN.md -- AppDiscoveryService (installed app scan, password manager detection), ClipboardMonitor ignore-list filtering
+- [x] 14-02-PLAN.md -- PrivacySettingsView (ignore list table, search, add/remove), AppPickerView sheet, password manager prompt, Privacy tab in SettingsView
 
 ### Phase 15: Import/Export
 **Goal**: Users can export their clipboard history to a portable .pastel file and import it back, enabling backup, restore, and transfer between machines

@@ -121,11 +121,11 @@ Requirements for v1.3 milestone: Power User Features.
 
 ### Privacy — App Filtering
 
-- [ ] **PRIV-01**: User can configure ignore-list of apps to exclude from clipboard monitoring
-- [ ] **PRIV-02**: Settings has "Privacy" section with app ignore-list management
-- [ ] **PRIV-03**: User can add apps to ignore-list via app picker showing running apps
-- [ ] **PRIV-04**: User can remove apps from ignore-list
-- [ ] **PRIV-05**: ClipboardMonitor respects ignore-list during capture (skips ignored app bundles)
+- [x] **PRIV-01**: User can configure ignore-list of apps to exclude from clipboard monitoring
+- [x] **PRIV-02**: Settings has "Privacy" section with app ignore-list management
+- [x] **PRIV-03**: User can add apps to ignore-list via app picker showing running apps
+- [x] **PRIV-04**: User can remove apps from ignore-list
+- [x] **PRIV-05**: ClipboardMonitor respects ignore-list during capture (skips ignored app bundles)
 
 ### Data Portability — Import/Export
 
@@ -255,11 +255,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PAST-21 | Phase 13 | Complete |
 | PAST-22 | Phase 13 | Complete |
 | PAST-23 | Phase 13 | Complete |
-| PRIV-01 | Phase 14 | Pending |
-| PRIV-02 | Phase 14 | Pending |
-| PRIV-03 | Phase 14 | Pending |
-| PRIV-04 | Phase 14 | Pending |
-| PRIV-05 | Phase 14 | Pending |
+| PRIV-01 | Phase 14 | Complete |
+| PRIV-02 | Phase 14 | Complete |
+| PRIV-03 | Phase 14 | Complete |
+| PRIV-04 | Phase 14 | Complete |
+| PRIV-05 | Phase 14 | Complete |
 | DATA-01 | Phase 15 | Pending |
 | DATA-02 | Phase 15 | Pending |
 | DATA-03 | Phase 15 | Pending |
