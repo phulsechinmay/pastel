@@ -217,10 +217,11 @@ Plans:
   3. User removes an app from the ignore list and copies from that app resume being captured
   4. User copies text in an ignored app (e.g., 1Password) and the clipboard item does not appear in Pastel's history
   5. ClipboardMonitor skips content processing entirely for ignored app bundles (no wasted work)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md -- TBD
+- [ ] 14-01-PLAN.md -- AppDiscoveryService (installed app scan, password manager detection), ClipboardMonitor ignore-list filtering
+- [ ] 14-02-PLAN.md -- PrivacySettingsView (ignore list table, search, add/remove), AppPickerView sheet, password manager prompt, Privacy tab in SettingsView
 
 ### Phase 15: Import/Export
 **Goal**: Users can export their clipboard history to a portable .pastel file and import it back, enabling backup, restore, and transfer between machines
@@ -272,6 +273,6 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 | 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 3/3 | Complete | 2026-02-09 |
 | 12. History Browser and Bulk Actions | v1.2 | 3/3 | Complete | 2026-02-08 |
 | 13. Paste as Plain Text | v1.3 | 1/1 | Complete | 2026-02-09 |
-| 14. App Ignore List | v1.3 | 0/TBD | Not started | - |
+| 14. App Ignore List | v1.3 | 0/2 | Not started | - |
 | 15. Import/Export | v1.3 | 0/TBD | Not started | - |
 | 16. Drag-and-Drop from Panel | v1.3 | 0/TBD | Not started | - |
