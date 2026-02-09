@@ -55,33 +55,22 @@ struct ClipboardCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header row: source app icon + label chip + timestamp
+            // Header row: source app icon + title + timestamp
             HStack {
                 sourceAppIcon
 
-                // Label chip (inline, only shown when assigned)
-                if let label = item.label {
-                    HStack(spacing: 3) {
-                        if let emoji = label.emoji, !emoji.isEmpty {
-                            Text(emoji)
-                                .font(.system(size: 9))
-                        }
-                        Text(label.name)
-                            .font(.caption2)
-                            .lineLimit(1)
-                            .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        cardLabelChipBackground(label),
-                        in: Capsule()
-                    )
+                // Title (when set) -- bold caption2, visually distinct
+                if let title = item.title, !title.isEmpty {
+                    Text(title)
+                        .font(.caption2.bold())
+                        .lineLimit(1)
+                        .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
                 }
 
                 Spacer()
 
-                Text(item.timestamp, format: .relative(presentation: .named))
+                // Abbreviated relative time
+                Text(relativeTimeString(for: item.timestamp))
                     .font(.caption2)
                     .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
             }
@@ -248,6 +237,29 @@ struct ClipboardCardView: View {
         } else {
             let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
             return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.45)
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Abbreviated relative time: "now", "X secs ago", "X mins ago", "X hours ago", "X days ago".
+    private func relativeTimeString(for date: Date) -> String {
+        let interval = Date.now.timeIntervalSince(date)
+        switch interval {
+        case ..<2:
+            return "now"
+        case ..<60:
+            let secs = Int(interval)
+            return secs == 1 ? "1 sec ago" : "\(secs) secs ago"
+        case ..<3600:
+            let mins = Int(interval / 60)
+            return mins == 1 ? "1 min ago" : "\(mins) mins ago"
+        case ..<86400:
+            let hours = Int(interval / 3600)
+            return hours == 1 ? "1 hour ago" : "\(hours) hours ago"
+        default:
+            let days = Int(interval / 86400)
+            return days == 1 ? "1 day ago" : "\(days) days ago"
         }
     }
 
