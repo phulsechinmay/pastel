@@ -8,19 +8,15 @@ Pastel is a native macOS clipboard manager that saves everything you copy and ma
 
 Clipboard history is always one hotkey away, with instant paste-back into any app.
 
-## Current Milestone: v1.2 Storage & Security
+## Current Milestone: v1.3 Power User Features
 
-**Goal:** Optimize storage usage with compression and deduplication, provide visibility into space consumption, and let users protect sensitive clipboard items with manual redaction.
+**Goal:** Complete core feature set with paste-as-plain-text support, privacy controls via app filtering, data portability through import/export, and drag-and-drop interaction from panel to other apps.
 
 **Target features:**
-- Image compression and storage optimization
-- Content deduplication across clipboard history
-- Storage dashboard showing usage by content type
-- Storage management tools (purge by category, compact database)
-- Manual "mark as sensitive" action on clipboard items
-- Redacted/blurred display for sensitive items in panel
-- Click-to-reveal interaction for sensitive content
-- Optional shorter auto-expiry for sensitive items
+- Paste as plain text via context menu, Shift+Enter, Shift+double-click
+- Allow/ignore app lists for selective clipboard monitoring
+- Import/export with custom Pastel format (extensible for other clipboard apps)
+- Drag-and-drop clipboard items from panel into other applications
 
 ## Requirements
 
@@ -48,7 +44,12 @@ Clipboard history is always one hotkey away, with instant paste-back into any ap
 
 ### Active
 
-See REQUIREMENTS.md for v1.2 milestone requirements.
+See REQUIREMENTS.md for v1.3 milestone requirements.
+
+- [ ] Paste as plain text — context menu, Shift+Enter, Shift+double-click
+- [ ] Allow/ignore app lists — selective clipboard monitoring
+- [ ] Import/export — custom Pastel format with extensibility
+- [ ] Drag-and-drop from panel — native macOS interaction
 
 ### Out of Scope
 
@@ -58,9 +59,7 @@ See REQUIREMENTS.md for v1.2 milestone requirements.
 - Import/export — defer to v2
 - Allow/ignore app lists — defer to v2
 - Light mode / system-adaptive theme — always dark
-- Paste as plain text — defer to v1.3
-- Drag-and-drop from panel — defer to v1.3
-- Pinned/favorite items — defer to v1.3
+- Pinned/favorite items — defer to v2
 
 ## Context
 
@@ -73,6 +72,7 @@ See REQUIREMENTS.md for v1.2 milestone requirements.
 - SwiftData for persistence (macOS 14+ target)
 - v1.0 complete with 29 requirements delivered across 5 phases
 - v1.1 complete with 15 requirements delivered across 5 phases (6-10)
+- v1.2 complete with item management features across 2 phases (11-12)
 
 ## Constraints
 
@@ -105,4 +105,4 @@ See REQUIREMENTS.md for v1.2 milestone requirements.
 | Image compression for storage | Reduce disk footprint without losing paste quality | — Pending |
 
 ---
-*Last updated: 2026-02-07 after v1.2 milestone start*
+*Last updated: 2026-02-09 after v1.3 milestone start*

@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.2 -- Storage & Security
+**Current focus:** Milestone v1.3 -- Power User Features
 
 ## Current Position
 
-Phase: 12 — History Browser and Bulk Actions
-Plan: 03 of 3
-Status: Phase complete
-Last activity: 2026-02-09 — Completed 12-03-PLAN.md (bulk action toolbar with Copy, Paste, Delete)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-09 — Milestone v1.3 started
 
-Progress: [████████████████████] 100% of Phase 12 (3/3 plans)
+Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (requirements phase)
 
 ## Previous Milestones
 
@@ -27,6 +27,10 @@ Progress: [████████████████████] 100% of
 - 15/15 requirements delivered across 5 phases (10 plans)
 - 10 quick tasks completed during v1.1
 - Features: code detection, color swatches, URL metadata, quick paste hotkeys, label emoji, drag-drop labels
+
+### v1.2 Item Management
+- Phases 11-12 complete (6 plans)
+- Features: item titles, multi-label support, edit modal, history browser with grid view, multi-select, bulk operations
 
 ## Accumulated Context
 
