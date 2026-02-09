@@ -9,10 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-08 — Completed quick task 014 (onboarding flow)
+Phase: 11 — Item Titles, Multi-Label Support, and Edit Modal
+Plan: 01 of 3
+Status: In progress
+Last activity: 2026-02-08 — Completed 11-01-PLAN.md (data models, migration, EditItemView)
+
+Progress: [==========..........] ~50% of Phase 11 (1/3 plans)
 
 ## Previous Milestones
 
@@ -40,6 +42,9 @@ Key decisions from v1.1 carrying forward:
 - [09-01]: Cmd+1-9 for normal paste, Cmd+Shift+1-9 for plain text
 - [10-01]: PersistentIdentifier serialized as JSON string for drag payload via Codable
 - [quick-014]: First-launch onboarding gate via UserDefaults hasCompletedOnboarding key; handleFirstLaunch() routes between onboarding and accessibility-only prompt
+- [11-01]: Two-property migration strategy -- keep deprecated label: Label? alongside new labels: [Label], migrate on first launch via UserDefaults gate
+- [11-01]: Label.items has no @Relationship attribute -- SwiftData infers inverse from ClipboardItem.labels to avoid dual-inverse conflict
+- [11-01]: EditItemView uses live editing via @Bindable (no save/cancel) matching existing LabelSettingsView pattern
 
 ### Pending Todos
 
@@ -51,6 +56,10 @@ Key decisions from v1.1 carrying forward:
 |---|-------------|------|--------|-----------|
 | 014 | Create onboarding flow with accessibility permissions, hotkey setup, and quick settings | 2026-02-08 | bbcddb3 | [014-onboarding-flow-accessibility-hotkey-settings](./quick/014-onboarding-flow-accessibility-hotkey-settings/) |
 
+### Roadmap Evolution
+
+- Phase 11 added: Item Titles, Multi-Label Support, and Edit Modal (first phase of v1.2)
+
 ### Blockers/Concerns
 
 None currently.
@@ -58,5 +67,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed quick task 014 (onboarding flow)
+Stopped at: Completed 11-01-PLAN.md (data models, migration, EditItemView)
 Resume file: None
