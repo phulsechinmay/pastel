@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Phase: 11 — Item Titles, Multi-Label Support, and Edit Modal
-Plan: 02 of 3
-Status: In progress
-Last activity: 2026-02-08 — Completed 11-02-PLAN.md (card layout restructure)
+Plan: 03 of 3
+Status: Phase complete
+Last activity: 2026-02-09 — Completed 11-03-PLAN.md (multi-label filtering, title search, drag-drop append)
 
-Progress: [==============......] ~67% of Phase 11 (2/3 plans)
+Progress: [████████████████████] 100% of Phase 11 (3/3 plans)
 
 ## Previous Milestones
 
@@ -48,6 +48,9 @@ Key decisions from v1.1 carrying forward:
 - [11-02]: Custom relativeTimeString over built-in Date.RelativeFormatStyle for exact abbreviated wording (mins/secs/hours/days)
 - [11-02]: Footer shows max 3 label chips with +N overflow badge to prevent narrow panel layout breakage
 - [11-02]: Label submenu uses toggle pattern (add/remove) with checkmark indicators
+- [11-03]: In-memory label filtering (not #Predicate) because SwiftData .contains() crashes on to-many relationships
+- [11-03]: Set<PersistentIdentifier> sorted to string for stable .id() view recreation (Set.hashValue not stable)
+- [11-03]: Drag-drop appends labels with duplicate guard instead of replacing
 
 ### Pending Todos
 
@@ -69,6 +72,6 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-08
-Stopped at: Completed 11-02-PLAN.md (card layout restructure)
+Last session: 2026-02-09
+Stopped at: Completed 11-03-PLAN.md (multi-label filtering, title search, drag-drop append) -- Phase 11 complete
 Resume file: None
