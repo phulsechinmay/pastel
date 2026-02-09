@@ -6,7 +6,7 @@ import SwiftData
 ///
 /// Follows the same NSWindow + NSHostingView pattern used by
 /// `AppState.checkAccessibilityOnLaunch()` for the accessibility prompt.
-/// The window is non-resizable, dark-themed, and centered on screen.
+/// The window is resizable (for the History tab), dark-themed, and centered on screen.
 @MainActor
 final class SettingsWindowController {
 
@@ -37,8 +37,8 @@ final class SettingsWindowController {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 420),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 700, height: 550),
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: true
         )
@@ -46,6 +46,7 @@ final class SettingsWindowController {
         window.title = "Pastel Settings"
         window.center()
         window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 500, height: 480)
         window.appearance = NSAppearance(named: .darkAqua)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
