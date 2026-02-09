@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Phase: 11 — Item Titles, Multi-Label Support, and Edit Modal
-Plan: 01 of 3
+Plan: 02 of 3
 Status: In progress
-Last activity: 2026-02-08 — Completed 11-01-PLAN.md (data models, migration, EditItemView)
+Last activity: 2026-02-08 — Completed 11-02-PLAN.md (card layout restructure)
 
-Progress: [==========..........] ~50% of Phase 11 (1/3 plans)
+Progress: [==============......] ~67% of Phase 11 (2/3 plans)
 
 ## Previous Milestones
 
@@ -45,6 +45,9 @@ Key decisions from v1.1 carrying forward:
 - [11-01]: Two-property migration strategy -- keep deprecated label: Label? alongside new labels: [Label], migrate on first launch via UserDefaults gate
 - [11-01]: Label.items has no @Relationship attribute -- SwiftData infers inverse from ClipboardItem.labels to avoid dual-inverse conflict
 - [11-01]: EditItemView uses live editing via @Bindable (no save/cancel) matching existing LabelSettingsView pattern
+- [11-02]: Custom relativeTimeString over built-in Date.RelativeFormatStyle for exact abbreviated wording (mins/secs/hours/days)
+- [11-02]: Footer shows max 3 label chips with +N overflow badge to prevent narrow panel layout breakage
+- [11-02]: Label submenu uses toggle pattern (add/remove) with checkmark indicators
 
 ### Pending Todos
 
@@ -67,5 +70,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 11-01-PLAN.md (data models, migration, EditItemView)
+Stopped at: Completed 11-02-PLAN.md (card layout restructure)
 Resume file: None
