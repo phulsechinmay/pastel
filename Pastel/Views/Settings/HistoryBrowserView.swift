@@ -20,6 +20,7 @@ struct HistoryBrowserView: View {
     @State private var debouncedSearchText = ""
     @State private var selectedLabelIDs: Set<PersistentIdentifier> = []
     @State private var selectedIDs: Set<PersistentIdentifier> = []
+    @State private var resolvedItems: [ClipboardItem] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,7 +34,8 @@ struct HistoryBrowserView: View {
             HistoryGridView(
                 searchText: debouncedSearchText,
                 selectedLabelIDs: selectedLabelIDs,
-                selectedIDs: $selectedIDs
+                selectedIDs: $selectedIDs,
+                resolvedItems: $resolvedItems
             )
             .environment(PanelActions())
             .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")

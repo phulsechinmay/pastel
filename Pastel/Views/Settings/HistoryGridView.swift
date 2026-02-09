@@ -16,6 +16,8 @@ struct HistoryGridView: View {
 
     // Multi-selection state (owned by parent HistoryBrowserView)
     @Binding var selectedIDs: Set<PersistentIdentifier>
+    // Resolved items exposed to parent for bulk operations
+    @Binding var resolvedItems: [ClipboardItem]
     @State private var lastClickedID: PersistentIdentifier? = nil
 
     // Label filtering (in-memory, same reason as FilteredCardListView)
@@ -25,9 +27,10 @@ struct HistoryGridView: View {
         GridItem(.adaptive(minimum: 280, maximum: 400), spacing: 12)
     ]
 
-    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, selectedIDs: Binding<Set<PersistentIdentifier>>) {
+    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>) {
         self.selectedLabelIDs = selectedLabelIDs
         _selectedIDs = selectedIDs
+        _resolvedItems = resolvedItems
 
         let predicate: Predicate<ClipboardItem>
         if !searchText.isEmpty {
@@ -98,6 +101,8 @@ struct HistoryGridView: View {
             lastClickedID = nil
             return .handled
         }
+        .onAppear { resolvedItems = filteredItems }
+        .onChange(of: items) { _, _ in resolvedItems = filteredItems }
     }
 
     // MARK: - Multi-Selection
