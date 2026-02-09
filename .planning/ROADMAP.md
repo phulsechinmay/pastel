@@ -4,7 +4,8 @@
 
 - v1.0 MVP - Phases 1-5 (shipped 2026-02-06)
 - v1.1 Rich Content & Enhanced Paste - Phases 6-10 (in progress)
-- v1.2 Storage & Security - Phases 11+ (planned)
+- v1.2 Storage & Security - Phases 11-12 (shipped 2026-02-09)
+- v1.3 Power User Features - Phases 13-16 (planned)
 
 ## Phases
 
@@ -65,23 +66,8 @@ Plans:
 
 </details>
 
-### v1.1 Rich Content & Enhanced Paste (In Progress)
-
-**Milestone Goal:** Enrich clipboard cards with syntax highlighting, color swatches, and URL previews; add Cmd+Shift+1-9 direct paste hotkeys; upgrade label system with color palette and emoji support.
-
-**Phase Numbering:**
-- Integer phases (6, 7, 8, 9): Planned milestone work
-- Decimal phases (7.1, 7.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 6: Data Model and Label Enhancements** - Extend schema for rich content and ship label emoji with expanded color palette
-- [x] **Phase 7: Code and Color Detection** - Detect code snippets and color values at capture time with syntax-highlighted and swatch card views
-- [ ] **Phase 8: URL Preview Cards** - Auto-fetch URL metadata and render rich preview cards with title, favicon, and og:image
-- [x] **Phase 9: Quick Paste Hotkeys** - Cmd+1-9 pastes the Nth item while panel is open, with position badges
-- [x] **Phase 10: Drag-and-Drop Label Assignment** - Drag label chips from the chip bar onto clipboard items to assign labels
-
-## Phase Details
+<details>
+<summary>v1.1 Rich Content & Enhanced Paste (Phases 6-10) - SHIPPED 2026-02-07</summary>
 
 ### Phase 6: Data Model and Label Enhancements
 **Goal**: Schema is extended for all v1.1 features and users see an upgraded label system with 12 colors and optional emoji on chips
@@ -136,14 +122,14 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User opens panel and presses Cmd+1, the most recent clipboard item is pasted into the active app
   2. User opens panel and presses Cmd+5, the 5th most recent item is pasted correctly
-  3. User opens the panel and the first 9 cards show position number badges (⌘ 1-9) in their bottom-right corners
+  3. User opens the panel and the first 9 cards show position number badges (Cmd 1-9) in their bottom-right corners
   4. User disables quick paste hotkeys in Settings and Cmd+1-9 no longer triggers paste and badges disappear
   5. User presses Cmd+Shift+3 and the 3rd item is pasted as plain text (RTF stripped)
 **Plans**: 2 plans
 
 Plans:
 - [x] 09-01-PLAN.md -- Quick paste .onKeyPress handlers (Cmd+1-9 normal, Cmd+Shift+1-9 plain text), pastePlainText on PasteService, Settings toggle under Hotkey section
-- [x] 09-02-PLAN.md -- Keycap-style position badges (⌘ 1-9) on first 9 panel cards, badge visibility tied to quickPasteEnabled setting
+- [x] 09-02-PLAN.md -- Keycap-style position badges (Cmd 1-9) on first 9 panel cards, badge visibility tied to quickPasteEnabled setting
 
 ### Phase 10: Drag-and-Drop Label Assignment
 **Goal**: Users can drag a label chip from the chip bar and drop it onto a clipboard card to assign that label, providing a faster alternative to the context menu
@@ -153,18 +139,15 @@ Plans:
 Plans:
 - [ ] 10-01-PLAN.md -- PersistentIdentifier transfer helpers, draggable chip bar (Button to onTapGesture refactor), per-card drop targets with visual feedback
 
-### v1.2 Storage & Security
+</details>
 
-**Milestone Goal:** Item titles for easier discovery, multi-label support, edit modal for item management, plus storage optimization and sensitive data protection.
-
-- [x] **Phase 11: Item Titles, Multi-Label Support, and Edit Modal** - User-assigned titles on clipboard items, multi-label relationships, and a right-click edit modal for title and label management
-- [x] **Phase 12: History Browser and Bulk Actions** - Full-window history browser in Settings with responsive grid layout, search/label filtering, multi-select, and bulk copy/paste/delete
-
-## Phase Details (v1.2)
+<details>
+<summary>v1.2 Item Management (Phases 11-12) - SHIPPED 2026-02-09</summary>
 
 ### Phase 11: Item Titles, Multi-Label Support, and Edit Modal
 **Goal**: Users can assign titles to clipboard items for easier discovery via search, items support multiple labels, and a right-click "Edit" modal provides title and label management
 **Depends on**: Phase 10 (v1.1 complete)
+**Requirements**: ITEM-01, ITEM-02, ITEM-03, ITEM-04, ITEM-05, ITEM-06
 **Success Criteria** (what must be TRUE):
   1. User right-clicks a clipboard card and selects "Edit" to open a modal where they can add/update a title
   2. The title appears on the card instead of the character count / image size footer, in a visually distinct style
@@ -182,6 +165,7 @@ Plans:
 ### Phase 12: History Browser and Bulk Actions
 **Goal**: Users can browse and manage their full clipboard history in a resizable Settings tab with responsive grid layout, multi-select, and bulk operations (copy, paste, delete)
 **Depends on**: Phase 11
+**Requirements**: HIST-01, HIST-02, HIST-03, HIST-04, HIST-05, HIST-06
 **Success Criteria** (what must be TRUE):
   1. User opens Settings and sees a "History" tab with the same clipboard cards displayed in a responsive grid that reflows on window resize
   2. User can search and filter by labels using the same search bar and chip bar as the panel
@@ -196,10 +180,82 @@ Plans:
 - [x] 12-02-PLAN.md -- HistoryGridView with adaptive LazyVGrid, @Query with in-memory label filtering, Cmd-click/Shift-click multi-selection
 - [x] 12-03-PLAN.md -- Bulk action toolbar (Copy, Paste, Delete) with confirmation dialog, image cleanup, and paste-back from settings
 
+</details>
+
+### v1.3 Power User Features
+
+**Milestone Goal:** Complete core feature set with paste-as-plain-text support, privacy controls via app filtering, data portability through import/export, and drag-and-drop interaction from panel to other apps.
+
+- [ ] **Phase 13: Paste as Plain Text** - Context menu, Shift+Enter, and Shift+double-click for plain text pasting with HTML bug fix
+- [ ] **Phase 14: App Ignore List** - Privacy-focused app filtering to exclude specific apps from clipboard monitoring
+- [ ] **Phase 15: Import/Export** - Data portability via custom .pastel format with duplicate-aware import
+- [ ] **Phase 16: Drag-and-Drop from Panel** - Native macOS drag of clipboard items from panel to other applications
+
+## Phase Details (v1.3)
+
+### Phase 13: Paste as Plain Text
+**Goal**: Users can paste any clipboard item as plain text (all formatting stripped) via context menu, keyboard shortcut, or mouse modifier, with the existing HTML formatting bug fixed
+**Depends on**: Phase 12 (v1.2 complete)
+**Requirements**: PAST-23, PAST-20, PAST-21, PAST-22
+**Success Criteria** (what must be TRUE):
+  1. User right-clicks a clipboard card and selects "Paste as Plain Text" to paste with all formatting (RTF and HTML) stripped
+  2. User selects a card and presses Shift+Enter to paste as plain text
+  3. User Shift+double-clicks a card to paste as plain text
+  4. User pastes rich HTML content as plain text into Google Docs or Notes and zero formatting appears (HTML bug fixed)
+**Plans**: TBD
+
+Plans:
+- [ ] 13-01-PLAN.md -- TBD
+
+### Phase 14: App Ignore List
+**Goal**: Users can exclude specific applications from clipboard monitoring so copies from password managers and sensitive apps are never captured
+**Depends on**: Phase 13
+**Requirements**: PRIV-01, PRIV-02, PRIV-03, PRIV-04, PRIV-05
+**Success Criteria** (what must be TRUE):
+  1. User opens Settings and sees a "Privacy" section where they can manage an ignore list of applications
+  2. User adds an app to the ignore list via an app picker that shows currently running applications
+  3. User removes an app from the ignore list and copies from that app resume being captured
+  4. User copies text in an ignored app (e.g., 1Password) and the clipboard item does not appear in Pastel's history
+  5. ClipboardMonitor skips content processing entirely for ignored app bundles (no wasted work)
+**Plans**: TBD
+
+Plans:
+- [ ] 14-01-PLAN.md -- TBD
+
+### Phase 15: Import/Export
+**Goal**: Users can export their clipboard history to a portable .pastel file and import it back, enabling backup, restore, and transfer between machines
+**Depends on**: Phase 14
+**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, DATA-05, DATA-06, DATA-07, DATA-08
+**Success Criteria** (what must be TRUE):
+  1. User clicks "Export" in Settings and saves a .pastel file containing their full clipboard history (text-based, no images)
+  2. Exported file preserves all metadata: titles, labels, timestamps, source apps, and content
+  3. User clicks "Import" in Settings, selects a .pastel file, and items appear in their history with labels intact
+  4. User imports a file with duplicate content and duplicates are skipped with a count shown (e.g., "Imported 200, skipped 50 duplicates")
+  5. Import creates any labels from the file that do not already exist in the user's label set
+**Plans**: TBD
+
+Plans:
+- [ ] 15-01-PLAN.md -- TBD
+
+### Phase 16: Drag-and-Drop from Panel
+**Goal**: Users can drag clipboard items directly from the sliding panel into other macOS applications as a natural alternative to paste-back
+**Depends on**: Phase 13 (shares ClipboardCardView modifications)
+**Requirements**: DRAG-01, DRAG-02, DRAG-03, DRAG-04, DRAG-05
+**Success Criteria** (what must be TRUE):
+  1. User drags a text card from the panel and drops it into TextEdit, and the text appears
+  2. User drags an image card from the panel and drops it into Finder or Preview, and the image file is received
+  3. User drags a URL card from the panel and drops it into Safari's address bar, and the URL is accepted
+  4. Panel remains visible throughout the entire drag session (does not dismiss when cursor leaves panel bounds)
+  5. Dragging an item from the panel does not create a duplicate entry in clipboard history (no self-capture)
+**Plans**: TBD
+
+Plans:
+- [ ] 16-01-PLAN.md -- TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10
+Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -215,3 +271,7 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10
 | 10. Drag-and-Drop Label Assignment | v1.1 | 1/1 | Complete | 2026-02-07 |
 | 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 3/3 | Complete | 2026-02-09 |
 | 12. History Browser and Bulk Actions | v1.2 | 3/3 | Complete | 2026-02-08 |
+| 13. Paste as Plain Text | v1.3 | 0/TBD | Not started | - |
+| 14. App Ignore List | v1.3 | 0/TBD | Not started | - |
+| 15. Import/Export | v1.3 | 0/TBD | Not started | - |
+| 16. Drag-and-Drop from Panel | v1.3 | 0/TBD | Not started | - |

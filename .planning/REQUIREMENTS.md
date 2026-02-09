@@ -251,6 +251,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIST-04 | Phase 12 | Complete |
 | HIST-05 | Phase 12 | Complete |
 | HIST-06 | Phase 12 | Complete |
+| PAST-20 | Phase 13 | Pending |
+| PAST-21 | Phase 13 | Pending |
+| PAST-22 | Phase 13 | Pending |
+| PAST-23 | Phase 13 | Pending |
+| PRIV-01 | Phase 14 | Pending |
+| PRIV-02 | Phase 14 | Pending |
+| PRIV-03 | Phase 14 | Pending |
+| PRIV-04 | Phase 14 | Pending |
+| PRIV-05 | Phase 14 | Pending |
+| DATA-01 | Phase 15 | Pending |
+| DATA-02 | Phase 15 | Pending |
+| DATA-03 | Phase 15 | Pending |
+| DATA-04 | Phase 15 | Pending |
+| DATA-05 | Phase 15 | Pending |
+| DATA-06 | Phase 15 | Pending |
+| DATA-07 | Phase 15 | Pending |
+| DATA-08 | Phase 15 | Pending |
+| DRAG-01 | Phase 16 | Pending |
+| DRAG-02 | Phase 16 | Pending |
+| DRAG-03 | Phase 16 | Pending |
+| DRAG-04 | Phase 16 | Pending |
+| DRAG-05 | Phase 16 | Pending |
 
 **v1.0 Coverage:**
 - v1 requirements: 29 total
@@ -268,10 +290,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Unmapped: 0
 
 **v1.3 Coverage:**
-- v1.3 requirements: 21 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 21
+- v1.3 requirements: 22 total
+- Mapped to phases: 22
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-09 after v1.3 milestone definition*
+*Last updated: 2026-02-09 after v1.3 roadmap creation*
