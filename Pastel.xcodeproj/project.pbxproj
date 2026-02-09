@@ -21,6 +21,7 @@
 		3ADFAC504957D459F381AFB2 /* TextCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7628FEB0B879CD6BCCD59F6 /* TextCardView.swift */; };
 		3E3278B3308A5ABB2B39E74B /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */; };
 		42B445F9B53C9938B8C7661C /* HistoryBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */; };
+		A1B2C3D4E5F60718091A2B3C /* HistoryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A4B5C60718091A2B3C /* HistoryGridView.swift */; };
 		4A72AB5E7A1E848B071EFD98 /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = B33BB73FF430F4D698304521 /* LaunchAtLogin */; };
 		4DA18147B096FCF7C2973416 /* ChipBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EE7734FD97FDE51DA389F0 /* ChipBarView.swift */; };
 		56831EBF806DA04E646ED2E7 /* LabelChipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E12D1FF5C4B00F62F48B0F4 /* LabelChipView.swift */; };
@@ -70,6 +71,7 @@
 		03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardMonitor.swift; sourceTree = "<group>"; };
 		10FC617DD35144DF808D4822 /* FileCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCardView.swift; sourceTree = "<group>"; };
 		12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryBrowserView.swift; sourceTree = "<group>"; };
+		D1E2F3A4B5C60718091A2B3C /* HistoryGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryGridView.swift; sourceTree = "<group>"; };
 		1291C4BDF0D13A50048E2CAE /* AccessibilityPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPromptView.swift; sourceTree = "<group>"; };
 		1317D22929AB0FAE7702656B /* NSPasteboard+Reading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Reading.swift"; sourceTree = "<group>"; };
 		13ED084C4528418ADF1B37C1 /* MigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationService.swift; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 			children = (
 				9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */,
 				12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */,
+				D1E2F3A4B5C60718091A2B3C /* HistoryGridView.swift */,
 				31E69FA6363380EEB64EF71E /* LabelSettingsView.swift */,
 				A48C40766989658A71731EFD /* ScreenEdgePicker.swift */,
 				543EE2EEFDD439C620E6A0A0 /* SettingsView.swift */,
@@ -399,6 +402,7 @@
 				D629BC5C08282F4295FA0416 /* FocusableTextField.swift in Sources */,
 				3E3278B3308A5ABB2B39E74B /* GeneralSettingsView.swift in Sources */,
 				42B445F9B53C9938B8C7661C /* HistoryBrowserView.swift in Sources */,
+				A1B2C3D4E5F60718091A2B3C /* HistoryGridView.swift in Sources */,
 				6AF5D219C387B0CA3EF35ED8 /* ImageCardView.swift in Sources */,
 				B2B95FF2ABFFE29D25EAD8D0 /* ImageStorageService.swift in Sources */,
 				B5985155933EAAF6A59D0F45 /* Label.swift in Sources */,
