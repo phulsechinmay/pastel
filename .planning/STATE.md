@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 
 ## Current Position
 
-Phase: 11 — Item Titles, Multi-Label Support, and Edit Modal
-Plan: 03 of 3
-Status: Phase complete
-Last activity: 2026-02-09 — Completed 11-03-PLAN.md (multi-label filtering, title search, drag-drop append)
+Phase: 12 — History Browser and Bulk Actions
+Plan: 01 of 3
+Status: In progress
+Last activity: 2026-02-09 — Completed 12-01-PLAN.md (resizable settings window, History tab with search and chip bar)
 
-Progress: [████████████████████] 100% of Phase 11 (3/3 plans)
+Progress: [███████░░░░░░░░░░░░░] 33% of Phase 12 (1/3 plans)
 
 ## Previous Milestones
 
@@ -51,6 +51,8 @@ Key decisions from v1.1 carrying forward:
 - [11-03]: In-memory label filtering (not #Predicate) because SwiftData .contains() crashes on to-many relationships
 - [11-03]: Set<PersistentIdentifier> sorted to string for stable .id() view recreation (Set.hashValue not stable)
 - [11-03]: Drag-drop appends labels with duplicate guard instead of replacing
+- [12-01]: Conditional frame sizing per tab -- General/Labels fixed 500pt, History flexible
+- [12-01]: HistoryBrowserView reuses SearchFieldView and ChipBarView with 200ms debounce
 
 ### Pending Todos
 
@@ -65,6 +67,7 @@ Key decisions from v1.1 carrying forward:
 ### Roadmap Evolution
 
 - Phase 11 added: Item Titles, Multi-Label Support, and Edit Modal (first phase of v1.2)
+- Phase 12 added: History Browser and Bulk Actions (full-window grid view with multi-select and bulk operations)
 
 ### Blockers/Concerns
 
@@ -73,5 +76,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 11-03-PLAN.md (multi-label filtering, title search, drag-drop append) -- Phase 11 complete
+Stopped at: Completed 12-01-PLAN.md (resizable settings window, History tab with search and chip bar)
 Resume file: None
