@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.3 -- Phase 13: Paste as Plain Text
+**Current focus:** Milestone v1.3 -- Phase 14: App Ignore List
 
 ## Current Position
 
-Phase: 13 of 16 (Paste as Plain Text)
-Plan: 1 of 1 (complete)
-Status: Phase complete
-Last activity: 2026-02-09 -- Completed 13-01-PLAN.md
+Phase: 14 of 16 (App Ignore List)
+Plan: 1 of 2 (service layer complete)
+Status: In progress
+Last activity: 2026-02-09 -- Completed 14-01-PLAN.md
 
-Progress: [█████░░░░░░░░░░░░░░░] 25% (v1.3 -- 1/4 phases)
+Progress: [██████████░░░░░░░░░░] 50% (v1.3 -- 2/4 phases started, Phase 14 Plan 1 of 2 done)
 
 ## Previous Milestones
 
@@ -48,6 +48,9 @@ Key decisions from v1.3:
 
 - [13-01]: Use onKeyPress(keys:) instead of onKeyPress(KeyEquivalent) when modifier detection is needed (latter has no KeyPress parameter)
 - [13-01]: No bulk paste-as-plain-text in History browser multi-selection (out of scope for Phase 13)
+- [14-01]: Ignore check in checkForChanges() not processPasteboardContent() -- filters ALL content types uniformly including images
+- [14-01]: Fresh UserDefaults read each poll cycle for ignore list -- no caching, matches RetentionService pattern
+- [14-01]: ignoredAppBundleIDs UserDefaults key stores [String] array of bundle IDs
 
 ### Research Flags (v1.3)
 
@@ -66,5 +69,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 13-01-PLAN.md (Phase 13 complete)
+Stopped at: Completed 14-01-PLAN.md (Phase 14 Plan 1 of 2)
 Resume file: None
