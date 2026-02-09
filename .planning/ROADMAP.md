@@ -158,6 +158,7 @@ Plans:
 **Milestone Goal:** Item titles for easier discovery, multi-label support, edit modal for item management, plus storage optimization and sensitive data protection.
 
 - [x] **Phase 11: Item Titles, Multi-Label Support, and Edit Modal** - User-assigned titles on clipboard items, multi-label relationships, and a right-click edit modal for title and label management
+- [ ] **Phase 12: History Browser and Bulk Actions** - Full-window history browser in Settings with responsive grid layout, search/label filtering, multi-select, and bulk copy/paste/delete
 
 ## Phase Details (v1.2)
 
@@ -178,6 +179,23 @@ Plans:
 - [x] 11-02-PLAN.md -- ClipboardCardView restructure (title in header, labels in footer, multi-label context menu, edit sheet, abbreviated time)
 - [x] 11-03-PLAN.md -- Multi-select chip bar, hybrid label filtering (predicate + in-memory), title search, drag-drop label append
 
+### Phase 12: History Browser and Bulk Actions
+**Goal**: Users can browse and manage their full clipboard history in a resizable Settings tab with responsive grid layout, multi-select, and bulk operations (copy, paste, delete)
+**Depends on**: Phase 11
+**Success Criteria** (what must be TRUE):
+  1. User opens Settings and sees a "History" tab with the same clipboard cards displayed in a responsive grid that reflows on window resize
+  2. User can search and filter by labels using the same search bar and chip bar as the panel
+  3. User can select multiple cards (click + Shift-click or Cmd-click) with visual selection indicators
+  4. User selects multiple items and uses "Copy" to concatenate their text content with newlines and copy to clipboard
+  5. User selects multiple items and uses "Paste" to paste concatenated content into the active app
+  6. User selects multiple items and uses "Delete" which shows a confirmation dialog stating the number of items to be deleted
+**Plans**: 3 plans
+
+Plans:
+- [ ] 12-01-PLAN.md -- Resizable settings window, History tab in SettingsView, HistoryBrowserView shell with search and chip bar
+- [ ] 12-02-PLAN.md -- HistoryGridView with adaptive LazyVGrid, @Query with in-memory label filtering, Cmd-click/Shift-click multi-selection
+- [ ] 12-03-PLAN.md -- Bulk action toolbar (Copy, Paste, Delete) with confirmation dialog, image cleanup, and paste-back from settings
+
 ## Progress
 
 **Execution Order:**
@@ -196,3 +214,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10
 | 9. Quick Paste Hotkeys | v1.1 | 2/2 | Complete | 2026-02-07 |
 | 10. Drag-and-Drop Label Assignment | v1.1 | 1/1 | Complete | 2026-02-07 |
 | 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 3/3 | Complete | 2026-02-09 |
+| 12. History Browser and Bulk Actions | v1.2 | 0/3 | Planned | - |
