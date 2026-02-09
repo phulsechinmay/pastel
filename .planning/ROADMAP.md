@@ -157,7 +157,7 @@ Plans:
 
 **Milestone Goal:** Item titles for easier discovery, multi-label support, edit modal for item management, plus storage optimization and sensitive data protection.
 
-- [ ] **Phase 11: Item Titles, Multi-Label Support, and Edit Modal** - User-assigned titles on clipboard items, multi-label relationships, and a right-click edit modal for title and label management
+- [x] **Phase 11: Item Titles, Multi-Label Support, and Edit Modal** - User-assigned titles on clipboard items, multi-label relationships, and a right-click edit modal for title and label management
 
 ## Phase Details (v1.2)
 
@@ -174,9 +174,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 11-01-PLAN.md -- Data model updates (title, labels array), Label inverse relationship, MigrationService, EditItemView modal
-- [ ] 11-02-PLAN.md -- ClipboardCardView restructure (title in header, labels in footer, multi-label context menu, edit sheet, abbreviated time)
-- [ ] 11-03-PLAN.md -- Multi-select chip bar, hybrid label filtering (predicate + in-memory), title search, drag-drop label append
+- [x] 11-01-PLAN.md -- Data model updates (title, labels array), Label inverse relationship, MigrationService, EditItemView modal
+- [x] 11-02-PLAN.md -- ClipboardCardView restructure (title in header, labels in footer, multi-label context menu, edit sheet, abbreviated time)
+- [x] 11-03-PLAN.md -- Multi-select chip bar, hybrid label filtering (predicate + in-memory), title search, drag-drop label append
 
 ## Progress
 
@@ -195,4 +195,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10
 | 8. URL Preview Cards | v1.1 | 1/2 | In progress | - |
 | 9. Quick Paste Hotkeys | v1.1 | 2/2 | Complete | 2026-02-07 |
 | 10. Drag-and-Drop Label Assignment | v1.1 | 1/1 | Complete | 2026-02-07 |
-| 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 0/3 | Not started | - |
+| 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 3/3 | Complete | 2026-02-09 |
