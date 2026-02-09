@@ -4,8 +4,12 @@ import SwiftData
 /// Dynamic query child view that constructs its @Query predicate at init time.
 ///
 /// This pattern is required because SwiftData's @Query cannot be changed dynamically
-/// after view creation. When the parent passes new searchText or selectedLabelID values,
+/// after view creation. When the parent passes new searchText or selectedLabelIDs values,
 /// SwiftUI recreates this view with a fresh @Query containing the updated predicate.
+///
+/// Filtering strategy: text search via @Query predicate, label filtering in-memory.
+/// #Predicate cannot use .contains() on to-many relationships, so label filtering
+/// is done as a post-filter on the query results (OR logic: items with ANY selected label).
 ///
 /// Handles keyboard navigation and mouse interaction (single-click to select,
 /// double-click to paste) since it has direct access to the queried items array.
@@ -28,6 +32,20 @@ struct FilteredCardListView: View {
     var onPastePlainText: (ClipboardItem) -> Void
     var onTypeToSearch: ((Character) -> Void)?
 
+    /// Selected label IDs for in-memory post-filtering (OR logic).
+    private let selectedLabelIDs: Set<PersistentIdentifier>
+
+    /// Items filtered by selected labels (in-memory, OR logic).
+    /// If no labels selected, returns all items from @Query.
+    private var filteredItems: [ClipboardItem] {
+        guard !selectedLabelIDs.isEmpty else { return items }
+        return items.filter { item in
+            item.labels.contains { label in
+                selectedLabelIDs.contains(label.persistentModelID)
+            }
+        }
+    }
+
     /// Whether the panel is on a horizontal edge (top/bottom), requiring horizontal card layout.
     private var isHorizontal: Bool {
         let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
@@ -36,33 +54,24 @@ struct FilteredCardListView: View {
 
     init(
         searchText: String,
-        selectedLabelID: PersistentIdentifier?,
+        selectedLabelIDs: Set<PersistentIdentifier>,
         selectedIndex: Binding<Int?>,
         isShiftHeld: Bool = false,
         onPaste: @escaping (ClipboardItem) -> Void,
         onPastePlainText: @escaping (ClipboardItem) -> Void,
         onTypeToSearch: ((Character) -> Void)? = nil
     ) {
-        let predicate: Predicate<ClipboardItem>
+        self.selectedLabelIDs = selectedLabelIDs
 
-        if let labelID = selectedLabelID {
-            if searchText.isEmpty {
-                predicate = #Predicate<ClipboardItem> { item in
-                    item.label?.persistentModelID == labelID
-                }
-            } else {
-                let search = searchText
-                predicate = #Predicate<ClipboardItem> { item in
-                    item.label?.persistentModelID == labelID &&
-                    (item.textContent?.localizedStandardContains(search) == true ||
-                     item.sourceAppName?.localizedStandardContains(search) == true)
-                }
-            }
-        } else if !searchText.isEmpty {
+        // Text-only predicate. Label filtering is done in-memory via filteredItems
+        // because #Predicate cannot use .contains() on to-many relationships.
+        let predicate: Predicate<ClipboardItem>
+        if !searchText.isEmpty {
             let search = searchText
             predicate = #Predicate<ClipboardItem> { item in
                 item.textContent?.localizedStandardContains(search) == true ||
-                item.sourceAppName?.localizedStandardContains(search) == true
+                item.sourceAppName?.localizedStandardContains(search) == true ||
+                item.title?.localizedStandardContains(search) == true
             }
         } else {
             predicate = #Predicate<ClipboardItem> { _ in true }
@@ -82,7 +91,7 @@ struct FilteredCardListView: View {
 
     var body: some View {
         Group {
-            if items.isEmpty {
+            if filteredItems.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 24))
@@ -97,7 +106,7 @@ struct FilteredCardListView: View {
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: 8) {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
                                 ClipboardCardView(
                                     item: item,
@@ -120,7 +129,11 @@ struct FilteredCardListView: View {
                                           let label = try? modelContext.model(for: labelID) as? Label else {
                                         return false
                                     }
-                                    item.label = label
+                                    // Append label if not already assigned
+                                    guard !item.labels.contains(where: {
+                                        $0.persistentModelID == label.persistentModelID
+                                    }) else { return true }
+                                    item.labels.append(label)
                                     try? modelContext.save()
                                     return true
                                 } isTargeted: { targeted in
@@ -147,7 +160,7 @@ struct FilteredCardListView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 8) {
-                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
                                 ClipboardCardView(
                                     item: item,
@@ -168,7 +181,11 @@ struct FilteredCardListView: View {
                                           let label = try? modelContext.model(for: labelID) as? Label else {
                                         return false
                                     }
-                                    item.label = label
+                                    // Append label if not already assigned
+                                    guard !item.labels.contains(where: {
+                                        $0.persistentModelID == label.persistentModelID
+                                    }) else { return true }
+                                    item.labels.append(label)
                                     try? modelContext.save()
                                     return true
                                 } isTargeted: { targeted in
@@ -211,8 +228,8 @@ struct FilteredCardListView: View {
             return isHorizontal ? .handled : .ignored
         }
         .onKeyPress(.return) {
-            if let index = selectedIndex, index < items.count {
-                onPaste(items[index])
+            if let index = selectedIndex, index < filteredItems.count {
+                onPaste(filteredItems[index])
             }
             return .handled
         }
@@ -226,9 +243,9 @@ struct FilteredCardListView: View {
                   number >= 1, number <= 9 else { return .ignored }
 
             let index = number - 1  // Convert 1-based to 0-based
-            guard index < items.count else { return .ignored }
+            guard index < filteredItems.count else { return .ignored }
 
-            let item = items[index]
+            let item = filteredItems[index]
 
             if keyPress.modifiers.contains(.shift) {
                 // Cmd+Shift+N: Plain text paste
@@ -260,9 +277,9 @@ struct FilteredCardListView: View {
     // MARK: - Private Helpers
 
     private func moveSelection(by offset: Int) {
-        guard !items.isEmpty else { return }
+        guard !filteredItems.isEmpty else { return }
         if let current = selectedIndex {
-            selectedIndex = max(0, min(items.count - 1, current + offset))
+            selectedIndex = max(0, min(filteredItems.count - 1, current + offset))
         } else {
             selectedIndex = 0
         }
