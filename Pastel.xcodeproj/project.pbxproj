@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E1A2B3C4D5E6F7081920A1B2 /* AppPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B3C4D5E6A7081920A1B2C3 /* AppPickerView.swift */; };
+		A4B5C6D7E8F9012345678901 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5C6D7E8F90A123456789012 /* PrivacySettingsView.swift */; };
 		A3E14B7C9D0F28A4E6C51730 /* AppDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D42E1FA8C3906D14E5B82A /* AppDiscoveryService.swift */; };
 		04769AF24E5670F5A628D811 /* ClipboardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59995DCA4628743D59C35FFA /* ClipboardItem.swift */; };
 		06AA48B5B881CDC6751CA40B /* ColorCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F774B6CD032B1A682BACC9D7 /* ColorCardView.swift */; };
@@ -68,6 +70,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F2B3C4D5E6A7081920A1B2C3 /* AppPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPickerView.swift; sourceTree = "<group>"; };
+		B5C6D7E8F90A123456789012 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		00804B3DBC5EB02EA738DEC2 /* NSWorkspace+AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSWorkspace+AppIcon.swift"; sourceTree = "<group>"; };
 		B7D42E1FA8C3906D14E5B82A /* AppDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiscoveryService.swift; sourceTree = "<group>"; };
 		03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardMonitor.swift; sourceTree = "<group>"; };
@@ -183,10 +187,12 @@
 		56B48783D74C66160C3B8AAC /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				F2B3C4D5E6A7081920A1B2C3 /* AppPickerView.swift */,
 				9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */,
 				12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */,
 				D1E2F3A4B5C60718091A2B3C /* HistoryGridView.swift */,
 				31E69FA6363380EEB64EF71E /* LabelSettingsView.swift */,
+				B5C6D7E8F90A123456789012 /* PrivacySettingsView.swift */,
 				A48C40766989658A71731EFD /* ScreenEdgePicker.swift */,
 				543EE2EEFDD439C620E6A0A0 /* SettingsView.swift */,
 				F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */,
@@ -387,6 +393,7 @@
 				9568A5C18B45B7183E87ABE3 /* AccessibilityService.swift in Sources */,
 				A3E14B7C9D0F28A4E6C51730 /* AppDiscoveryService.swift in Sources */,
 				DA56D7DCAB8FE7ABF5DFD32E /* AppIconColorService.swift in Sources */,
+				E1A2B3C4D5E6F7081920A1B2 /* AppPickerView.swift in Sources */,
 				D784DF24180305D270E7DDED /* AppState.swift in Sources */,
 				1FF817C58BBCAC1F6A6DA2DD /* AsyncThumbnailView.swift in Sources */,
 				4DA18147B096FCF7C2973416 /* ChipBarView.swift in Sources */,
@@ -426,6 +433,7 @@
 				FC28C1E1511F71298087486A /* PasteService.swift in Sources */,
 				5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */,
 				385A012F3E35FA4E4AA1F74B /* PersistentIdentifier+Transfer.swift in Sources */,
+				A4B5C6D7E8F9012345678901 /* PrivacySettingsView.swift in Sources */,
 				2103A21B8C8E7C2FCD20019E /* RetentionService.swift in Sources */,
 				BAE74603B44F4338BBDCD644 /* ScreenEdgePicker.swift in Sources */,
 				9860CE67423A7F0C7A769D5B /* SearchFieldView.swift in Sources */,
