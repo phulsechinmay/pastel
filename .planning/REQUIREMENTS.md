@@ -251,10 +251,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIST-04 | Phase 12 | Complete |
 | HIST-05 | Phase 12 | Complete |
 | HIST-06 | Phase 12 | Complete |
-| PAST-20 | Phase 13 | Pending |
-| PAST-21 | Phase 13 | Pending |
-| PAST-22 | Phase 13 | Pending |
-| PAST-23 | Phase 13 | Pending |
+| PAST-20 | Phase 13 | Complete |
+| PAST-21 | Phase 13 | Complete |
+| PAST-22 | Phase 13 | Complete |
+| PAST-23 | Phase 13 | Complete |
 | PRIV-01 | Phase 14 | Pending |
 | PRIV-02 | Phase 14 | Pending |
 | PRIV-03 | Phase 14 | Pending |
