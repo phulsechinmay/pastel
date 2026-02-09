@@ -1,18 +1,16 @@
-# Architecture Research: Storage Optimization & Sensitive Item Protection
+# Architecture Research: v1.3 Power User Features
 
-**Domain:** macOS clipboard manager -- storage optimization, management tools, and sensitive data protection
-**Researched:** 2026-02-07
-**Confidence:** HIGH (based on direct source code analysis of all 40+ Swift files in the Pastel codebase, plus verified macOS/SwiftData API patterns)
+**Domain:** macOS clipboard manager -- paste-as-plain-text UI, app filtering, import/export, drag-and-drop
+**Researched:** 2026-02-09
+**Confidence:** HIGH (based on direct source code analysis of all 50+ Swift files in the Pastel codebase, verified macOS/SwiftUI API patterns, and Maccy reference implementation)
 
 ## Confidence Note
 
-All integration points are derived from direct analysis of every service, model, and view file in the Pastel codebase. Architecture recommendations are grounded in existing patterns the codebase already follows (singleton services, @MainActor services with ModelContext, @Observable for reactive UI, @AppStorage for preferences). Image compression recommendations use established macOS ImageIO and Core Graphics APIs. SwiftData batch deletion and aggregate query patterns are verified against Apple documentation and multiple credible sources. Sensitive content redaction uses SwiftUI's built-in `.redacted(reason:)` and `.blur()` modifiers -- HIGH confidence. SQLite VACUUM for database compaction is a well-documented technique, though SwiftData's direct support for it requires accessing the underlying Core Data store -- MEDIUM confidence for the exact API surface.
+All integration points are derived from direct analysis of every service, model, and view file in the Pastel codebase. Architecture recommendations build on patterns the codebase already follows (@MainActor services, @AppStorage for preferences, @Observable for reactive UI, PanelActions callback bridge). Drag-and-drop recommendations use SwiftUI's `.onDrag` / `.draggable` modifiers which the codebase already uses for label chips (ChipBarView). App filtering logic is verified against Maccy's open-source implementation. Import/export patterns use standard Codable + NSSavePanel/NSOpenPanel which are well-documented macOS APIs. Paste-as-plain-text infrastructure already exists (PasteService.pastePlainText) -- this research focuses on UI integration points only.
 
 ---
 
-## Existing Architecture Summary
-
-The current codebase has clean separation of concerns with well-defined component boundaries:
+## Existing Architecture Summary (Updated for v1.2)
 
 ```
 PastelApp (@main)
@@ -20,46 +18,46 @@ PastelApp (@main)
     +-- AppState (@Observable, @MainActor)
     |       |-- ClipboardMonitor (Timer polling -> classify -> deduplicate -> SwiftData insert)
     |       |-- PanelController (NSPanel lifecycle, show/hide, event monitors)
-    |       |-- PasteService (pasteboard write + CGEvent Cmd+V simulation)
-    |       |-- RetentionService (hourly purge of items older than retention period)
+    |       |-- PasteService (pasteboard write + CGEvent Cmd+V, plain text mode)
+    |       |-- RetentionService (hourly purge based on retention period)
     |       `-- modelContainer (SwiftData: ClipboardItem, Label)
     |
     +-- Models
     |       |-- ClipboardItem (@Model: textContent, htmlContent, rtfData, contentType,
     |       |                   imagePath, thumbnailPath, isConcealed, expiresAt,
-    |       |                   contentHash (@Attribute(.unique)), label relationship,
+    |       |                   contentHash (@Attribute(.unique)), title, labels[],
     |       |                   detectedLanguage, detectedColorHex, url metadata fields)
     |       |-- ContentType (enum: text, richText, url, image, file, code, color)
-    |       |-- Label (@Model: name, colorName/emoji, sortOrder)
-    |       `-- LabelColor (enum: 8 preset colors)
+    |       |-- Label (@Model: name, colorName, emoji, sortOrder, items[])
+    |       |-- LabelColor (enum: 12 preset colors)
+    |       `-- PasteBehavior (enum: paste, copy, copyAndPaste)
     |
     +-- Services
-    |       |-- ClipboardMonitor (main-thread polling at 0.5s, SHA256 hashing,
-    |       |                     ExpirationService for concealed items)
+    |       |-- ClipboardMonitor (@MainActor, 0.5s polling, SHA256 hashing, skipNextChange)
     |       |-- ImageStorageService (singleton, background DispatchQueue, PNG storage,
-    |       |                        4K downscale, 200px thumbnails, ~/Library/App Support/Pastel/images/)
-    |       |-- ExpirationService (DispatchWorkItem timers, 60s auto-delete for concealed items)
-    |       |-- RetentionService (hourly Timer, @AppStorage "historyRetention" in days)
-    |       |-- PasteService (writeToPasteboard + simulatePaste, plain text mode)
-    |       |-- CodeDetectionService (NLLanguageRecognizer, regex heuristics)
-    |       |-- ColorDetectionService (regex for hex, rgb, hsl)
-    |       |-- URLMetadataService (LPMetadataProvider, favicon/og:image caching)
-    |       `-- AppIconColorService (dominant color extraction for card gradients)
+    |       |                        4K downscale, 200px thumbnails)
+    |       |-- ExpirationService (60s auto-delete for concealed items)
+    |       |-- RetentionService (hourly purge by retention days)
+    |       |-- PasteService (writeToPasteboard, writeToPasteboardPlainText, simulatePaste)
+    |       |-- CodeDetectionService, ColorDetectionService, URLMetadataService
+    |       |-- AccessibilityService, AppIconColorService, MigrationService
+    |       `-- [Missing: AppFilterService, ImportExportService]
     |
     +-- Views/Panel
     |       |-- PanelController -> SlidingPanel (NSPanel, .nonactivatingPanel)
     |       |-- PanelContentView (header + search + chips + filtered list)
-    |       |-- FilteredCardListView (dynamic @Query with init-based predicates)
-    |       |-- ClipboardCardView (dispatcher: header + contentPreview + footer)
-    |       |-- TextCardView, ImageCardView, URLCardView, FileCardView, CodeCardView, ColorCardView
-    |       |-- ChipBarView, SearchFieldView, EmptyStateView, AsyncThumbnailView
-    |       `-- PanelActions (@Observable bridge for paste callbacks)
+    |       |-- FilteredCardListView (dynamic @Query, keyboard nav, quick paste hotkeys)
+    |       |-- ClipboardCardView (dispatcher: header + contentPreview + footer + context menu)
+    |       |-- [Type-specific cards: Text, Image, URL, File, Code, Color]
+    |       |-- ChipBarView (label chips with .draggable), SearchFieldView
+    |       |-- PanelActions (@Observable bridge: pasteItem, pastePlainTextItem, copyOnlyItem)
+    |       `-- EditItemView + EditItemWindow (title + multi-label editing)
     |
     +-- Views/Settings
-    |       |-- SettingsWindowController (NSWindow hosting SwiftUI)
-    |       |-- SettingsView (tab bar: General, Labels)
-    |       |-- GeneralSettingsView (launch, hotkey, position, retention, paste behavior, URL previews)
-    |       `-- LabelSettingsView (CRUD for labels with emoji/color)
+    |       |-- SettingsView (tabs: General, Labels, History)
+    |       |-- GeneralSettingsView (startup, hotkey, position, retention, paste, URL previews)
+    |       |-- LabelSettingsView (CRUD for labels)
+    |       `-- HistoryBrowserView + HistoryGridView (search, filter, multi-select, bulk ops)
     |
     +-- Views/MenuBar
             `-- StatusPopoverView (monitoring toggle, show history, settings, clear all, quit)
@@ -67,899 +65,1044 @@ PastelApp (@main)
 
 ### Key Architecture Patterns Already Established
 
-1. **Service singletons for stateless work:** `ImageStorageService.shared`, `AppIconColorService.shared`
-2. **@MainActor services for SwiftData access:** `ClipboardMonitor`, `RetentionService`, `ExpirationService` -- all hold a `ModelContext` and run on main thread
-3. **Background DispatchQueue for I/O:** `ImageStorageService.backgroundQueue` at `.utility` QoS with completion handlers back to main
-4. **@AppStorage for user preferences:** All settings use `@AppStorage` with string keys, read from `UserDefaults.standard` in services
-5. **Fire-and-forget async post-processing:** Language detection and URL metadata fetch happen as `Task {}` after initial save
-6. **@Observable + environment for reactive UI:** `AppState`, `PanelActions` injected via `.environment()`
-7. **Dynamic @Query via init-based predicates:** `FilteredCardListView` rebuilds its `@Query` by being recreated with new init params
+1. **PanelActions callback bridge:** SwiftUI views call `panelActions.pasteItem?(item)` which routes through PanelController to AppState to PasteService. All paste variants (normal, plain text, copy-only) follow this pattern.
+2. **PasteService already has plain text support:** `pastePlainText(item:)` and `writeToPasteboardPlainText(item:)` strip RTF and write only `.string` + `.html`. This is fully implemented and working via Cmd+Shift+1-9 hotkeys.
+3. **Context menu pattern in ClipboardCardView:** Right-click context menu has Copy, Paste, Copy+Paste, Edit, Label submenu, and Delete. Adding new items is straightforward.
+4. **Source app tracking already exists:** `ClipboardItem.sourceAppBundleID` and `sourceAppName` are captured at copy time via `NSWorkspace.shared.frontmostApplication`. This is the foundation for app filtering.
+5. **SwiftUI drag already works:** ChipBarView uses `.draggable(label.persistentModelID.asTransferString)` with `PersistentIdentifier+Transfer` extension. The codebase has proven drag-and-drop patterns.
+6. **@AppStorage for all preferences:** Every user-configurable setting uses `@AppStorage` with string keys.
+7. **Dynamic @Query via view recreation:** FilteredCardListView takes search/filter params in init, constructs a #Predicate, and uses `.id()` on the parent to force recreation when filters change.
 
 ---
 
-## Integration Architecture for New Features
+## Feature 1: Paste-as-Plain-Text UI
 
-### Feature Group 1: Image Compression Service
+### Current State
 
-#### Integration Point: ImageStorageService
+PasteService already has **full plain text paste support**:
+- `PasteService.pastePlainText(item:clipboardMonitor:panelController:)` -- strips RTF, writes `.string` + `.html` only
+- `PasteService.writeToPasteboardPlainText(item:)` -- the underlying pasteboard write
+- `AppState.pastePlainText(item:)` -- delegates to PasteService
+- `PanelActions.pastePlainTextItem` -- callback bridge from SwiftUI
+- `PanelContentView.pastePlainTextItem(_:)` -- wired to PanelActions
+- FilteredCardListView handles `Cmd+Shift+1-9` for plain text paste via `onPastePlainText` callback
 
-The image compression feature slots directly into `ImageStorageService`, which already handles all image disk I/O on a background `DispatchQueue`.
+**What is missing is only the UI entry points**: context menu items, Shift+Enter, and Shift+double-click.
 
-**Current flow (capture):**
+### Integration Points
+
+#### 1. Context Menu in ClipboardCardView (MODIFY)
+
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/ClipboardCardView.swift`
+**Lines:** 163-222 (contextMenu block)
+
+The current context menu has:
 ```
-ClipboardMonitor.processImageContent()
-    -> reads TIFF/PNG data from NSPasteboard (main thread)
-    -> ImageStorageService.shared.saveImage(data:) (background queue)
-        -> downscaleIfNeeded(data:, maxSize: 3840) -- 4K cap
-        -> write PNG to ~/Library/App Support/Pastel/images/{UUID}.png
-        -> generate 200px thumbnail as {UUID}_thumb.png
-        -> completion(imageFilename, thumbnailFilename) on main thread
-    -> ClipboardMonitor creates ClipboardItem with imagePath, thumbnailPath
-    -> modelContext.insert + save
-```
-
-**Proposed change -- compress to JPEG instead of PNG:**
-
-The key insight is that `ImageStorageService` already calls `downscaleIfNeeded(data:maxSize:)` which uses `CGImageSource` and `NSBitmapImageRep`. The modification is minimal: instead of always producing PNG output, compress to JPEG at a configurable quality level.
-
-```
-ImageStorageService.saveImage(data:)  // MODIFIED
-    -> downscaleIfNeeded (existing)
-    -> compressToJPEG(data:, quality: compressionQuality)  // NEW
-    -> write as {UUID}.jpg instead of {UUID}.png
-    -> thumbnail generation unchanged (already small)
-    -> completion with new filename
-```
-
-**Implementation details:**
-
-- Add `@AppStorage("imageCompressionQuality")` preference (default: 0.8, range 0.5-1.0)
-- Modify `saveImage(data:)` to call `NSBitmapImageRep.representation(using: .jpeg, properties: [.compressionFactor: quality])` instead of `.png`
-- File extension changes from `.png` to `.jpg` -- this is safe because the DB stores only filenames, and `resolveImageURL(_:)` just appends to the directory path
-- Existing images remain as PNG -- no migration needed. The viewer (`AsyncThumbnailView`) loads via `NSImage(contentsOf:)` which handles both formats
-- **Do NOT use HEIC** despite better compression ratios: HEIC decoding is 2.1x slower than JPEG, and clipboard managers need fast thumbnail loading. JPEG at quality 0.8 provides ~80% size reduction vs PNG with negligible decode overhead
-
-**Why NOT compress on capture in the hot path:**
-The current flow already does background I/O. JPEG compression is fast (< 10ms for typical clipboard images). Compression should happen inline during `saveImage()`, not as a separate background task. A separate "batch recompress" feature is unnecessary complexity.
-
-**New component:** None needed -- modification to existing `ImageStorageService`
-
-**Settings integration:** Add a "Storage" section to `GeneralSettingsView` (or a new Settings tab) with an image quality slider
-
-#### Estimated storage savings
-
-| Format | Typical screenshot (1920x1080) | Typical photo (4K) |
-|--------|-------------------------------|-------------------|
-| PNG (current) | ~3-5 MB | ~15-25 MB |
-| JPEG @ 0.8 | ~200-400 KB | ~1-2 MB |
-| Savings | ~90% | ~90% |
-
+Copy
+Paste
+Copy + Paste
 ---
+Edit...
+---
+Label >
+---
+Delete
+```
 
-### Feature Group 2: Content Deduplication
+Add "Paste as Plain Text" after "Copy + Paste":
+```
+Copy
+Paste
+Copy + Paste
+Paste as Plain Text    <-- NEW
+---
+Edit...
+---
+Label >
+---
+Delete
+```
 
-#### Integration Point: ClipboardMonitor.isDuplicateOfMostRecent()
+**Implementation:** Call `panelActions.pastePlainTextItem?(item)` -- the callback already exists on PanelActions.
 
-**Current deduplication:**
-- `ClipboardItem.contentHash` is `@Attribute(.unique)` -- SwiftData enforces uniqueness at the database level
-- `isDuplicateOfMostRecent(contentHash:)` checks only the single most recent item (consecutive duplicate prevention)
-- If a non-consecutive duplicate is inserted, the `.unique` constraint causes `modelContext.save()` to throw, caught in the `catch` block with `modelContext.rollback()`
+**Conditional visibility:** Only show "Paste as Plain Text" for text-based content types (.text, .richText, .code, .color). For .url, .image, .file it has no effect (PasteService already delegates to normal writeToPasteboard for non-text types).
 
-**The existing architecture already prevents true duplicates** via the `@Attribute(.unique)` constraint on `contentHash`. What happens today:
-1. Copy "hello" -> saved with hash ABC
-2. Copy "world" -> saved with hash DEF
-3. Copy "hello" again -> `isDuplicateOfMostRecent` returns false (different from "world"), insert attempted, `.unique` constraint violation on hash ABC, rollback -- silently dropped
+#### 2. Shift+Double-Click in FilteredCardListView (MODIFY)
 
-**This means deduplication is already fully implemented.** The `@Attribute(.unique)` constraint on `contentHash` prevents any item with the same content from being stored twice, regardless of when it was copied. The only behavior question is: should re-copying existing content update the timestamp of the existing item (bump it to the top)?
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/FilteredCardListView.swift`
+**Lines:** 120-125 (vertical layout), 170-175 (horizontal layout)
 
-**Proposed enhancement -- bump-to-top on re-copy:**
+Current pattern:
+```swift
+.onTapGesture(count: 2) { onPaste(item) }
+.onTapGesture(count: 1) { selectedIndex = index }
+```
 
-Instead of silently dropping the duplicate (current behavior via rollback), detect the duplicate and update its timestamp:
+**Challenge:** SwiftUI's `.onTapGesture` does not provide modifier key information. The `count: 2` handler receives no `NSEvent` to check for Shift.
+
+**Solution approach:** Use `NSEvent.modifierFlags` (static property) to check current modifier state at the time of the gesture callback:
 
 ```swift
-// In ClipboardMonitor.processPasteboardContent(), after computing contentHash:
-
-// Check for existing item with same hash (any position, not just most recent)
-if let existing = try? findExistingItem(contentHash: contentHash) {
-    existing.timestamp = .now
-    existing.sourceAppBundleID = sourceAppBundleID
-    existing.sourceAppName = sourceAppName
-    try? modelContext.save()
-    return  // Don't create a new item
+.onTapGesture(count: 2) {
+    if NSEvent.modifierFlags.contains(.shift) {
+        onPastePlainText(item)
+    } else {
+        onPaste(item)
+    }
 }
 ```
 
-**New method on ClipboardMonitor:** `findExistingItem(contentHash:) -> ClipboardItem?`
+This pattern is already proven in the codebase: `HistoryGridView.handleTap()` uses `NSEvent.modifierFlags` to detect Cmd and Shift modifiers for multi-select behavior (line 160).
 
-This replaces the current `isDuplicateOfMostRecent` with a broader lookup, and updates instead of dropping. The `@Attribute(.unique)` constraint remains as a safety net.
+**Confidence:** HIGH -- the pattern works and is already used in HistoryGridView.
 
-**Image deduplication:** Already handled -- `ImageStorageService.computeImageHash(data:)` hashes the first 4KB of image data, and the same `@Attribute(.unique)` constraint applies.
+#### 3. Shift+Enter in FilteredCardListView (MODIFY)
 
-**Near-duplicate detection:** Not recommended for v1.1. Near-duplicate detection (fuzzy matching, edit distance) adds significant complexity with marginal user benefit. Exact hash matching is sufficient for a clipboard manager.
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/FilteredCardListView.swift`
+**Lines:** 230-235 (Return key handler)
+
+Current handler:
+```swift
+.onKeyPress(.return) {
+    if let index = selectedIndex, index < filteredItems.count {
+        onPaste(filteredItems[index])
+    }
+    return .handled
+}
+```
+
+**Solution:** The `.onKeyPress` handler receives a `KeyPress` value that has a `.modifiers` property. Check for `.shift`:
+
+```swift
+.onKeyPress(.return) { keyPress in
+    guard let index = selectedIndex, index < filteredItems.count else { return .handled }
+    if keyPress.modifiers.contains(.shift) {
+        onPastePlainText(filteredItems[index])
+    } else {
+        onPaste(filteredItems[index])
+    }
+    return .handled
+}
+```
+
+This pattern is already used in the Cmd+1-9 handler at lines 236-259, which checks `keyPress.modifiers.contains(.shift)` and `keyPress.modifiers.contains(.command)`.
+
+**Confidence:** HIGH -- exact same modifier check pattern already in use.
+
+### Data Model Changes
+
+None. The plain text paste infrastructure is fully implemented. This is purely a UI wiring task.
+
+### New Components
+
+None. All changes are modifications to existing files.
+
+### Files to Modify
+
+| File | Change | Scope |
+|------|--------|-------|
+| `ClipboardCardView.swift` | Add "Paste as Plain Text" context menu item | ~8 lines added |
+| `FilteredCardListView.swift` | Shift+double-click and Shift+Enter checks | ~10 lines modified |
 
 ---
 
-### Feature Group 3: Storage Usage Tracking & Dashboard
+## Feature 2: App Allow/Ignore Lists
 
-#### New Component: StorageStatsService
+### Architecture Decision: Where to Check
 
-**Purpose:** Calculate and cache storage statistics for display in a Settings dashboard.
+There are two architectural options for app filtering:
 
-**Architecture decision -- compute on demand, not cached in DB:**
+**Option A: Filter in ClipboardMonitor.checkForChanges()** (early filtering)
+- Check `NSWorkspace.shared.frontmostApplication?.bundleIdentifier` before processing
+- Items from ignored apps never enter the capture pipeline
+- Pro: No unnecessary work (no hashing, no SwiftData access)
+- Con: Must check on every poll tick (0.5s), but the check is trivial (Set.contains)
 
-Storage stats should be computed when the user opens the storage dashboard, not maintained incrementally. Rationale:
-1. Stats are only viewed occasionally (settings screen)
-2. Computing file sizes is fast enough for the expected scale (< 10K images typical)
-3. Incremental tracking adds complexity to every insert/delete path
-4. SwiftData `fetchCount` with predicates is efficient for item counts
+**Option B: Filter in ClipboardMonitor.processPasteboardContent()** (late filtering)
+- Check after content classification but before SwiftData insert
+- Pro: Classification info available (could filter by content type per app)
+- Con: Does unnecessary classification work before discarding
 
-```swift
+**Recommendation: Option A -- early filtering in checkForChanges().** The check is a single `Set.contains(bundleID)` operation. Filtering before `processPasteboardContent()` avoids all unnecessary work: no content reading, no hashing, no SwiftData queries. This matches Maccy's implementation pattern.
+
+### Integration Points
+
+#### 1. New Service: AppFilterService (NEW)
+
+**File:** `Pastel/Services/AppFilterService.swift`
+
+```
 @MainActor
 @Observable
-final class StorageStatsService {
+final class AppFilterService {
+    /// List of bundle IDs in the user's configured list
+    var appBundleIDs: [String]  // loaded from UserDefaults
 
-    struct StorageStats {
-        var totalItems: Int
-        var itemsByType: [ContentType: Int]
-        var imagesDiskSize: Int64       // bytes, from FileManager
-        var databaseSize: Int64         // bytes, from FileManager
-        var totalDiskSize: Int64        // images + database
-        var oldestItemDate: Date?
-        var newestItemDate: Date?
+    /// Whether the list acts as an allow-list or ignore-list
+    var mode: FilterMode  // .allowList or .ignoreList
+
+    enum FilterMode: String {
+        case allowList = "allowList"   // ONLY capture from listed apps
+        case ignoreList = "ignoreList" // capture from ALL EXCEPT listed apps
     }
 
-    func computeStats(modelContext: ModelContext) async -> StorageStats {
-        // Item counts: SwiftData fetchCount with type predicates
-        // Image disk size: FileManager enumerate ~/Library/App Support/Pastel/images/
-        // Database size: FileManager attributesOfItem on .store file
+    /// Check whether clipboard content from a given app should be captured
+    func shouldCapture(bundleID: String?) -> Bool {
+        guard let bundleID else { return true }  // Unknown app -> capture
+        switch mode {
+        case .ignoreList:
+            return !appBundleIDs.contains(bundleID)
+        case .allowList:
+            return appBundleIDs.contains(bundleID)
+        }
     }
 }
 ```
 
-**Integration with Settings:**
+**Persistence:** Store the app list in UserDefaults as a JSON-encoded `[String]` array, and the mode as a string. Use `@AppStorage` for the mode toggle and manual UserDefaults access for the array (since @AppStorage does not support arrays).
 
-Add a new "Storage" tab to `SettingsView` (alongside General and Labels):
+**Why a separate service instead of inline logic in ClipboardMonitor:**
+- ClipboardMonitor is already 400 lines with complex responsibility
+- AppFilterService encapsulates the allow/ignore logic and persistence
+- Settings views can bind to AppFilterService.appBundleIDs directly
+- Testable in isolation
 
-```
-SettingsTab enum:
-    case general    // existing
-    case labels     // existing
-    case storage    // NEW
-```
+#### 2. ClipboardMonitor Modification (MODIFY)
 
-The `StorageSettingsView` displays:
-- Total storage used (images + database)
-- Breakdown by content type (pie chart or bar)
-- Item count by type
-- "Purge by Category" buttons
-- "Compact Database" button
-- Image compression quality slider
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Services/ClipboardMonitor.swift`
+**Method:** `checkForChanges()` (lines 128-143)
 
-**Disk size calculation approach:**
+Add filter check after the changeCount guard, before `processPasteboardContent()`:
 
 ```swift
-// Image directory size -- enumerate files and sum
-func imageDiskSize() -> Int64 {
-    let fm = FileManager.default
-    let imagesDir = ImageStorageService.shared.resolveImageURL("").deletingLastPathComponent()
-    guard let enumerator = fm.enumerator(at: imagesDir,
-        includingPropertiesForKeys: [.fileSizeKey],
-        options: [.skipsHiddenFiles]) else { return 0 }
-    var total: Int64 = 0
-    for case let url as URL in enumerator {
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-        total += Int64(size)
-    }
-    return total
-}
+private func checkForChanges() {
+    guard isMonitoring else { return }
+    let currentChangeCount = pasteboard.changeCount
+    guard currentChangeCount != lastChangeCount else { return }
+    lastChangeCount = currentChangeCount
 
-// Database size -- find the .store file
-func databaseSize() -> Int64 {
-    // SwiftData stores in ~/Library/Application Support/default.store
-    // Access via modelContainer.configurations.first?.url
+    if skipNextChange {
+        skipNextChange = false
+        return
+    }
+
+    // NEW: App filtering
+    let sourceApp = NSWorkspace.shared.frontmostApplication
+    if let filterService = appFilterService,
+       !filterService.shouldCapture(bundleID: sourceApp?.bundleIdentifier) {
+        return
+    }
+
+    processPasteboardContent()
 }
 ```
 
-**Why a new tab, not a section in General:**
+**Important consideration:** The `NSWorkspace.shared.frontmostApplication` call is already made later in `processPasteboardContent()` (line 223). Moving it earlier to `checkForChanges()` for filtering means it runs on every poll tick where the changeCount differs. This is safe -- it is a simple property access on the main thread with no performance concern.
 
-GeneralSettingsView already has 6 sections (startup, hotkey, position, retention, paste behavior, URL previews). Adding storage stats + purge controls + compression settings would make it too long. A dedicated "Storage" tab with its own icon keeps settings organized and follows macOS conventions (System Settings uses separate panes for Storage).
+However, there is a subtlety: if app filtering skips the content, `processPasteboardContent()` is never called, so the sourceApp info from `checkForChanges()` is discarded. If filtering passes, `processPasteboardContent()` re-reads `frontmostApplication`, which could theoretically return a different app if the user switched apps between the two calls (within the same 0.5s tick). This is an extremely unlikely edge case and not worth optimizing for.
+
+#### 3. AppState Wiring (MODIFY)
+
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/App/AppState.swift`
+
+Add `appFilterService` property and pass it to ClipboardMonitor:
+
+```swift
+var appFilterService: AppFilterService?
+
+func setup(modelContext: ModelContext) {
+    let filter = AppFilterService()
+    self.appFilterService = filter
+
+    let monitor = ClipboardMonitor(modelContext: modelContext, appFilterService: filter)
+    // ...
+}
+```
+
+#### 4. Settings UI: App Filter Settings View (NEW)
+
+**File:** `Pastel/Views/Settings/AppFilterSettingsView.swift`
+
+This view needs:
+- Toggle between Allow List mode and Ignore List mode
+- List of currently configured apps (showing app name + icon + bundle ID)
+- "Add App" button that shows a file picker for .app bundles (NSOpenPanel with /Applications as starting directory)
+- Remove button per app entry
+- Running apps list for quick selection (via `NSWorkspace.shared.runningApplications`)
+
+**App discovery approach:**
+- **Primary:** NSOpenPanel pointing to /Applications, filter for .app bundles. Read bundle ID from the selected app's Info.plist via `Bundle(url:)?.bundleIdentifier`.
+- **Secondary:** Show a list of currently running applications (`NSWorkspace.shared.runningApplications`) filtered to `.activationPolicy == .regular` (excludes background agents and daemons). User taps to add.
+
+**Integration with SettingsView:** Add a new "Apps" or "Privacy" tab, or add as a section within GeneralSettingsView. Given that the settings already have 3 tabs (General, Labels, History), adding a 4th "Apps" tab is reasonable and avoids overloading General.
+
+#### 5. SettingsView Tab Addition (MODIFY)
+
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Settings/SettingsView.swift`
+
+Add `case apps` to `SettingsTab` enum:
+```swift
+private enum SettingsTab: String, CaseIterable {
+    case general
+    case labels
+    case history
+    case apps  // NEW
+}
+```
+
+### Data Model Changes
+
+None. App filter configuration lives entirely in UserDefaults, not SwiftData. The ClipboardItem model already has `sourceAppBundleID` for display purposes -- this is not used for filtering (filtering happens before item creation).
+
+### New Components
+
+| Component | Type | Purpose |
+|-----------|------|---------|
+| `AppFilterService` | @MainActor @Observable | Allow/ignore list logic and persistence |
+| `AppFilterSettingsView` | SwiftUI View | UI for managing app lists |
+
+### Files to Modify
+
+| File | Change | Scope |
+|------|--------|-------|
+| `ClipboardMonitor.swift` | Add filter check in `checkForChanges()` | ~8 lines added, 1 init param |
+| `AppState.swift` | Create and wire AppFilterService | ~5 lines |
+| `SettingsView.swift` | Add `apps` tab | ~5 lines |
 
 ---
 
-### Feature Group 4: Purge-by-Category and Database Compaction
+## Feature 3: Import/Export
 
-#### Integration Point: New methods on AppState or a dedicated PurgeService
+### Architecture Decision: File Format
 
-**Purge-by-category:**
+**Custom `.pastel` format (JSON-based):**
 
-SwiftData provides `delete(model:where:)` for batch deletion with predicates. This is the correct API:
+The export file should be a self-contained JSON document that includes:
+- Metadata (export date, app version, item count)
+- ClipboardItem data (all fields except SwiftData-specific identifiers)
+- Label definitions (name, color, emoji, sort order)
+- Item-to-label assignments
+- Embedded image data (Base64-encoded) for image items
 
-```swift
-// Delete all images
-let predicate = #Predicate<ClipboardItem> { $0.contentType == "image" }
-try modelContext.delete(model: ClipboardItem.self, where: predicate)
-try modelContext.save()
-```
+**Why JSON over alternatives:**
+- **Plist:** More macOS-native but harder to extend. JSON is human-readable and debuggable.
+- **SQLite dump:** Ties the format to SwiftData internals. Schema changes break imports.
+- **Zip with separate files:** More complex to create/parse. Images are rare in clipboard history, so embedding Base64 is acceptable for most exports.
+- **JSON:** Universal, Codable-friendly, extensible with versioning. Standard practice.
 
-However, batch delete does NOT trigger cascade cleanup of disk files. Image, favicon, and preview files must be cleaned up manually before the batch delete. The existing `clearAllHistory()` on AppState already demonstrates this pattern: fetch items first, delete their disk files, then batch delete.
+**Format structure:**
 
-**Proposed implementation:**
-
-```swift
-// On AppState (follows existing clearAllHistory pattern)
-func purgeByCategory(_ contentType: ContentType, modelContext: ModelContext) {
-    do {
-        let typeRaw = contentType.rawValue
-        let descriptor = FetchDescriptor<ClipboardItem>(
-            predicate: #Predicate<ClipboardItem> { $0.contentType == typeRaw }
-        )
-        let items = try modelContext.fetch(descriptor)
-
-        // Clean up disk files
-        for item in items {
-            ImageStorageService.shared.deleteImage(imagePath: item.imagePath, thumbnailPath: item.thumbnailPath)
-            ImageStorageService.shared.deleteImage(imagePath: item.urlFaviconPath, thumbnailPath: item.urlPreviewImagePath)
+```json
+{
+    "version": 1,
+    "exportDate": "2026-02-09T12:00:00Z",
+    "appVersion": "1.3.0",
+    "labels": [
+        { "name": "Work", "colorName": "blue", "emoji": null, "sortOrder": 0 }
+    ],
+    "items": [
+        {
+            "textContent": "Hello world",
+            "htmlContent": null,
+            "rtfData": null,
+            "contentType": "text",
+            "timestamp": "2026-02-09T11:30:00Z",
+            "sourceAppBundleID": "com.apple.Safari",
+            "sourceAppName": "Safari",
+            "characterCount": 11,
+            "byteCount": 11,
+            "isConcealed": false,
+            "contentHash": "abc123...",
+            "title": null,
+            "labels": ["Work"],
+            "detectedLanguage": null,
+            "detectedColorHex": null,
+            "imageData": null
         }
-
-        // Batch delete from SwiftData
-        try modelContext.delete(model: ClipboardItem.self, where: #Predicate<ClipboardItem> { $0.contentType == typeRaw })
-        try modelContext.save()
-
-        // Update item count
-        clipboardMonitor?.itemCount = try modelContext.fetchCount(FetchDescriptor<ClipboardItem>())
-    } catch {
-        modelContext.rollback()
-    }
-}
-```
-
-**Database compaction (VACUUM):**
-
-After large deletes, SQLite does not automatically reclaim disk space. The database file retains its size with deleted pages marked as free. To reclaim space:
-
-```swift
-func compactDatabase() {
-    guard let container = modelContainer else { return }
-    // Access underlying Core Data store
-    let coordinator = container.mainContext.managedObjectContext?.persistentStoreCoordinator
-    // Or use direct SQLite access
-    guard let storeURL = container.configurations.first?.url else { return }
-    // Execute VACUUM via sqlite3
-}
-```
-
-**MEDIUM confidence warning:** Accessing SwiftData's underlying SQLite store for VACUUM is not officially supported. The safest approaches are:
-1. **NSPersistentStoreCoordinator option:** Set `NSSQLiteManualVacuumOption` when adding the store
-2. **Direct sqlite3:** Open the `.store` file with `sqlite3_open` and execute `VACUUM` -- but this requires the store to not be in use
-3. **Deferred approach:** Skip VACUUM initially. SQLite reuses free pages for new data, so compaction is primarily a cosmetic concern for the storage dashboard display
-
-**Recommendation:** Implement purge-by-category first. Add VACUUM as a follow-up only if users report storage dashboard showing large database files after purging. The free-page reuse means performance is not affected.
-
----
-
-### Feature Group 5: Sensitive Item Flag (`isSensitive`)
-
-#### Integration Point: ClipboardItem model + ClipboardMonitor capture pipeline
-
-**Current sensitive content handling:**
-
-The codebase already has a `isConcealed` field on `ClipboardItem`:
-- Set to `true` when `org.nspasteboard.ConcealedType` is detected on the pasteboard (password managers)
-- Concealed items get `expiresAt = Date.now + 60` seconds
-- `ExpirationService` auto-deletes them after 60s
-- Concealed items skip code/color detection (privacy)
-
-**The new `isSensitive` flag is a different concept from `isConcealed`:**
-
-| Aspect | `isConcealed` (existing) | `isSensitive` (new) |
-|--------|------------------------|---------------------|
-| Source | Auto-detected from pasteboard type | User-set flag OR heuristic detection |
-| Duration | 60s auto-delete | User-configured retention (shorter than normal) |
-| Visual | Currently no special rendering | Blurred/redacted card, click-to-reveal |
-| Paste | Normal paste | Normal paste (content is accessible) |
-
-**Model change:**
-
-```swift
-@Model
-final class ClipboardItem {
-    // ... existing fields ...
-
-    /// Whether the item is marked as sensitive (user-set or auto-detected)
-    var isSensitive: Bool    // NEW
-}
-```
-
-**Why a separate field from `isConcealed`:**
-- `isConcealed` has hardcoded 60s expiration behavior tied to `ExpirationService`
-- `isSensitive` needs configurable retention and visual treatment
-- A concealed item is always sensitive, but a sensitive item is not always concealed
-- Keeping them separate avoids breaking the existing ExpirationService logic
-
-**Auto-detection in ClipboardMonitor:**
-
-Extend the capture pipeline to detect potentially sensitive content:
-
-```swift
-// In processPasteboardContent(), after content classification:
-let isSensitive = isConcealed || SensitiveContentDetector.detect(primaryContent, sourceAppBundleID: sourceAppBundleID)
-```
-
-**SensitiveContentDetector (new service):**
-
-```swift
-struct SensitiveContentDetector {
-    /// Check if content appears sensitive based on heuristics
-    static func detect(_ content: String, sourceAppBundleID: String?) -> Bool {
-        // 1. Source app is a known password manager
-        if let bundleID = sourceAppBundleID,
-           sensitiveAppBundleIDs.contains(bundleID) {
-            return true
-        }
-
-        // 2. Content matches sensitive patterns (conservative)
-        // - API key patterns: "sk-", "api_key=", "AKIA" (AWS)
-        // - Token patterns: "ghp_", "Bearer ", "token="
-        // NOT passwords (too many false positives with short strings)
-
-        return false
-    }
-
-    private static let sensitiveAppBundleIDs: Set<String> = [
-        "com.agilebits.onepassword7",
-        "com.agilebits.onepassword-osx",
-        "com.lastpass.LastPass",
-        "org.keepassxc.keepassxc",
-        "com.bitwarden.desktop",
     ]
 }
 ```
 
-**User-triggered sensitive flag:**
+**Key decisions:**
+- Labels referenced by name (not PersistentIdentifier) since IDs are not portable
+- `imageData` is Base64-encoded PNG for image items (nullable for text items)
+- RTF data is Base64-encoded when present
+- `contentHash` is exported so import can skip duplicates
+- No export of `imagePath`, `thumbnailPath`, `changeCount`, `expiresAt` (runtime-only fields)
+- Concealed items are excluded by default (they are sensitive/temporary)
+- URL metadata fields (urlTitle, urlFaviconPath, urlPreviewImagePath) are NOT exported -- they will be re-fetched on import if URL metadata fetching is enabled
 
-Add "Mark as Sensitive" / "Unmark as Sensitive" to the context menu in `ClipboardCardView`:
+### Integration Points
 
-```swift
-// In ClipboardCardView contextMenu
-Button(item.isSensitive ? "Unmark as Sensitive" : "Mark as Sensitive") {
-    item.isSensitive.toggle()
-    try? modelContext.save()
-}
+#### 1. New Service: ImportExportService (NEW)
+
+**File:** `Pastel/Services/ImportExportService.swift`
+
 ```
+@MainActor
+final class ImportExportService {
 
-**Sensitive item retention:**
+    // MARK: - Export Types
 
-The existing `RetentionService` reads `historyRetention` from UserDefaults. Add a separate `sensitiveRetention` setting:
-
-```swift
-// In RetentionService.purgeExpiredItems()
-// After normal retention purge, also purge sensitive items with shorter retention
-let sensitiveRetentionHours = UserDefaults.standard.integer(forKey: "sensitiveRetention")
-guard sensitiveRetentionHours > 0 else { return } // 0 = same as normal
-
-let sensitiveCutoff = Calendar.current.date(byAdding: .hour, value: -sensitiveRetentionHours, to: .now)!
-let sensitiveDescriptor = FetchDescriptor<ClipboardItem>(
-    predicate: #Predicate<ClipboardItem> { item in
-        item.isSensitive == true && item.timestamp < sensitiveCutoff
+    struct ExportDocument: Codable {
+        let version: Int
+        let exportDate: Date
+        let appVersion: String
+        let labels: [ExportLabel]
+        let items: [ExportItem]
     }
-)
-// ... fetch and delete with disk cleanup ...
-```
 
-**Settings integration:** Add to the new "Storage" tab or create a "Security" section in General.
-
----
-
-### Feature Group 6: Redacted/Blurred Card Rendering
-
-#### Integration Point: ClipboardCardView (the dispatcher view)
-
-**The architectural decision is: where does the redaction wrapper go?**
-
-Option A: Inside each card subview (TextCardView, ImageCardView, etc.)
-Option B: In the dispatcher (ClipboardCardView), wrapping `contentPreview`
-Option C: As a ViewModifier applied at the ClipboardCardView level
-
-**Recommendation: Option B -- wrap in the dispatcher.** Rationale:
-- Single point of change (one `if/else`, not 6 card views modified)
-- The dispatcher already handles all cross-cutting concerns (hover, selection, context menu)
-- Card subviews remain pure content renderers
-- The header (source app icon, timestamp) should remain visible even when content is redacted
-
-**Implementation in ClipboardCardView:**
-
-```swift
-@ViewBuilder
-private var contentPreview: some View {
-    if item.isSensitive && !isRevealed {
-        // Redacted overlay
-        sensitiveContentPlaceholder
-    } else {
-        switch item.type {
-        case .text, .richText: TextCardView(item: item)
-        case .url: URLCardView(item: item)
-        case .image: ImageCardView(item: item)
-        case .file: FileCardView(item: item)
-        case .code: CodeCardView(item: item)
-        case .color: ColorCardView(item: item)
-        }
+    struct ExportLabel: Codable {
+        let name: String
+        let colorName: String
+        let emoji: String?
+        let sortOrder: Int
     }
-}
 
-@ViewBuilder
-private var sensitiveContentPlaceholder: some View {
-    HStack(spacing: 8) {
-        Image(systemName: "eye.slash.fill")
-            .foregroundStyle(.secondary)
-        Text("Sensitive content")
-            .font(.callout)
-            .foregroundStyle(.secondary)
-        Spacer()
-        Text("Click to reveal")
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
+    struct ExportItem: Codable {
+        let textContent: String?
+        let htmlContent: String?
+        let rtfData: String?       // Base64
+        let contentType: String
+        let timestamp: Date
+        let sourceAppBundleID: String?
+        let sourceAppName: String?
+        let characterCount: Int
+        let byteCount: Int
+        let isConcealed: Bool
+        let contentHash: String
+        let title: String?
+        let labels: [String]       // Label names
+        let detectedLanguage: String?
+        let detectedColorHex: String?
+        let imageData: String?     // Base64 PNG
     }
-    .frame(maxWidth: .infinity, minHeight: 30)
-}
-```
 
-**Why NOT use SwiftUI's `.redacted(reason: .privacy)`:**
+    // MARK: - Export
 
-The built-in redaction replaces text with gray rectangles of the same shape, which reveals the structure and length of the content. For a clipboard manager, this leaks information (a short redacted block suggests a password, a long one suggests a paragraph). A uniform placeholder with an icon is more appropriate and more visually consistent with the dark theme.
-
-**Alternative: Gaussian blur over actual content:**
-
-```swift
-if item.isSensitive && !isRevealed {
-    switch item.type {
-    case .text, .richText: TextCardView(item: item)
-    // ... all types ...
+    func exportAll(modelContext: ModelContext) throws -> Data {
+        // 1. Fetch all Labels
+        // 2. Fetch all ClipboardItems (excluding concealed)
+        // 3. For image items, read image file from disk and Base64-encode
+        // 4. Map to ExportDocument
+        // 5. JSONEncoder with .prettyPrinted + .iso8601 dateStrategy
+        // 6. Return Data
     }
-    .blur(radius: 10)
-    .allowsHitTesting(false)
-    .overlay {
-        Image(systemName: "eye.slash.fill")
-            .font(.title2)
-            .foregroundStyle(.white.opacity(0.7))
+
+    // MARK: - Import
+
+    func importFromData(_ data: Data, modelContext: ModelContext) throws -> ImportResult {
+        // 1. JSONDecoder with .iso8601 dateStrategy
+        // 2. Version check (handle migration if needed)
+        // 3. Import labels: match by name (update existing, create new)
+        // 4. Import items: skip if contentHash already exists in DB
+        // 5. For image items: decode Base64, save via ImageStorageService
+        // 6. Assign labels by name lookup
+        // 7. Save in batches (per SwiftData best practices)
+        // 8. Return ImportResult with counts
+    }
+
+    struct ImportResult {
+        let itemsImported: Int
+        let itemsSkipped: Int   // duplicates
+        let labelsCreated: Int
+        let labelsMatched: Int
     }
 }
 ```
 
-**Recommendation:** Use the placeholder approach (not blur) for v1 because:
-1. Blur still renders the actual content (accessibility tools may read it)
-2. Blur requires rendering the full view then applying a filter (performance cost for images)
-3. Placeholder communicates intent clearly
-4. Blur looks odd on small cards
+**SwiftData batch import considerations:**
+- For large imports (1000+ items), split into batches of 500 to avoid memory spikes
+- Call `modelContext.save()` after each batch
+- Image items require async disk I/O via ImageStorageService -- process sequentially to avoid overwhelming the background queue
+- Skip items where `contentHash` already exists (use `@Attribute(.unique)` constraint as guard)
 
----
+#### 2. Export UI: NSSavePanel Integration (NEW)
 
-### Feature Group 7: Click-to-Reveal Interaction
-
-#### Integration Point: ClipboardCardView state management
-
-**Where does the "revealed" state live?**
-
-| Option | Mechanism | Pros | Cons |
-|--------|-----------|------|------|
-| @State on ClipboardCardView | `@State private var isRevealed = false` | Simple, auto-resets on view recreation | Resets when scrolling (LazyVStack recycles), resets when query changes |
-| Persisted on ClipboardItem | `var isRevealed: Bool` in SwiftData model | Survives scrolling | Persists across app launches (probably unwanted), pollutes model |
-| EnvironmentObject tracking set | `Set<PersistentIdentifier>` on parent | Survives scrolling, resets on panel close | Slightly more complex wiring |
-
-**Recommendation: @State on ClipboardCardView (Option 1).**
-
-Rationale:
-- Sensitive items should default to hidden every time the panel opens
-- LazyVStack recycling actually *helps* -- scrolling away re-hides the content
-- This is the simplest implementation and matches user expectations
-- The panel is dismissed and recreated frequently (every toggle), so state is naturally reset
-
-**Implementation:**
+**File:** `Pastel/Views/Settings/ImportExportView.swift` (or section in GeneralSettingsView)
 
 ```swift
-// In ClipboardCardView
-@State private var isRevealed = false
+func showExportPanel() {
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [.init(filenameExtension: "pastel")!]
+    panel.nameFieldStringValue = "Pastel Export \(dateFormatter.string(from: .now))"
+    panel.canCreateDirectories = true
 
-// In the body, on the card's tap gesture:
-.onTapGesture(count: 1) {
-    if item.isSensitive && !isRevealed {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            isRevealed = true
-        }
-        // Auto-hide after 10 seconds
-        Task {
-            try? await Task.sleep(for: .seconds(10))
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isRevealed = false
+    panel.begin { response in
+        guard response == .OK, let url = panel.url else { return }
+        Task { @MainActor in
+            do {
+                let data = try importExportService.exportAll(modelContext: modelContext)
+                try data.write(to: url)
+            } catch {
+                // Show error alert
             }
         }
-    } else {
-        selectedIndex = index  // normal selection behavior
     }
 }
 ```
 
-**Interaction design:**
-- Single tap on a sensitive card: reveals content (no selection change)
-- Single tap on a revealed sensitive card: normal selection behavior
-- Double tap: paste (same as non-sensitive, works whether revealed or not)
-- Auto-hide after 10 seconds of reveal
-- Panel close: all reveals reset (natural from view recreation)
+**Why NSSavePanel instead of SwiftUI .fileExporter:**
+- `.fileExporter` requires conformance to `FileDocument` or `ReferenceFileDocument`, which adds unnecessary protocol machinery for a simple one-shot export
+- NSSavePanel integrates cleanly with the existing AppKit hybrid (PanelController, SettingsWindowController)
+- NSSavePanel provides more control over the initial directory and filename
+- The app is not sandboxed, so NSSavePanel works without security-scoped bookmarks
 
-**Important: tap gesture interaction with existing gestures.**
-
-The current `FilteredCardListView` attaches `.onTapGesture(count: 2)` and `.onTapGesture(count: 1)` to each `ClipboardCardView`. The reveal logic needs to be integrated into the single-tap handler:
+#### 3. Import UI: NSOpenPanel Integration (NEW)
 
 ```swift
-// In FilteredCardListView, modify the single-tap:
-.onTapGesture(count: 1) {
-    if item.isSensitive {
-        // Let ClipboardCardView handle its own reveal state
-        // This requires moving tap handling INTO ClipboardCardView
-    }
-    selectedIndex = index
-}
-```
+func showImportPanel() {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.init(filenameExtension: "pastel")!]
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
 
-**Architecture consideration:** The tap gesture ownership may need to move from `FilteredCardListView` into `ClipboardCardView` itself, since `ClipboardCardView` is the component that knows about `isSensitive` and `isRevealed`. This is a minor refactor but important for clean separation.
-
----
-
-### Feature Group 8: Sensitive Item Shorter Auto-Expiry
-
-#### Integration Point: RetentionService
-
-**Current retention architecture:**
-- `RetentionService` runs hourly via `Timer.scheduledTimer(withTimeInterval: 3600)`
-- Reads `historyRetention` from UserDefaults (in days): 7, 30, 90, 365, or 0 (forever)
-- Fetches items with `timestamp < cutoffDate`, deletes them with disk cleanup
-
-**Proposed change:**
-
-Add a second pass in `purgeExpiredItems()` for sensitive items with a shorter retention:
-
-```swift
-func purgeExpiredItems() {
-    // Pass 1: Normal retention (existing code, unchanged)
-    purgeNormalItems()
-
-    // Pass 2: Sensitive retention (NEW)
-    purgeSensitiveItems()
-}
-
-private func purgeSensitiveItems() {
-    let sensitiveHours = UserDefaults.standard.integer(forKey: "sensitiveRetention")
-    guard sensitiveHours > 0 else { return } // 0 = no separate sensitive retention
-
-    guard let cutoff = Calendar.current.date(byAdding: .hour, value: -sensitiveHours, to: .now) else { return }
-
-    let descriptor = FetchDescriptor<ClipboardItem>(
-        predicate: #Predicate<ClipboardItem> { item in
-            item.isSensitive == true && item.timestamp < cutoff
+    panel.begin { response in
+        guard response == .OK, let url = panel.url else { return }
+        Task { @MainActor in
+            do {
+                let data = try Data(contentsOf: url)
+                let result = try importExportService.importFromData(data, modelContext: modelContext)
+                // Show result summary alert
+            } catch {
+                // Show error alert
+            }
         }
-    )
-    // ... fetch, clean up disk files, delete, save ...
+    }
 }
 ```
 
-**Sensitive retention options (for Settings picker):**
-- 1 Hour
-- 4 Hours
-- 24 Hours
-- Same as normal (default -- no separate treatment)
+#### 4. Settings Integration (MODIFY)
 
-**Interaction with ExpirationService:**
+The import/export buttons can be placed in:
+- **Option A:** New section at bottom of GeneralSettingsView ("Data" section, which already has "Clear All History")
+- **Option B:** New "Data" tab in SettingsView
 
-The existing `ExpirationService` handles `isConcealed` items with a hardcoded 60-second timer. Concealed items are always sensitive, so they will be caught by `ExpirationService` first (60s) before `RetentionService`'s sensitive pass runs (1h+). No conflict.
+**Recommendation: Option A -- add to GeneralSettingsView's existing "Data" section.** The Data section currently only has "Clear All History". Adding "Export..." and "Import..." buttons below it is natural. This avoids adding a 5th tab (with the "Apps" tab from Feature 2, we are already at 4 tabs).
 
-**Timer frequency consideration:**
+```
+Data section in GeneralSettingsView:
+    Export History...      [button]
+    Import History...      [button]
+    ---
+    Clear All History...   [existing button]
+```
 
-The current hourly timer is appropriate for normal retention (measured in days). For sensitive retention measured in hours, hourly is still fine -- worst case, a sensitive item lives 1 hour longer than configured. If more precision is needed, the timer can be changed to run every 15 minutes, but this is premature optimization.
+#### 5. ClipboardMonitor ItemCount Update (MODIFY)
+
+After import, `clipboardMonitor.itemCount` must be updated. The import service should call:
+```swift
+clipboardMonitor?.itemCount = try modelContext.fetchCount(FetchDescriptor<ClipboardItem>())
+```
+
+### Data Model Changes
+
+None. Import/export operates on the existing ClipboardItem and Label models via Codable mapping structs. No new fields needed.
+
+### New Components
+
+| Component | Type | Purpose |
+|-----------|------|---------|
+| `ImportExportService` | @MainActor service | Export/import logic with Codable mapping |
+| Import/Export UI | SwiftUI section or buttons | NSSavePanel/NSOpenPanel triggers |
+
+### Files to Modify
+
+| File | Change | Scope |
+|------|--------|-------|
+| `GeneralSettingsView.swift` | Add Export/Import buttons to Data section | ~30 lines |
+| `AppState.swift` | Add ImportExportService property, wire to model context | ~5 lines |
 
 ---
 
-## Component Dependency Graph
+## Feature 4: Drag-and-Drop from Panel
+
+### Architecture Decision: .onDrag vs .draggable
+
+SwiftUI provides two approaches:
+1. **`.onDrag { NSItemProvider(...) }`** -- older API, returns NSItemProvider
+2. **`.draggable(value)`** -- newer API (macOS 13+), uses Transferable protocol
+
+The codebase already uses `.draggable` in ChipBarView for label drag:
+```swift
+.draggable(label.persistentModelID.asTransferString) {
+    LabelChipView(label: label)
+}
+```
+
+However, for clipboard item drag-and-drop to external apps, **`.onDrag` with NSItemProvider is the better choice** because:
+- External apps expect standard pasteboard types (UTType.plainText, UTType.png, UTType.fileURL)
+- NSItemProvider supports multiple representations (text + URL, text + RTF) which `.draggable` with Transferable does not handle as cleanly for cross-app scenarios
+- `.onDrag` allows lazy data loading (important for large images)
+- `.draggable` with String conformance only provides text -- we need type-specific providers
+
+### Critical Concern: NSPanel and Drag Sessions
+
+The panel is a non-activating `NSPanel` with `hidesOnDeactivate = false`. When a drag session starts from the panel and the user moves the cursor outside the panel to drop in another app, several things happen:
+
+1. The drag session is managed by the window server, not the panel
+2. The panel does NOT hide -- `hidesOnDeactivate` is already `false`
+3. The panel does NOT lose key status during the drag
+4. Once the drop completes (or drag is cancelled), focus returns to the target app
+
+**Key finding:** The panel's existing configuration (`hidesOnDeactivate = false`, `isFloatingPanel = true`, `collectionBehavior = .canJoinAllSpaces`) should work correctly with drag sessions. The panel stays visible during the drag. No modifications to SlidingPanel or PanelController are needed.
+
+**MEDIUM confidence:** This assessment is based on the panel's configuration flags and macOS window server behavior. Testing with actual drag sessions is needed to confirm. If the panel does hide during drag, the fix would be to suppress the global click monitor during active drag sessions.
+
+### Concern: .onDrag Conflicts with Existing Gestures
+
+FilteredCardListView currently attaches these gestures to each ClipboardCardView:
+```swift
+.onTapGesture(count: 2) { onPaste(item) }
+.onTapGesture(count: 1) { selectedIndex = index }
+```
+
+Adding `.onDrag` can conflict with click gestures on macOS. Known issues:
+- `.onDrag` can consume mouse-down events, interfering with `.onTapGesture`
+- Clicks on draggable content may not register
+
+**Mitigation strategy:** Apply `.onDrag` to the ClipboardCardView body rather than at the FilteredCardListView level. This keeps gesture scoping clean. The existing `.onTapGesture` handlers at the FilteredCardListView level should take priority because they are attached higher in the view hierarchy.
+
+If conflicts persist, the fallback is to use a longer press-and-drag threshold so that taps are distinguished from drags. SwiftUI's `.onDrag` has a built-in delay before initiating a drag session (it waits for the user to actually move the cursor), which should prevent most conflicts.
+
+### Integration Points
+
+#### 1. ClipboardCardView .onDrag (MODIFY)
+
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/ClipboardCardView.swift`
+
+Add `.onDrag` to the card's body:
+
+```swift
+.onDrag {
+    createItemProvider(for: item)
+}
+```
+
+**NSItemProvider construction by content type:**
+
+```swift
+private func createItemProvider(for item: ClipboardItem) -> NSItemProvider {
+    let provider = NSItemProvider()
+
+    switch item.type {
+    case .text, .richText, .code, .color:
+        // Register plain text
+        if let text = item.textContent {
+            provider.registerObject(text as NSString, visibility: .all)
+        }
+        // Register RTF if available
+        if let rtfData = item.rtfData {
+            provider.registerDataRepresentation(
+                forTypeIdentifier: UTType.rtf.identifier,
+                visibility: .all
+            ) { completion in
+                completion(rtfData, nil)
+                return nil
+            }
+        }
+
+    case .url:
+        if let urlString = item.textContent, let url = URL(string: urlString) {
+            provider.registerObject(url as NSURL, visibility: .all)
+            // Also register as plain text for apps that don't accept URLs
+            provider.registerObject(urlString as NSString, visibility: .all)
+        }
+
+    case .image:
+        if let imagePath = item.imagePath {
+            let imageURL = ImageStorageService.shared.resolveImageURL(imagePath)
+            // Register as file URL (apps can read the image file)
+            provider.registerFileRepresentation(
+                forTypeIdentifier: UTType.png.identifier,
+                visibility: .all
+            ) { completion in
+                completion(imageURL, true, nil)
+                return nil
+            }
+        }
+
+    case .file:
+        if let filePath = item.textContent {
+            let fileURL = URL(fileURLWithPath: filePath)
+            provider.registerObject(fileURL as NSURL, visibility: .all)
+        }
+    }
+
+    return provider
+}
+```
+
+#### 2. Drag Preview (MODIFY)
+
+SwiftUI's `.onDrag` supports a `preview:` parameter on macOS 13+. Provide a compact preview:
+
+```swift
+.onDrag {
+    createItemProvider(for: item)
+} preview: {
+    dragPreview(for: item)
+}
+```
+
+For text items, show a truncated text snippet in a small card. For images, show the thumbnail. For URLs, show the URL string. Keep previews small (max 200x60pt) to avoid obscuring drop targets.
+
+#### 3. PanelController Global Click Monitor (POTENTIAL MODIFY)
+
+**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/PanelController.swift`
+**Method:** `installEventMonitors()` (lines 198-216)
+
+The global click monitor dismisses the panel on any click outside it:
+```swift
+globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
+    matching: [.leftMouseDown, .rightMouseDown]
+) { [weak self] _ in
+    self?.hide()
+}
+```
+
+**Risk:** If a drag-drop operation involves a mouse-down outside the panel (which it does -- the drop target is in another app), the global click monitor will hide the panel during the drag.
+
+**Fix:** Track whether a drag session is active and suppress the hide:
+
+```swift
+var isDragging: Bool = false  // Set by ClipboardCardView's .onDrag
+
+globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
+    matching: [.leftMouseDown, .rightMouseDown]
+) { [weak self] _ in
+    guard self?.isDragging != true else { return }
+    self?.hide()
+}
+```
+
+**Communication mechanism:** The `isDragging` flag could be set via:
+- A new callback on PanelActions (like `panelActions.onDragStarted` / `onDragEnded`)
+- A published property on AppState
+- Direct access to PanelController via environment
+
+**Recommendation:** Add `isDragging: Bool` to PanelActions since it is already the bridge between SwiftUI views and PanelController. ClipboardCardView sets it, PanelController reads it.
+
+However, SwiftUI's `.onDrag` does not provide start/end callbacks. Detecting drag state requires either:
+- Using `NSDraggingSource` protocol methods (requires NSView subclass)
+- Monitoring `NSEvent.addLocalMonitorForEvents(matching: .leftMouseDragged)` to detect drag initiation
+
+**Alternative approach:** Instead of tracking drag state, modify the global click monitor to only respond to `.leftMouseDown` events that are NOT drag-related. This is harder to distinguish at the event level.
+
+**Pragmatic solution:** Simply do not hide the panel during drag. After the drag completes (drop or cancel), the user can dismiss the panel manually or it auto-hides on the next global click. The user experience is: drag from panel -> drop in target app -> panel stays open -> click elsewhere or press Escape to dismiss. This is actually better UX because users might want to drag multiple items.
+
+**Simplest implementation:** Set `hidesOnDeactivate = false` (already done) and accept that the panel stays visible after a drag-drop. The existing Escape key handler and toggle hotkey provide explicit dismiss options.
+
+### Data Model Changes
+
+None.
+
+### New Components
+
+None. All changes are modifications to existing files.
+
+### Files to Modify
+
+| File | Change | Scope |
+|------|--------|-------|
+| `ClipboardCardView.swift` | Add `.onDrag` with NSItemProvider construction | ~40 lines added |
+| `FilteredCardListView.swift` | May need gesture conflict resolution | ~5 lines if needed |
+| `PanelController.swift` | Potentially modify global click monitor for drag compat | ~5 lines if needed |
+
+---
+
+## Component Dependency Graph (v1.3)
 
 ```
-                    ┌─────────────────┐
-                    │   ClipboardItem │
-                    │   (@Model)      │
-                    │ + isSensitive   │ ◄── NEW FIELD
-                    └───────┬─────────┘
-                            │
-              ┌─────────────┼──────────────────┐
-              │             │                  │
-              v             v                  v
-    ┌─────────────────┐ ┌──────────────┐ ┌───────────────┐
-    │ClipboardMonitor │ │RetentionSvc  │ │ClipboardCard  │
-    │+ SensitiveDetect│ │+ sensitive   │ │+ isRevealed   │
-    │  (capture-time) │ │  purge pass  │ │+ redacted view│
-    └────────┬────────┘ └──────────────┘ └───────────────┘
-             │
-             v
-    ┌──────────────────┐     ┌──────────────────┐
-    │ImageStorageService│     │StorageStatsService│ ◄── NEW
-    │+ JPEG compression │     │+ disk size calc  │
-    └──────────────────┘     │+ item counts     │
-                             └──────────────────┘
-                                      │
-                                      v
-                             ┌──────────────────┐
-                             │StorageSettingsView│ ◄── NEW
-                             │+ dashboard       │
-                             │+ purge buttons   │
-                             │+ compression     │
-                             └──────────────────┘
+                    +---------------------+
+                    |   ClipboardItem     |
+                    |   (@Model)          |
+                    |   (NO changes)      |
+                    +---------+-----------+
+                              |
+            +-----------+-----+--------+------------+
+            |           |              |            |
+            v           v              v            v
+  +-----------------+ +------------+ +----------+ +------------------+
+  |ClipboardMonitor | |PasteService| |ClipCard  | |ImportExportSvc   |
+  |+ appFilter check| |(unchanged) | |+ onDrag  | |+ export/import   |
+  |  (checkForChgs) | |            | |+ ctx menu| |+ Codable mapping |
+  +---------+-------+ +------------+ |+ shiftDbl| +--------+---------+
+            |                        +----------+          |
+            v                                              v
+  +------------------+                          +------------------+
+  |AppFilterService  | <-- NEW                  |GeneralSettingsVw |
+  |+ shouldCapture() |                          |+ Export/Import   |
+  |+ allow/ignore    |                          |  buttons         |
+  +--------+---------+                          +------------------+
+           |
+           v
+  +---------------------+
+  |AppFilterSettingsView | <-- NEW
+  |+ mode toggle        |
+  |+ app list management|
+  +---------------------+
 ```
 
 ---
 
 ## Data Flow Changes
 
-### Capture Pipeline (Modified)
+### Clipboard Capture Pipeline (Modified for App Filtering)
 
 ```
 NSPasteboard.general
-    │
+    |
     v
 ClipboardMonitor.checkForChanges()
-    │
+    |
+    +-- Guard: isMonitoring
+    +-- Guard: changeCount changed
+    +-- Guard: skipNextChange
+    +-- NEW: Guard: AppFilterService.shouldCapture(bundleID)
+    |         |
+    |         +-- If ignore mode: skip if bundleID in list
+    |         +-- If allow mode: skip if bundleID NOT in list
+    |
     v
-classifyContent() -> (contentType, isConcealed)
-    │
-    v
-readContent (text/url/file/image)
-    │
-    v
-CodeDetection / ColorDetection (existing)
-    │
-    ├── NEW: SensitiveContentDetector.detect(content, bundleID)
-    │         -> sets isSensitive = true if detected
-    │
-    v
-computeContentHash (SHA256)
-    │
-    ├── MODIFIED: findExistingItem(contentHash:)  -- bump-to-top dedup
-    │             instead of isDuplicateOfMostRecent
-    │
-    v
-[Image path] ImageStorageService.saveImage(data:)
-    │           ├── MODIFIED: compress to JPEG @ configurable quality
-    │           └── thumbnail generation (unchanged)
-    │
-    v
-ClipboardItem(... isSensitive: isSensitive ...)  -- NEW field
-    │
-    v
-modelContext.insert + save
-    │
-    v
-[If concealed] ExpirationService.scheduleExpiration (unchanged)
-[If code]      CodeDetectionService.detectLanguage (unchanged)
-[If url]       URLMetadataService.fetchMetadata (unchanged)
+processPasteboardContent()  // unchanged from here down
 ```
 
-### Rendering Pipeline (Modified)
+### Paste Flow (Modified for Plain Text UI)
 
 ```
-FilteredCardListView (@Query)
-    │
+User interaction:
+    |
+    +-- Double-click on card
+    |       +-- Check NSEvent.modifierFlags.contains(.shift)
+    |       +-- Shift held: onPastePlainText(item) -> PasteService.pastePlainText
+    |       +-- No shift: onPaste(item) -> PasteService.paste
+    |
+    +-- Enter key
+    |       +-- Check keyPress.modifiers.contains(.shift)
+    |       +-- Shift: pastePlainText
+    |       +-- No shift: paste
+    |
+    +-- Context menu "Paste as Plain Text"
+    |       +-- panelActions.pastePlainTextItem?(item)
+    |
+    +-- Cmd+Shift+1-9 (existing, unchanged)
+            +-- onPastePlainText(item)
+```
+
+### Drag-and-Drop Flow (New)
+
+```
+User long-presses and drags card:
+    |
     v
-ForEach items -> ClipboardCardView(item:)
-    │
-    ├── Header: sourceAppIcon + label + timestamp (UNCHANGED)
-    │
-    ├── Content: contentPreview
-    │   ├── if item.isSensitive && !isRevealed:
-    │   │       sensitiveContentPlaceholder (lock icon + "Click to reveal")
-    │   └── else:
-    │           TextCardView / ImageCardView / etc. (UNCHANGED)
-    │
-    ├── Footer: metadata + badge (UNCHANGED)
-    │
-    └── Context Menu:
-        ├── existing items (Copy, Paste, Label, Delete)
-        └── NEW: "Mark as Sensitive" / "Unmark as Sensitive"
+ClipboardCardView.onDrag
+    |
+    +-- createItemProvider(for: item)
+    |       +-- .text/.richText: NSString + RTF data
+    |       +-- .url: NSURL + NSString fallback
+    |       +-- .image: file representation (PNG from disk)
+    |       +-- .file: NSURL (file URL)
+    |
+    v
+macOS drag session (window server managed)
+    |
+    +-- Panel stays visible (hidesOnDeactivate = false)
+    +-- User drags to target app
+    +-- Drop: target app receives NSItemProvider data
+    +-- Cancel: nothing happens, panel remains
 ```
 
-### Retention Pipeline (Modified)
+### Import/Export Flow (New)
 
 ```
-RetentionService.purgeExpiredItems() -- runs hourly
-    │
-    ├── Pass 1: Normal retention (UNCHANGED)
-    │   └── Delete items where timestamp < (now - retentionDays)
-    │
-    └── Pass 2: Sensitive retention (NEW)
-        └── Delete items where isSensitive == true
-            AND timestamp < (now - sensitiveRetentionHours)
+Export:
+    User clicks "Export..." in Settings
+        |
+        v
+    NSSavePanel -> user picks location
+        |
+        v
+    ImportExportService.exportAll(modelContext:)
+        |-- Fetch all Labels
+        |-- Fetch all ClipboardItems (exclude concealed)
+        |-- For image items: read from disk, Base64-encode
+        |-- Encode to JSON
+        |
+        v
+    Write .pastel file to disk
+
+Import:
+    User clicks "Import..." in Settings
+        |
+        v
+    NSOpenPanel -> user picks .pastel file
+        |
+        v
+    ImportExportService.importFromData(_:modelContext:)
+        |-- Decode JSON
+        |-- Version check
+        |-- Import labels: match by name or create new
+        |-- Import items: skip if contentHash exists (dedup)
+        |-- For image items: decode Base64, save via ImageStorageService
+        |-- Save in batches of 500
+        |-- Update clipboardMonitor.itemCount
+        |
+        v
+    Show result summary (X imported, Y skipped, Z labels)
 ```
 
 ---
 
-## New vs Modified Components
+## New vs Modified Components Summary
 
 ### New Components
 
-| Component | Type | Purpose |
-|-----------|------|---------|
-| `SensitiveContentDetector` | Static service (struct) | Heuristic detection of sensitive content at capture time |
-| `StorageStatsService` | @Observable service | Compute storage stats on demand for dashboard |
-| `StorageSettingsView` | SwiftUI View | Storage dashboard, purge-by-category, compression settings |
+| Component | Type | File | Purpose |
+|-----------|------|------|---------|
+| `AppFilterService` | @MainActor @Observable | `Services/AppFilterService.swift` | Allow/ignore list logic + persistence |
+| `AppFilterSettingsView` | SwiftUI View | `Views/Settings/AppFilterSettingsView.swift` | App filter UI (mode toggle + app list) |
+| `ImportExportService` | @MainActor service | `Services/ImportExportService.swift` | Export/import with Codable mapping |
 
 ### Modified Components
 
-| Component | Change | Scope |
-|-----------|--------|-------|
-| `ClipboardItem` | Add `isSensitive: Bool` field | Model migration (lightweight, additive) |
-| `ImageStorageService` | JPEG compression in `saveImage()` | ~20 lines changed in one method |
-| `ClipboardMonitor` | Add sensitive detection call, improve dedup to bump-to-top | ~15 lines added |
-| `RetentionService` | Add sensitive purge pass | ~25 lines added |
-| `ClipboardCardView` | Add redacted view, isRevealed state, context menu item | ~30 lines added |
-| `SettingsView` | Add `.storage` tab to SettingsTab enum | 3 lines |
-| `GeneralSettingsView` | Possibly move compression setting here OR to new Storage tab | Minimal |
-| `AppState` | Add `purgeByCategory()` method | ~20 lines |
+| Component | File | Change | Lines |
+|-----------|------|--------|-------|
+| `ClipboardCardView` | `Views/Panel/ClipboardCardView.swift` | Context menu + .onDrag | ~50 lines |
+| `FilteredCardListView` | `Views/Panel/FilteredCardListView.swift` | Shift+Enter, Shift+double-click | ~15 lines |
+| `ClipboardMonitor` | `Services/ClipboardMonitor.swift` | App filter check in checkForChanges | ~10 lines |
+| `AppState` | `App/AppState.swift` | Wire AppFilterService + ImportExportService | ~10 lines |
+| `GeneralSettingsView` | `Views/Settings/GeneralSettingsView.swift` | Export/Import buttons | ~30 lines |
+| `SettingsView` | `Views/Settings/SettingsView.swift` | Add apps tab | ~5 lines |
+| `PanelController` | `Views/Panel/PanelController.swift` | Drag compat (if needed) | ~5 lines |
 
 ### Unchanged Components
 
 | Component | Why Unchanged |
 |-----------|---------------|
-| `PasteService` | Paste-back works identically for sensitive items (content is accessible) |
-| `PanelController` / `SlidingPanel` | No panel behavior changes |
-| `ExpirationService` | Concealed item auto-expire is orthogonal to sensitive flag |
-| `TextCardView`, `ImageCardView`, etc. | Content rendering unchanged; redaction handled at dispatcher level |
-| `FilteredCardListView` | Query predicates unchanged (no filtering by sensitivity) |
-| `ChipBarView`, `SearchFieldView` | No interaction with sensitive/storage features |
-| `Label`, `LabelColor` | No changes |
-
----
-
-## SwiftData Migration
-
-Adding `isSensitive: Bool` to `ClipboardItem` is a **lightweight migration** -- SwiftData handles additive fields automatically when using the default `ModelConfiguration`. The new field will default to `false` for existing items.
-
-No explicit migration plan or versioned schema is needed. SwiftData's automatic lightweight migration handles:
-- Adding new stored properties with default values
-- The existing `@Attribute(.unique)` on `contentHash` is unaffected
-
----
-
-## Settings Architecture
-
-### New Settings Tab
-
-```
-SettingsView
-    ├── General (existing)
-    ├── Labels (existing)
-    └── Storage (NEW)
-        ├── Storage Usage section
-        │   ├── Total disk usage (images + database)
-        │   ├── Breakdown by content type
-        │   └── Item count
-        │
-        ├── Image Compression section
-        │   ├── Quality slider (0.5 - 1.0, default 0.8)
-        │   └── Estimated savings text
-        │
-        ├── Sensitive Items section
-        │   ├── Auto-detect sensitive content toggle
-        │   ├── Sensitive item retention picker (1h, 4h, 24h, Same as normal)
-        │   └── Excluded apps list (bundle IDs that always mark as sensitive)
-        │
-        └── Maintenance section
-            ├── "Purge by Category" buttons (one per content type)
-            ├── "Compact Database" button
-            └── Each with confirmation dialog
-```
-
-### @AppStorage Keys
-
-| Key | Type | Default | Used By |
-|-----|------|---------|---------|
-| `imageCompressionQuality` | Double | 0.8 | ImageStorageService |
-| `sensitiveRetention` | Int | 0 (= same as normal) | RetentionService |
-| `autoDetectSensitive` | Bool | true | ClipboardMonitor / SensitiveContentDetector |
+| `PasteService` | Already has full plain text support; no new paste logic |
+| `SlidingPanel` | Panel config already supports drag sessions |
+| `ImageStorageService` | Used as-is for import image saving |
+| `RetentionService` | No retention changes |
+| `ExpirationService` | Unrelated to v1.3 features |
+| All card subviews | No rendering changes |
+| `Label`, `LabelColor`, `ContentType` | No model changes |
+| `ChipBarView`, `SearchFieldView` | No interaction changes |
+| `HistoryBrowserView`, `HistoryGridView` | No changes (drag-and-drop is panel-only for v1.3) |
+| `EditItemView` | No changes |
 
 ---
 
 ## Suggested Build Order
 
-Based on dependency analysis, the recommended implementation order is:
+Based on dependency analysis, complexity, and risk:
 
-### Phase 1: Image Compression (Foundation)
-**Why first:** Immediately reduces storage growth rate. No model changes. Isolated to `ImageStorageService`. Zero risk to existing features.
+### Phase 1: Paste-as-Plain-Text UI
 
-1. Modify `ImageStorageService.saveImage()` to output JPEG
-2. Add `imageCompressionQuality` @AppStorage
-3. Add quality slider to Settings (either General or new Storage tab shell)
+**Why first:**
+- Zero dependencies on other v1.3 features
+- All infrastructure already exists (PasteService.pastePlainText)
+- Pure UI wiring task -- smallest scope, fastest to ship
+- Low risk -- proven patterns (modifier key checks)
+- Immediately useful
 
-### Phase 2: Sensitive Item Model + Detection (Core)
-**Why second:** Adds the `isSensitive` field that rendering and retention depend on. Small model migration. Detection is additive to capture pipeline.
+**Scope:** ~25 lines across 2 files
 
-1. Add `isSensitive` field to `ClipboardItem`
-2. Create `SensitiveContentDetector` service
-3. Wire into `ClipboardMonitor.processPasteboardContent()` and `processImageContent()`
-4. Add "Mark as Sensitive" context menu to `ClipboardCardView`
+### Phase 2: App Allow/Ignore Lists
 
-### Phase 3: Redacted Card Rendering + Click-to-Reveal (UI)
-**Why third:** Depends on `isSensitive` field from Phase 2. Pure view-layer change.
+**Why second:**
+- Independent of other features
+- New service + settings view is moderate complexity
+- User-facing privacy feature that should land before import/export (users want to configure filtering before importing large histories)
+- Requires testing with real apps
 
-1. Add `isRevealed` state to `ClipboardCardView`
-2. Add `sensitiveContentPlaceholder` view
-3. Wire tap gesture for reveal with auto-hide timer
-4. Handle interaction between reveal tap and selection/paste tap
+**Scope:** ~200 lines across 4-5 files (2 new, 2-3 modified)
 
-### Phase 4: Sensitive Retention (Lifecycle)
-**Why fourth:** Depends on `isSensitive` field. Extends existing `RetentionService`. Needs settings UI.
+### Phase 3: Import/Export
 
-1. Add `purgeSensitiveItems()` to `RetentionService`
-2. Add `sensitiveRetention` @AppStorage
-3. Add sensitive retention picker to Settings
+**Why third:**
+- Independent of other features but benefits from app filtering being done first (exported data respects user preferences)
+- Most complex new feature (Codable mapping, batch insert, image encoding)
+- Requires careful error handling and edge case testing
+- Benefits from the two simpler phases being done first to warm up
 
-### Phase 5: Deduplication Enhancement (Optimization)
-**Why fifth:** Improves existing behavior, not a new feature. Low risk. Can be done independently but placed here to avoid disrupting the capture pipeline while Phases 2-4 are being built.
+**Scope:** ~400 lines across 2-3 files (1 new service, 1-2 modified views)
 
-1. Replace `isDuplicateOfMostRecent` with `findExistingItem` (bump-to-top)
-2. Keep `@Attribute(.unique)` as safety net
+### Phase 4: Drag-and-Drop from Panel
 
-### Phase 6: Storage Dashboard + Purge-by-Category (Management)
-**Why last:** This is a reporting/management feature that benefits from all other features being in place. The dashboard shows data from features built in Phases 1-5.
+**Why last:**
+- Has the most uncertainty (NSPanel + drag session interaction)
+- Potential gesture conflict with existing tap handlers
+- Requires manual testing that cannot be automated
+- If gesture conflicts arise, solutions may require refactoring gesture attachment points
+- Least critical of the four features (users have copy+paste as alternative)
 
-1. Create `StorageStatsService`
-2. Create `StorageSettingsView` with dashboard
-3. Add `purgeByCategory()` to `AppState`
-4. Add "Storage" tab to `SettingsView`
-5. Wire purge buttons with confirmation dialogs
-6. (Optional) Add database compaction
+**Scope:** ~80 lines across 1-2 files, but higher testing overhead
+
+### Parallel Build Opportunities
+
+Phases 1 and 2 can be built in parallel -- they touch completely different files:
+- Phase 1: ClipboardCardView, FilteredCardListView
+- Phase 2: ClipboardMonitor, AppState, SettingsView, new AppFilterService + AppFilterSettingsView
+
+Phase 3 (import/export) is independent and could theoretically parallel with Phase 2, but they both modify AppState and GeneralSettingsView, so sequential is safer.
+
+Phase 4 (drag-and-drop) modifies ClipboardCardView which Phase 1 also touches, so it must come after Phase 1.
+
+**Recommended order:** Phase 1 -> (Phase 2 can parallel) -> Phase 3 -> Phase 4
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Incremental Storage Tracking
-**What:** Maintaining running totals of storage usage in SwiftData/UserDefaults, updated on every insert/delete.
-**Why bad:** Creates coupling between every data mutation and the stats system. Race conditions. Stale data when files are deleted outside the app.
-**Instead:** Compute stats on demand from FileManager + SwiftData queries. Cache briefly (30s) for the dashboard view.
+### Anti-Pattern 1: Filtering in processPasteboardContent Instead of checkForChanges
 
-### Anti-Pattern 2: HEIC for Clipboard Images
-**What:** Using HEIC format for better compression ratios.
-**Why bad:** HEIC decoding is 2.1x slower than JPEG. Clipboard managers need fast thumbnail loading for smooth scrolling. The compression savings (~10% better than JPEG) don't justify the decode performance hit.
-**Instead:** JPEG at quality 0.8 provides ~90% reduction vs PNG with negligible decode overhead.
+**What:** Checking the app filter after content classification and before SwiftData insert.
+**Why bad:** Unnecessary work -- reads pasteboard data, classifies content type, computes hash, all to discard the result. For ignore-listed apps that copy frequently (e.g., a terminal with rapid clipboard changes), this wastes CPU cycles on every poll tick.
+**Instead:** Filter in `checkForChanges()` before entering `processPasteboardContent()`.
 
-### Anti-Pattern 3: Blur-Based Redaction
-**What:** Using `.blur(radius:)` on the actual content view for sensitive items.
-**Why bad:** The content is still rendered (accessibility tools can read it). Performance cost for large images. Inconsistent appearance at different blur radii.
-**Instead:** Don't render the content at all. Show a placeholder. Only render content when `isRevealed == true`.
+### Anti-Pattern 2: Using .draggable(String) for External Drag
 
-### Anti-Pattern 4: Persisting Reveal State
-**What:** Storing `isRevealed` in SwiftData so it survives app restarts.
-**Why bad:** Sensitive items should always default to hidden. Persisting reveal state means a user who reveals content and quits has their sensitive data visible on next launch.
-**Instead:** Use `@State` (ephemeral). Panel recreation on toggle naturally resets all reveals.
+**What:** Using SwiftUI's `.draggable("text content")` for dragging to external apps.
+**Why bad:** `.draggable` with String only provides `UTType.plainText`. External apps that accept images, URLs, or rich text will not get the correct content type. No way to provide multiple representations.
+**Instead:** Use `.onDrag { NSItemProvider(...) }` with explicit type registration per content type.
 
-### Anti-Pattern 5: Near-Duplicate Detection
-**What:** Using edit distance, fuzzy hashing, or NLP to detect "similar" clipboard content.
-**Why bad:** High false positive rate (e.g., incrementing a version number in a URL would be detected as near-duplicate). Expensive computation on every clipboard change. User confusion when "different" items are merged.
-**Instead:** Exact hash matching (already implemented) is sufficient. Let users manually delete items they consider duplicates.
+### Anti-Pattern 3: Storing Image Data in SwiftData for Export
 
-### Anti-Pattern 6: Separate Database for Sensitive Items
-**What:** Storing sensitive items in a separate encrypted SQLite database.
-**Why bad:** Doubles the data access complexity. SwiftData doesn't support multiple stores cleanly. Encryption at rest is already handled by macOS FileVault.
-**Instead:** Same database, same model. Sensitivity is a flag that affects rendering and retention, not storage.
+**What:** Loading image data into a SwiftData field (e.g., `imageExportData: Data?`) before export.
+**Why bad:** Bloats the database. Images are already on disk. Loading all images into memory for export can cause memory spikes.
+**Instead:** Read images from disk during export, Base64-encode them directly into the JSON, and write to file. Stream if possible.
+
+### Anti-Pattern 4: SwiftUI .fileExporter for One-Shot Export
+
+**What:** Using SwiftUI's `.fileExporter(isPresented:document:)` modifier.
+**Why bad:** Requires conforming to `FileDocument` protocol, which expects a read-write document lifecycle. Export is a one-shot operation -- there is no "document" to open and edit. The protocol machinery adds unnecessary complexity.
+**Instead:** Use NSSavePanel directly. The app is not sandboxed, so NSSavePanel works without security-scoped bookmarks.
+
+### Anti-Pattern 5: Re-Implementing Paste-as-Plain-Text Logic
+
+**What:** Creating new paste methods or duplicating pasteboard write logic for the context menu.
+**Why bad:** PasteService.pastePlainText already exists and is fully wired through AppState and PanelActions. Adding new code paths creates maintenance burden and potential for divergent behavior.
+**Instead:** Call the existing `panelActions.pastePlainTextItem?(item)` callback from the new context menu item. One line.
+
+### Anti-Pattern 6: Complex Drag State Tracking
+
+**What:** Building an elaborate system to track drag session state (started, moved, ended, cancelled) to coordinate with PanelController.
+**Why bad:** Over-engineering. SwiftUI's `.onDrag` does not provide reliable lifecycle callbacks. NSPanel with `hidesOnDeactivate = false` already handles the common case.
+**Instead:** Accept that the panel stays visible during and after drag. Users dismiss it via Escape or hotkey toggle. If testing reveals the global click monitor hiding the panel during drag, add a simple flag -- but don't build the infrastructure until the problem is confirmed.
 
 ---
 
 ## Sources
 
 - Direct source code analysis of all Pastel Swift files (HIGH confidence)
-- [SwiftData batch delete API](https://fatbobman.com/en/snippet/how-to-batch-delete-data-in-swiftdata/) -- batch delete with predicates
-- [SwiftData batch delete (Apple)](https://developer.apple.com/documentation/swiftdata/modelcontext/delete(model:where:includesubclasses:)) -- official API reference
-- [SQLite VACUUM documentation](https://sqlite.org/lang_vacuum.html) -- database compaction
-- [Core Data VACUUM](https://blog.eidinger.info/keep-your-coredata-store-small-by-vacuuming/) -- practical implementation
-- [HEIC performance benchmarks](https://pspdfkit.com/blog/2018/ios-heic-performance/) -- decode speed comparison
-- [SwiftUI redacted modifier](https://swiftwithmajid.com/2020/10/22/the-magic-of-redacted-modifier-in-swiftui/) -- privacy redaction patterns
-- [SwiftUI privacySensitive](https://www.hackingwithswift.com/quick-start/swiftui/how-to-mark-content-as-private-using-privacysensitive) -- built-in privacy modifier
-- [FileManager directory size](https://gist.github.com/tmspzz/a75f589e6bd86aa2121618155cbdf827) -- disk size calculation patterns
-- [Maccy clipboard manager](https://github.com/p0deje/Maccy) -- reference implementation for sensitive content handling
-- [SaneClip](https://saneclip.com/) -- password detection patterns in clipboard managers
-- [ByteCountFormatter](https://nemecek.be/blog/22/how-to-get-file-size-using-filemanager-formatting) -- formatting byte counts for display
-- [SwiftData expressions (iOS 18+)](https://useyourloaf.com/blog/swiftdata-expressions/) -- aggregate query capabilities
+- [Maccy clipboard manager -- app filtering implementation](https://github.com/p0deje/Maccy/blob/master/Maccy/Clipboard.swift) -- shouldIgnore pattern with allow/ignore mode toggle
+- [Maccy -- lightweight clipboard manager for macOS](https://github.com/p0deje/Maccy) -- reference for app filtering UX
+- [SwiftUI drag and drop on macOS](https://eclecticlight.co/2024/05/21/swiftui-on-macos-drag-and-drop-and-more/) -- DropDelegate and NSItemProvider patterns
+- [SwiftUI .onDrag conflicts with clicks on macOS](https://www.hackingwithswift.com/forums/swiftui/ondrag-conflicts-with-clicks-on-macos/8020) -- known gesture conflicts
+- [Drag and Drop in SwiftUI](https://swiftwithmajid.com/2020/04/01/drag-and-drop-in-swiftui/) -- NSItemProvider patterns
+- [SwiftUI Open and Save Panels](https://www.swiftdevjournal.com/swiftui-open-and-save-panels/) -- NSSavePanel/NSOpenPanel in SwiftUI apps
+- [SwiftData batch insert](https://www.hackingwithswift.com/quick-start/swiftdata/how-to-batch-insert-large-amounts-of-data-efficiently) -- batch import best practices
+- [SwiftData Codable conformance](https://www.hackingwithswift.com/quick-start/swiftdata/how-to-make-swiftdata-models-conform-to-codable) -- model serialization
+- [NSRunningApplication bundleIdentifier](https://developer.apple.com/documentation/appkit/nsrunningapplication/bundleidentifier) -- returns nil for apps without Info.plist
+- [NSPasteboard.org -- transient and concealed types](http://nspasteboard.org/) -- special pasteboard type conventions

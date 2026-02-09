@@ -1,448 +1,667 @@
-# Feature Research: v1.2 Storage & Security
+# Feature Research: v1.3 Power User Features
 
-**Domain:** macOS Clipboard Manager (storage optimization and sensitive content protection)
+**Domain:** macOS Clipboard Manager (paste-as-plain-text, app filtering, import/export, drag-and-drop)
 **Project:** Pastel
-**Researched:** 2026-02-07
-**Confidence:** MEDIUM-HIGH (storage patterns are well-understood; macOS Tahoe clipboard privacy implications are evolving)
+**Researched:** 2026-02-09
+**Confidence:** MEDIUM-HIGH (paste-as-plain-text and app filtering are well-established patterns; import/export has no ecosystem standard; drag-and-drop from NSPanel has specific technical constraints)
 
-> **Scope:** This document covers v1.2 features only: image compression, content deduplication improvements, storage dashboard/management, and sensitive item protection. For v1.0/v1.1 feature landscape, see git history.
-
----
-
-## 1. Image Compression and Storage Optimization
-
-### How Clipboard Managers Handle Image Storage
-
-**Current Pastel approach (v1.0-v1.1):**
-- Images stored as PNG files on disk (lossless but large)
-- Full images capped at 4K (3840px max dimension) via CGImageSource downscaling
-- Thumbnails at 200px for panel display
-- Favicons and og:image previews also stored as PNG
-- Typical clipboard screenshot PNG: 2-8 MB per image
-
-**The storage problem:** A user who copies 20 screenshots per day accumulates 100-400 MB per week in image storage alone. Over 3 months (the default retention), that is 1.2-4.8 GB. This is unsustainable without compression.
-
-**Industry standard approaches:**
-
-| Format | Compression Ratio vs PNG | Quality | Decode Speed | macOS Support |
-|--------|-------------------------|---------|--------------|---------------|
-| JPEG (0.8 quality) | ~5-8x smaller | Lossy, good at 0.8 | Fast (1x baseline) | macOS 10.0+ |
-| HEIC (0.8 quality) | ~10-15x smaller | Lossy, excellent | Slower (2x JPEG) | macOS 10.13+ |
-| WebP | ~6-10x smaller | Lossy or lossless | Medium | macOS 14+ native |
-| PNG (current) | 1x (baseline) | Lossless | Fast | Universal |
-
-**Key insight for clipboard managers:** Users copy images to paste them elsewhere. The pasted content comes from the original pasteboard data, NOT from the stored file. The stored file is only for display in the panel (history browsing). Therefore, lossy compression for the stored copy is perfectly acceptable -- it only affects the preview quality, not paste quality.
-
-**However, there is a nuance:** When a user clicks an old item to paste it, Pastel re-writes it to the pasteboard. If we only stored a compressed JPEG, we would paste a degraded image. The solution is a two-tier approach:
-
-1. **Recent items (< 24 hours):** Store original quality (PNG or whatever the pasteboard provided) for faithful paste-back
-2. **Older items:** Compress to JPEG at quality 0.8 for storage savings; accept slight quality loss on paste-back of old items
-
-This matches how PastePal handles it (per training data, MEDIUM confidence) -- recent items are full-quality, older items are compressed after a configurable delay.
-
-**Recommendation:** Use JPEG compression at quality 0.8 for stored images. HEIC offers better compression ratios but decodes 2x slower, which matters for scrolling through history. JPEG is the pragmatic choice: universal compatibility, fast decode, and 5-8x size reduction over PNG. Apply compression to images older than 24 hours via a background task.
-
-**NSImage JPEG compression on macOS (HIGH confidence -- Apple API):**
-```swift
-let bitmap = NSBitmapImageRep(cgImage: cgImage)
-let jpegData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
-```
-
-### What About Thumbnails?
-
-Thumbnails are already small (200px max) and compressed would save minimal space. Keep thumbnails as PNG for sharpness -- they are tiny files (~10-30 KB each). Not worth the complexity.
+> **Scope:** This document covers v1.3 features only: paste-as-plain-text UI expansion (PAST-20), allow/ignore app lists (PRIV-01), import/export (DATA-01), and drag-and-drop from panel (HIST-02). For earlier feature research, see git history.
 
 ---
 
-## 2. Content Deduplication
+## 1. Paste as Plain Text (PAST-20)
 
-### Current Pastel Deduplication
+### What Already Exists in Pastel
 
-**What exists (Phase 1, v1.0):**
-- SHA256 hash of text content (`contentHash` field, `@Attribute(.unique)`)
-- Consecutive duplicate detection (skip if hash matches most recent item)
-- Non-consecutive duplicates: insert fails due to unique constraint, caught and rolled back
-- Image hashing: first 4096 bytes via SHA256 (fast but potentially collision-prone)
+Pastel already has the core plain-text paste mechanism fully built:
 
-**What this means:** Pastel already has basic deduplication. The unique constraint on `contentHash` means the same text copied twice (even non-consecutively) creates a conflict that is silently rolled back. However, the "update timestamp on re-copy" behavior is missing -- if you copy "hello" today and again tomorrow, the second copy is silently dropped and the old item retains its original timestamp. The item appears to be buried in history rather than bubbling up to the top.
+- **PasteService.pastePlainText()** -- Strips RTF data from the pasteboard write, keeping only `.string` and `.html` types. Receiving apps fall back to their default text styling.
+- **PasteService.writeToPasteboardPlainText()** -- For non-text types (URL, image, file), delegates to normal write since they have no RTF to strip.
+- **Cmd+Shift+1-9** -- Quick paste hotkeys with Shift modifier already paste as plain text (Phase 9, PAST-10b).
+- **PanelActions.pastePlainTextItem** -- The SwiftUI-to-AppKit bridge for plain text paste exists and is wired through PanelContentView -> FilteredCardListView -> AppState.
 
-**Expected behavior in clipboard managers:**
+**What is missing (PAST-20 scope):**
+1. Context menu "Paste as Plain Text" option
+2. Shift+Enter keyboard shortcut for plain text paste of the selected item
+3. Shift+double-click mouse interaction for plain text paste
 
-| Manager | Dedup Approach | On Re-copy | Source |
-|---------|---------------|------------|--------|
-| Maccy | Hash-based dedup | Moves existing item to top (updates timestamp) | WebSearch (MEDIUM confidence) |
-| PastePal | Hash-based dedup | Moves to top | Training data (MEDIUM confidence) |
-| CopyClip | No dedup | Creates duplicate entry | Training data (LOW confidence) |
-| CleanClip | Hash-based dedup | Moves to top | WebSearch (LOW confidence) |
+### How Competitors Handle Plain Text Paste
 
-**Recommendation:** Change behavior from "silently drop duplicate" to "update timestamp and bubble to top." This is the expected UX -- when a user re-copies something, they expect to see it at the top of history, not buried where it was first captured. Implementation: on unique constraint conflict, fetch the existing item by hash, update its timestamp and source app, then save.
+| Manager | Context Menu | Keyboard Shortcut | Mouse Modifier | Source |
+|---------|-------------|-------------------|----------------|--------|
+| Paste (pasteapp.io) | "Paste as Plain Text" in right-click menu | Shift held during paste | N/A | [Paste Help Center](https://pasteapp.io/help/paste-on-mac) (MEDIUM) |
+| PastePal | "Paste as Plain/Rich Text" toggle in context menu | N/A documented | N/A | [PastePal review](https://macsources.com/pastepal-clipboard-manager-for-macos-review/) (MEDIUM) |
+| Maccy | N/A (paste-only menu) | Option+Shift+Enter | N/A | [Maccy README](https://github.com/p0deje/Maccy/blob/master/README.md) (HIGH) |
+| ClipTools | N/A | Control+Shift during paste | N/A | [ClipTools guide](https://macmost.com/cliptools-using-the-clipboard-manager-functions.html) (MEDIUM) |
+| macOS native | Edit > Paste and Match Style | Cmd+Shift+Option+V | N/A | Apple standard (HIGH) |
 
-### Image Deduplication Improvement
+**Key pattern:** The dominant UX convention across the ecosystem is using a modifier key (Shift) combined with the normal paste trigger. Pastel's proposed Shift+Enter and Shift+double-click follow this convention naturally. The context menu option is table stakes -- every major clipboard manager with a context menu includes a plain text paste variant.
 
-**Current approach:** Hashing only first 4096 bytes is fast but fragile -- two different images with the same file header would collide. In practice, this is rare for clipboard content (screenshots always have unique pixel data in the header), so this is LOW priority to change.
+### Expected Behavior from User's Perspective
 
-**Advanced approach (NOT recommended for v1.2):** Perceptual hashing (pHash) could detect near-duplicate images (same screenshot cropped slightly differently). But this adds significant complexity and CPU overhead for marginal benefit. Keep the current SHA256 approach.
+**Context menu "Paste as Plain Text":**
+- Appears alongside existing "Paste" option in the right-click menu
+- Strips all formatting (RTF, HTML styles) and pastes only raw text
+- For non-text items (images, files), this option should either be disabled/hidden or behave identically to normal paste (since there is no formatting to strip)
+- User expectation: the item is pasted into the frontmost app immediately, panel closes
 
----
+**Shift+Enter:**
+- When a card is selected via keyboard navigation (arrow keys), pressing Shift+Enter pastes it as plain text
+- Without Shift, Enter pastes with original formatting (existing behavior)
+- User expectation: instant muscle memory -- "Enter = paste, Shift+Enter = paste plain"
 
-## 3. Storage Dashboard and Usage Visibility
+**Shift+double-click:**
+- When double-clicking a card while holding Shift, paste as plain text
+- Without Shift, double-click pastes with original formatting (existing behavior)
+- User expectation: same modifier convention as Shift+Enter, but for mouse users
 
-### How Apps Show Storage Usage
+### Edge Cases to Consider
 
-**No clipboard manager surveyed offers a storage dashboard.** This is genuinely novel territory. Disk space analyzers (DiskSavvy, CleanMyMac, macOS System Settings) show storage breakdowns, but clipboard managers do not surface this information.
+| Edge Case | Expected Behavior | Notes |
+|-----------|-------------------|-------|
+| Shift+Enter on an image item | Normal paste (no formatting to strip) | PasteService already handles this: `writeToPasteboardPlainText` delegates to `writeToPasteboard` for non-text types |
+| Shift+Enter on a URL item | Paste URL string as plain text (no link formatting) | Already handled by PasteService |
+| Shift+Enter on a code item | Paste code as plain text (no syntax highlighting, just raw text) | Code items are stored as `.string` -- stripping RTF has no extra effect, which is correct |
+| Shift+Enter on a color item | Paste color string as plain text | Color items are plain strings already |
+| Shift+double-click when Shift was held before click | Must detect Shift modifier at time of gesture | NSEvent.modifierFlags check |
+| Context menu "Paste as Plain Text" on concealed item | Should still work -- concealed items have text content | No special handling needed |
+| Shift+Enter when no card is selected | Ignore (no-op) | Same as Enter when no card selected |
 
-**Why it matters for Pastel:** Unlike text-only clipboard managers (Maccy, CopyClip), Pastel stores images, thumbnails, favicons, and og:image previews on disk. Without visibility, users have no idea how much space their clipboard history consumes or what contributes most to disk usage.
+### Integration with Existing Pastel Patterns
 
-**What to show:**
+**Context menu addition is straightforward:** The existing context menu in `ClipboardCardView` already has "Copy", "Paste", "Copy + Paste". Adding "Paste as Plain Text" after "Paste" is a one-line addition using the existing `panelActions.pastePlainTextItem` callback.
 
-| Metric | Source | Complexity | Value |
-|--------|--------|------------|-------|
-| Total items count | `fetchCount(ClipboardItem.self)` | LOW | Basic orientation |
-| Items by content type | Group query on `contentType` | LOW | Identify what fills history |
-| Total disk usage (images) | Sum file sizes in images directory | MEDIUM | The headline number |
-| Database file size | SwiftData store file size | LOW | Usually small vs images |
-| Usage by category (images, thumbnails, favicons, previews) | Categorize by filename suffix | MEDIUM | Identify optimization targets |
-| Oldest item age | Query `min(timestamp)` | LOW | Retention context |
-
-**Visualization approach:** SwiftUI Charts (available macOS 13+) provides `SectorMark` for pie/donut charts. A simple donut chart showing storage by content type (images, text, URLs, code, colors) would be immediately useful and visually satisfying.
-
-**Where to put it:** New "Storage" tab in Settings window, alongside General and Labels tabs. This is the natural location -- Settings is where users manage app behavior, and storage management is a settings-adjacent concern.
-
----
-
-## 4. Storage Management Tools
-
-### Purge by Category
-
-**Expected behavior:** Users should be able to delete all items of a specific content type ("Delete all images", "Delete all URLs") without affecting other types. This is useful when images are consuming disproportionate disk space.
-
-**Current clearing options in Pastel:**
-- Delete individual item (context menu, Phase 4)
-- Clear all history (confirmation dialog, Phase 4)
-- Automatic retention-based purge (RetentionService, Phase 5)
-
-**What is missing:** Selective purge. Users cannot currently say "I want to keep my text clips but purge all images older than 1 week."
-
-**Purge options to support:**
-
-| Purge Action | Use Case | Complexity |
-|-------------|----------|------------|
-| Purge by content type | "Delete all images" | LOW -- predicate on `contentType` |
-| Purge by age within type | "Delete images older than 1 week" | MEDIUM -- compound predicate |
-| Purge items without labels | "Delete unlabeled items only" | LOW -- predicate on `label == nil` |
-
-### Database Compaction
-
-**Context:** SwiftData uses SQLite with WAL (Write-Ahead Logging) under the hood. After large deletions (like purging all images), the database file does not shrink automatically. SQLite maintains free pages internally for future use.
-
-**VACUUM command:** Rebuilds the database file, reclaiming free pages and shrinking the file on disk. Should be triggered after bulk deletions when freelist exceeds ~20% of total pages.
-
-**How to trigger VACUUM from SwiftData (MEDIUM confidence):**
-SwiftData does not expose a direct VACUUM API. The approach is to access the underlying SQLite store URL and run VACUUM directly via sqlite3:
+**Shift+Enter in FilteredCardListView:** The existing `.onKeyPress(.return)` handler calls `onPaste(filteredItems[index])`. Adding a Shift modifier check to route to `onPastePlainText` is clean:
 
 ```swift
-// Access the SQLite file from the ModelContainer's configuration
-let storeURL = modelContainer.configurations.first?.url
-// Use sqlite3_exec to run VACUUM
-```
-
-Alternatively, use `NSSQLitePragmasOption` with auto_vacuum if setting up the store from scratch. For an existing store, a manual VACUUM pass is needed.
-
-**Recommendation:** Add a "Compact Database" button in the Storage settings tab. When pressed, run VACUUM on the SQLite store. Show before/after file size to give users satisfaction. This is a LOW-frequency action (monthly at most) so performance of VACUUM (which can take seconds) is acceptable.
-
----
-
-## 5. Sensitive Item Protection
-
-### The Landscape: Existing Concealment in Pastel
-
-**What Pastel already does (Phase 1, v1.0):**
-- Detects `org.nspasteboard.ConcealedType` from password managers (1Password, Bitwarden, etc.)
-- Sets `isConcealed = true` on those items
-- Auto-expires concealed items after 60 seconds via ExpirationService
-- ConcealedType items skip code/color detection
-
-**What is NOT built yet:**
-- Manual "mark as sensitive" by user
-- Visual redaction/blurring of sensitive items in the panel
-- Click-to-reveal interaction
-- Configurable expiry for sensitive items (currently hardcoded to 60s)
-
-### How Password Managers Handle Sensitive Clipboard Content
-
-**1Password (HIGH confidence -- widely documented):**
-- Auto-clears clipboard after 90 seconds (configurable)
-- Sets `org.nspasteboard.ConcealedType` on macOS native app
-- Browser extension does NOT consistently set ConcealedType (known issue per 1Password community forums)
-
-**Bitwarden:**
-- Similar auto-clear behavior
-- Desktop app has had issues with ConcealedType on macOS (GitHub issue #350)
-
-**Key takeaway:** The `ConcealedType` convention is not universally reliable. Browser extensions often bypass it. Users need a manual fallback to mark items as sensitive.
-
-### Manual "Mark as Sensitive" Design
-
-**How it should work (user's requirement specifies manual, NOT auto-detect):**
-
-1. User right-clicks a clipboard item in the panel
-2. Context menu shows "Mark as Sensitive" / "Unmark as Sensitive"
-3. Marked items display with visual redaction (blurred/redacted text, blurred image)
-4. Clicking a marked item reveals content temporarily
-5. Sensitive items can optionally auto-expire faster than normal items
-
-**Why manual, not auto-detect:** Automatic detection of sensitive content (credit card numbers, SSNs, API keys) is fraught with false positives and false negatives. Users know what is sensitive in their workflow. A regex that matches "4111 1111 1111 1111" as a credit card might also match a product SKU. The PROJECT.md decision is explicit: "User decides what's sensitive, not heuristics."
-
-### Visual Redaction Approaches
-
-**SwiftUI provides two built-in mechanisms:**
-
-1. **`.redacted(reason: .privacy)`** -- Replaces content with gray rectangles. Available iOS 15+ / macOS 12+. Good for text but looks like a loading skeleton, which is confusing in this context.
-
-2. **`.blur(radius:)`** -- Gaussian blur overlay. More intuitive for "hidden content" because users understand blurred = concealed. Blur radius of 8-12 makes text unreadable while preserving the sense that content exists.
-
-**Recommendation: Use `.blur(radius: 10)` with an overlay icon (lock or eye-slash).** This is more visually intuitive than `.redacted()` for sensitive content. The blur communicates "this is hidden intentionally" rather than "this is loading." Add a small lock icon overlay so users know why it is blurred and that they can click to reveal.
-
-**Click-to-reveal pattern:**
-
-```swift
-@State private var isRevealed = false
-
-VStack {
-    contentView
-        .blur(radius: item.isSensitive && !isRevealed ? 10 : 0)
-        .overlay {
-            if item.isSensitive && !isRevealed {
-                Image(systemName: "eye.slash.fill")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .onTapGesture {
-            if item.isSensitive {
-                isRevealed.toggle()
-            }
-        }
+.onKeyPress(.return) { keyPress in
+    guard let index = selectedIndex, index < filteredItems.count else { return .handled }
+    if keyPress.modifiers.contains(.shift) {
+        onPastePlainText(filteredItems[index])
+    } else {
+        onPaste(filteredItems[index])
+    }
+    return .handled
 }
 ```
 
-**Auto-hide after reveal:** After revealing, automatically re-blur after 5-10 seconds. This prevents accidentally leaving sensitive content visible on screen.
+**Shift+double-click requires gesture modifier detection:** The current `.onTapGesture(count: 2)` in FilteredCardListView does not receive modifier flags. Two approaches:
+1. Use `NSEvent.modifierFlags.contains(.shift)` at the time of the tap (check global modifier state)
+2. Replace `onTapGesture` with a custom gesture that captures modifiers via `NSEvent.addLocalMonitorForEvents`
 
-### Sensitive Item Auto-Expiry
+Approach 1 is simpler and sufficient -- Pastel already tracks `isShiftHeld` state via a flags monitor in PanelContentView and passes it to FilteredCardListView.
 
-**Current behavior:** All items use the global retention setting (7d, 30d, 90d, 1y, forever). Concealed items (from password managers) expire in 60 seconds.
+### Complexity Assessment
 
-**User's requirement:** "Optional shorter auto-expiry for sensitive items."
-
-**Recommended options:**
-
-| Option | Use Case |
-|--------|----------|
-| 1 hour | Copied a password, will not need it again today |
-| 24 hours | Temporary sensitive info, keep through the workday |
-| 1 week | Somewhat sensitive, but may need to re-paste |
-| Same as normal | User wants sensitivity marking for display only, not expiry |
-
-**Implementation:** Add a `sensitiveExpiryHours` setting in Settings (default: 24 hours). When an item is marked sensitive, set `expiresAt` to `now + sensitiveExpiryHours`. The existing ExpirationService and RetentionService can handle cleanup -- they already check `expiresAt`. The user can also set this to "Same as retention" to disable separate expiry.
+**LOW.** All infrastructure exists. This is wiring existing `pastePlainText` capability to three additional trigger points (context menu, Shift+Enter, Shift+double-click).
 
 ---
 
-## Feature Landscape
+## 2. Allow/Ignore App Lists (PRIV-01)
+
+### How Competitors Implement App Filtering
+
+**Three distinct models exist in the ecosystem:**
+
+#### Model 1: Ignore List (Blocklist) -- Most Common
+
+Apps on the ignore list are excluded from clipboard monitoring. Everything else is captured.
+
+| Manager | UI | Granularity | Default | Source |
+|---------|-----|------------|---------|--------|
+| Maccy | Preferences > Ignore > Add app | By bundle ID | Ignore 1Password, TypeIt4Me | [Maccy README](https://github.com/p0deje/Maccy/blob/master/README.md) (HIGH) |
+| Paste | Settings > Exclude apps | By app | None | [Paste review](https://josephnilo.com/blog/paste-setapp-review/) (MEDIUM) |
+| CopyClip 2 | Settings > Excluded apps | By app | None | WebSearch (MEDIUM) |
+| BetterTouchTool | Clipboard settings | By app | None | [BTT forum](https://community.folivora.ai/t/exclude-apps-from-clipboard-manager-passwords/16601) (MEDIUM) |
+
+#### Model 2: Allow List (Whitelist) -- Rare
+
+Only apps on the allow list have their clipboard content captured. Everything else is ignored.
+
+No major macOS clipboard manager uses this model by default. It is too restrictive for the general use case -- users copy from dozens of apps daily and maintaining a comprehensive allow list is burdensome.
+
+#### Model 3: Dual Mode (Ignore + Allow) -- Ideal
+
+User chooses between "monitor all except ignored" (default) or "monitor only allowed apps." Provides maximum flexibility.
+
+No surveyed macOS clipboard manager currently offers this dual mode, but it is the logical evolution. Android clipboard managers (via LSPosed modules) support this pattern.
+
+### Recommended Model for Pastel: Ignore List with Optional Allow List
+
+**Primary mode: Ignore list (blocklist).** This matches user expectations and competitor norms. Default behavior remains "capture everything" -- the ignore list is opt-in.
+
+**Secondary mode (stretch goal): Allow list.** Some power users in security-sensitive environments want the inverse: "only capture from these specific apps." This can be a settings toggle: "Monitor: All apps except ignored / Only allowed apps."
+
+### Implementation: How It Works Technically
+
+**Pastel already captures source app bundle ID.** In `ClipboardMonitor.processPasteboardContent()`:
+
+```swift
+let sourceApp = NSWorkspace.shared.frontmostApplication
+let sourceAppBundleID = sourceApp?.bundleIdentifier
+```
+
+The ignore check must happen BEFORE content processing:
+
+```swift
+func checkForChanges() {
+    guard isMonitoring else { return }
+    // ... changeCount check ...
+
+    // App filter check (NEW)
+    let sourceApp = NSWorkspace.shared.frontmostApplication
+    if let bundleID = sourceApp?.bundleIdentifier,
+       isAppIgnored(bundleID) {
+        return  // Skip this clipboard change entirely
+    }
+
+    processPasteboardContent()
+}
+```
+
+**Important caveat (from Maccy issue #1072):** `NSWorkspace.shared.frontmostApplication` returns the currently active/frontmost app, which is NOT always the app that wrote to the clipboard. A background app (e.g., a script using `pbcopy`) can modify the clipboard while a different app is frontmost. This is a known limitation that Maccy also faces. For Pastel's use case (ignoring password managers, banking apps), this is acceptable because:
+1. Password managers are typically frontmost when copying credentials
+2. The false negative rate (capturing content that should be ignored) is very low
+3. The alternative (no source identification at all via NSPasteboard API) would mean no app filtering is possible
+
+### Settings UI Pattern
+
+**How to build the app picker:**
+
+| Approach | UX | Complexity | Competitors Use |
+|----------|-----|-----------|----------------|
+| Drag app from Finder / Applications | Natural macOS UX | MEDIUM (file drop zone) | Paste |
+| Browse /Applications with file picker | Standard but clunky | LOW (NSOpenPanel) | Some |
+| Running apps list with toggle | Shows only running apps | LOW | None surveyed |
+| Running applications picker via NSWorkspace | List all installed apps | MEDIUM | Maccy (sort of -- uses defaults command) |
+
+**Recommended approach:** A list in Settings showing currently ignored/allowed apps with an "Add App..." button that opens an NSOpenPanel pointed at `/Applications`. When the user selects an app bundle, extract its `bundleIdentifier` and `localizedName`. Display apps in the list with their icon (via `NSWorkspace.shared.icon(forFile:)`), name, and bundle ID.
+
+**Additionally, offer a context menu shortcut from the clipboard panel:** When right-clicking a clipboard card, add "Ignore [Source App Name]" to the context menu. This lets users block an app directly from the card that triggered the annoyance. This is a UX pattern no surveyed competitor offers and would be a genuine differentiator.
+
+### Data Model
+
+```swift
+// Stored in UserDefaults as an array of bundle IDs
+@AppStorage("ignoredAppBundleIDs") private var ignoredAppsData: Data = Data()
+// OR stored as a simple [String] in UserDefaults:
+// defaults: ["com.1password.1password", "com.bitwarden.desktop"]
+```
+
+Using UserDefaults (not SwiftData) because:
+1. The ignore list is small (typically 2-5 apps)
+2. It is checked on every clipboard poll (0.5s) -- must be fast
+3. It is app configuration, not user data
+4. Does not need to be part of import/export (app-specific preference)
+
+### Edge Cases
+
+| Edge Case | Expected Behavior | Notes |
+|-----------|-------------------|-------|
+| User ignores the app they are currently using | Next copy from that app is skipped | No special handling |
+| Copy via `pbcopy` in Terminal | Attributed to Terminal.app (or whatever is frontmost) | If Terminal is ignored, pbcopy clips are also ignored. Acceptable tradeoff |
+| Universal Clipboard (copy on iPhone, paste on Mac) | Attributed to... nothing? Check frontmost app | May need `com.apple.is-remote-clipboard` pasteboard type check like Maccy |
+| User removes an app from ignore list | Future copies are captured again; past captures remain as-is | No retroactive changes |
+| Ignored app copies concealed content | Double-skip: both concealed AND ignored | Concealed check happens in classifyContent(); app check happens before that |
+| Empty bundle ID (rare: some system processes) | Captured (not ignored) | Nil bundle ID should pass the ignore check |
+
+### Pre-populated Defaults
+
+**Recommended default ignore list:** Empty. Users should opt in to ignoring apps. However, display a helpful hint: "Consider adding password managers (1Password, Bitwarden) for privacy."
+
+**Why not pre-populate?** Password managers already use `org.nspasteboard.ConcealedType` which Pastel respects (captures with auto-expiry after 60s). Pre-ignoring them would mean users lose the ability to re-paste a recently copied password, which some users actually want.
+
+### Complexity Assessment
+
+**MEDIUM.** Requires a new Settings section with app picker UI, a check in the clipboard monitoring hot path, and context menu integration. No model changes needed.
+
+---
+
+## 3. Import/Export (DATA-01)
+
+### The Current Landscape: No Standard Format
+
+**No macOS clipboard manager has established a standard import/export format.** This is a genuine gap in the ecosystem:
+
+| Manager | Export? | Format | Import? | Source |
+|---------|---------|--------|---------|--------|
+| Maccy | No | N/A | No | [Maccy GitHub](https://github.com/p0deje/Maccy) (HIGH) |
+| Paste | No (iCloud sync only) | Proprietary | No | WebSearch (MEDIUM) |
+| PastePal | No (iCloud sync only) | Proprietary | No | [PastePal App Store](https://apps.apple.com/us/app/clipboard-manager-pastepal/id1503446680) (MEDIUM) |
+| CopyClip | No | N/A | No | WebSearch (LOW) |
+| CleanClip | No documented export | N/A | No | WebSearch (LOW) |
+| Alfred Clipboard | Archive script (community) | JSON + files | No native import | [Alfred Gist](https://gist.github.com/pirate/6551e1c00a7c4b0c607762930e22804c) (MEDIUM) |
+| PasteBar | Local storage only | N/A | No | WebSearch (LOW) |
+
+**Key insight:** Since there is no standard, Pastel can define its own format. The goal is extensibility (could later support importing from other managers) and human-readability (JSON over binary).
+
+### Recommended Format: .pastel Bundle (Directory)
+
+A `.pastel` export is a directory bundle (like .app or .rtfd) containing:
+
+```
+export_2026-02-09.pastel/
+    manifest.json          -- Metadata, version, item count
+    items.json             -- Array of clipboard item records
+    images/                -- Referenced image files
+        <uuid>.png
+        <uuid>_thumb.png
+    favicons/              -- URL metadata images
+        <uuid>_favicon.png
+    previews/              -- og:image previews
+        <uuid>_preview.png
+```
+
+**manifest.json:**
+```json
+{
+    "format": "pastel-export",
+    "version": 1,
+    "exportDate": "2026-02-09T14:30:00Z",
+    "appVersion": "1.3.0",
+    "itemCount": 142,
+    "imageCount": 23,
+    "labelCount": 5
+}
+```
+
+**items.json:**
+```json
+{
+    "labels": [
+        {
+            "id": "uuid-string",
+            "name": "Work",
+            "colorName": "blue",
+            "emoji": null,
+            "sortOrder": 0
+        }
+    ],
+    "items": [
+        {
+            "textContent": "Hello world",
+            "htmlContent": null,
+            "rtfData": null,
+            "contentType": "text",
+            "timestamp": "2026-02-09T14:25:00Z",
+            "sourceAppBundleID": "com.apple.Safari",
+            "sourceAppName": "Safari",
+            "characterCount": 11,
+            "byteCount": 11,
+            "imagePath": null,
+            "thumbnailPath": null,
+            "isConcealed": false,
+            "contentHash": "abc123...",
+            "title": "My greeting",
+            "labelIDs": ["uuid-string"],
+            "detectedLanguage": null,
+            "detectedColorHex": null,
+            "urlTitle": null,
+            "urlFaviconPath": null,
+            "urlPreviewImagePath": null
+        }
+    ]
+}
+```
+
+**Why a directory bundle, not a single file:**
+- Images cannot be efficiently embedded in JSON (base64 bloats by 33%)
+- A zip of the directory can be offered as a secondary option for sharing
+- macOS treats directory bundles as single items in Finder (good UX)
+- Separation of concerns: metadata in JSON, binary assets in their own directory
+
+### Export UX
+
+**Trigger:** Settings > General (or Data section) > "Export History..." button
+
+**Flow:**
+1. User clicks "Export History..."
+2. NSSavePanel appears with default filename `Pastel Export YYYY-MM-DD.pastel`
+3. Optional: filter dialog (export all, export labeled only, export date range)
+4. Progress indicator during export (may take seconds for large histories with images)
+5. Success confirmation with file size
+
+**Scope options for export:**
+| Scope | Complexity | Value |
+|-------|-----------|-------|
+| Export all items | LOW | Baseline |
+| Export labeled items only | LOW | Users who organized items probably want those |
+| Export date range | MEDIUM | Less useful -- retention handles age-based cleanup |
+| Export specific labels | MEDIUM | Power user feature |
+
+**Recommendation:** Start with "Export all" and "Export labeled items only." Date range and label-specific export are stretch goals.
+
+### Import UX
+
+**Trigger:** Settings > General (or Data section) > "Import..." button
+
+**Flow:**
+1. User clicks "Import..."
+2. NSOpenPanel with file type filter for `.pastel` bundles
+3. Preview: show item count, label count, date range of import
+4. Conflict resolution dialog: "X items already exist in your history. Skip duplicates? / Import all?"
+5. Progress indicator
+6. Success summary: "Imported 95 items, 3 labels, skipped 47 duplicates"
+
+**Conflict resolution strategy:**
+- Use `contentHash` for deduplication (already exists on all items)
+- If hash matches: skip (item already exists)
+- If hash does not match: import as new item
+- Labels: merge by name. If a label with the same name exists, reuse it. If not, create it.
+- Images: copy to Pastel's image storage directory with new UUIDs to avoid filename conflicts
+
+### Edge Cases
+
+| Edge Case | Expected Behavior | Notes |
+|-----------|-------------------|-------|
+| Import from different machine (different image paths) | Images should be portable (bundled in export) | Image paths in items.json reference files within the bundle, not absolute paths |
+| Import items with labels that do not exist locally | Create the labels during import | Match by name first, create if new |
+| Import items with labels that exist locally (same name, different color) | Reuse existing local label | Name match takes precedence over color |
+| Export includes concealed items | Export them (user chose to export) | But warn: "X concealed items included" |
+| RTF data in export | Store as base64 string in items.json | RTF is binary Data, needs encoding |
+| Corrupt .pastel bundle (missing manifest, bad JSON) | Graceful error: "Invalid export file" | Validate manifest version before processing |
+| Export during active clipboard monitoring | Safe -- reads from SwiftData, not pasteboard | No race conditions |
+| Import triggers duplicate detection in ClipboardMonitor | No -- import uses modelContext.insert directly, not the pasteboard | No skipNextChange needed |
+| Very large export (10K+ items, 500+ images) | Show progress bar, use background task | May take 10-30 seconds |
+
+### Future Extensibility: Importing from Other Managers
+
+The format version field (`"version": 1`) allows for format evolution. A future `"version": 2` could add fields without breaking v1 imports. The manifest's `"format"` field could later support `"maccy-export"` or `"paste-export"` if we want to build importers for other managers' data.
+
+**Maccy's data:** SQLite database at `~/Library/Containers/org.p0deje.Maccy/Data/Library/Application Support/Maccy/Storage.sqlite`. Text-only (no images). Could be imported by reading the SQLite directly.
+
+**This is a v2+ concern.** For v1.3, focus on Pastel's own format.
+
+### Complexity Assessment
+
+**MEDIUM-HIGH.** Requires:
+- JSON serialization/deserialization of the full data model
+- File system operations (directory creation, image copying)
+- NSSavePanel / NSOpenPanel integration
+- Conflict resolution logic
+- Progress reporting for large exports
+- Error handling for corrupt imports
+
+This is the most complex of the four v1.3 features.
+
+---
+
+## 4. Drag-and-Drop from Panel (HIST-02)
+
+### How Competitors Implement Drag from Clipboard Manager
+
+| Manager | Drag Support | Target | Content | Source |
+|---------|-------------|--------|---------|--------|
+| Pasta | Drag clippings to other apps | Any app | Text and files | [Pasta App Store](https://apps.apple.com/us/app/pasta-clipboard-manager/id1438389787?mt=12) (MEDIUM) |
+| PasteNow | Drag and drop from list | Any app | Text, images, files | [PasteNow](https://pastenow.app/) (MEDIUM) |
+| PastePal | Drag from sidebar | Any app | Text, images, files | [PastePal review](https://macsources.com/pastepal-clipboard-manager-for-macos-review/) (MEDIUM) |
+| Clipboard Manager (App Store) | Quick panel drag | Any app | Various | [App Store listing](https://apps.apple.com/us/app/clipboard-manager/id1116697975) (LOW) |
+| Maccy | No drag support | N/A | N/A | [Maccy GitHub](https://github.com/p0deje/Maccy) (HIGH) |
+
+**Key finding:** Drag-and-drop is a differentiator, not table stakes. Maccy (the most popular free clipboard manager) does not support it. But premium managers (Pasta, PasteNow, PastePal) all do.
+
+### Technical Implementation: SwiftUI .onDrag + NSItemProvider
+
+**The standard SwiftUI approach:**
+
+```swift
+ClipboardCardView(item: item, ...)
+    .onDrag {
+        // Create NSItemProvider with appropriate content
+        switch item.type {
+        case .text, .richText, .code, .color:
+            return NSItemProvider(object: (item.textContent ?? "") as NSString)
+        case .url:
+            if let urlString = item.textContent, let url = URL(string: urlString) {
+                return NSItemProvider(object: url as NSURL)
+            }
+            return NSItemProvider(object: (item.textContent ?? "") as NSString)
+        case .image:
+            if let imagePath = item.imagePath {
+                let imageURL = ImageStorageService.shared.resolveImageURL(imagePath)
+                return NSItemProvider(contentsOf: imageURL) ?? NSItemProvider()
+            }
+            return NSItemProvider()
+        case .file:
+            if let filePath = item.textContent {
+                let fileURL = URL(fileURLWithPath: filePath)
+                return NSItemProvider(contentsOf: fileURL) ?? NSItemProvider()
+            }
+            return NSItemProvider()
+        }
+    }
+```
+
+### Critical Technical Concern: NSPanel + Drag Interaction
+
+**Pastel's panel is a non-activating NSPanel.** This creates a specific challenge for drag-and-drop:
+
+1. **Non-activating panels do not steal focus.** This is essential for paste-back (the frontmost app stays focused so Cmd+V reaches it). But during drag, the user needs to:
+   - Start the drag in the panel
+   - Move the cursor to another app's window
+   - Drop the content
+
+2. **The panel may dismiss when the cursor leaves.** Pastel currently installs a global click monitor that hides the panel on clicks outside it. During a drag operation, the user's cursor leaves the panel area and enters another app's window. If the panel dismisses mid-drag, the drag data may be lost.
+
+**Solutions:**
+
+| Approach | Description | Complexity |
+|----------|-------------|-----------|
+| Suppress dismiss during drag | Detect drag start (via `.onDrag`), disable the global click monitor until drag ends | MEDIUM |
+| Keep panel visible during drag | Do not auto-dismiss on focus loss during drag | LOW (flag toggle) |
+| Let panel dismiss, preserve drag | NSItemProvider retains data even after source view disappears (OS manages drag data) | LOW (test needed) |
+
+**Recommended approach:** Option 3 is the simplest and likely works. Once `.onDrag` creates the `NSItemProvider`, macOS takes ownership of the drag data. The panel can dismiss and the drag should still complete. However, this needs testing -- if the NSItemProvider references a file URL (for images), the file must still exist when the drop completes.
+
+**Testing priority:** Verify that `NSItemProvider` drag data survives the source view (panel) being dismissed. If it does not survive, fall back to Option 1 (suppress dismiss during active drag).
+
+### Content Type Mapping for Drag
+
+| Pastel Content Type | NSItemProvider Object | UTType | Receiving App Gets |
+|--------------------|-----------------------|--------|-------------------|
+| .text | NSString | public.plain-text | Plain text |
+| .richText | NSString (+ optionally NSAttributedString with RTF) | public.plain-text / public.rtf | Text with optional formatting |
+| .url | NSURL | public.url | URL (clickable in supporting apps) |
+| .image | NSItemProvider(contentsOf: imageFileURL) | public.image | Image data |
+| .file | NSItemProvider(contentsOf: fileURL) | public.file-url | File reference |
+| .code | NSString | public.plain-text | Code as plain text |
+| .color | NSString | public.plain-text | Color string (e.g., "#FF5733") |
+
+**Rich text drag (stretch goal):** For `.richText` items that have `rtfData`, the drag could provide both plain text and RTF representations. This allows RTF-aware apps (TextEdit, Pages) to receive formatted text while plain-text apps get the fallback. Implementation uses `NSItemProvider.registerDataRepresentation(forTypeIdentifier:)` with multiple UTTypes.
+
+### Drag Preview
+
+SwiftUI's `.onDrag` supports an optional preview parameter (macOS 13+):
+
+```swift
+.onDrag {
+    NSItemProvider(object: text as NSString)
+} preview: {
+    Text(text)
+        .padding(8)
+        .background(.ultraThinMaterial)
+        .cornerRadius(6)
+}
+```
+
+**Recommendation:** Show a compact preview during drag -- text snippet for text items, thumbnail for images, URL for URLs. This gives users visual feedback about what they are dragging.
+
+### Edge Cases
+
+| Edge Case | Expected Behavior | Notes |
+|-----------|-------------------|-------|
+| Drag an image item whose file was deleted (retention cleanup) | Drag fails gracefully (empty provider) | Check file existence before creating provider |
+| Drag a file reference to a file that no longer exists | Drop delivers the path string, but target app cannot open it | Show visual indicator that file path may be stale |
+| Drag a concealed item | Allow drag (user explicitly initiated it) | No special handling |
+| Drag during horizontal panel layout (top/bottom edge) | Must work in both orientations | `.onDrag` is view-level, orientation-independent |
+| Drag multiple items (multi-select + drag) | NOT required for v1.3 | Multi-drag is complex; defer to v2 |
+| Drag from History Browser (Settings window) | Would be nice but NOT required | History grid uses same card views; could share drag logic |
+
+### Integration with Existing Panel Behavior
+
+**Panel auto-dismiss:** The panel currently hides on any global click outside it. A drag gesture starts inside the panel but the cursor moves outside. Two scenarios:
+1. **Drag stays within panel bounds:** No issue. Normal drag within the panel (this is not the use case -- we want drag TO other apps).
+2. **Drag moves outside panel:** Global click monitor fires when cursor enters another app. Panel may hide. The drag data needs to survive.
+
+**Panel keyboard dismiss (Escape):** If user starts a drag then presses Escape, panel should dismiss and drag should cancel. This is the default macOS behavior.
+
+**Panel toggle hotkey during drag:** If user presses the panel toggle hotkey (Cmd+Shift+V) during a drag, panel hides. Drag data should survive (same as auto-dismiss case).
+
+### Complexity Assessment
+
+**MEDIUM.** SwiftUI's `.onDrag` handles most of the heavy lifting. The main complexity is:
+1. Creating correct NSItemProvider for each content type
+2. Testing interaction with NSPanel dismiss behavior
+3. Optional: drag preview customization
+4. Edge case handling for missing files
+
+---
+
+## Feature Landscape Summary
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist when they see "storage optimization" and "sensitive items" in a changelog.
+Features users assume exist or will expect once they see the v1.3 changelog.
 
-| Feature | Why Expected | Complexity | Depends On |
-|---------|--------------|------------|------------|
-| Image compression for storage savings | Images are the #1 storage consumer; users expect optimization | MEDIUM | ImageStorageService (exists) |
-| Duplicate handling: bubble re-copied items to top | Every major clipboard manager does this; silent drop is confusing | LOW | ClipboardMonitor dedup logic (exists) |
-| Total storage usage display | Users need to know how much space the app uses | LOW | New Settings tab |
-| Item count by type | Basic orientation: "how many images vs text clips do I have?" | LOW | SwiftData aggregate queries |
-| Mark item as sensitive (manual) | Users who handle passwords/keys expect a way to protect them | MEDIUM | Context menu (exists), new model field |
-| Blur/redact sensitive items in panel | If "sensitive" exists as a concept, display must reflect it | LOW | SwiftUI `.blur()` modifier |
-| Click-to-reveal for sensitive items | Blurred content is useless if you can never see it | LOW | State toggle per card |
-| Purge all items (already exists) | Basic cleanup; already implemented in v1.0 | N/A | Already built |
+| Feature | Why Expected | Complexity | Integration Notes |
+|---------|--------------|------------|-------------------|
+| Context menu "Paste as Plain Text" | Every competitor with a context menu has this | LOW | Add to existing context menu in ClipboardCardView |
+| Shift+Enter for plain text paste | Natural modifier convention (Shift = plain variant) | LOW | Modify existing .onKeyPress(.return) handler |
+| Ignore app list in Settings | Paste, Maccy, CopyClip 2 all offer this | MEDIUM | New Settings section + ClipboardMonitor check |
+| Ignore password managers specifically | Primary use case for app filtering | LOW | Part of ignore list; default hint in UI |
+| Export clipboard history | Data portability is a user right; users expect backup | MEDIUM-HIGH | New file format, NSSavePanel, serialization |
+| Import clipboard history | Restore from backup completes the export story | MEDIUM-HIGH | NSOpenPanel, deserialization, conflict resolution |
 
 ### Differentiators (Competitive Advantage)
 
-Features no surveyed clipboard manager offers. These set Pastel apart.
+Features that set Pastel apart from competitors.
 
-| Feature | Value Proposition | Complexity | Depends On |
-|---------|-------------------|------------|------------|
-| Storage dashboard with donut chart | No competitor shows storage breakdown visually; genuine novelty | MEDIUM | SwiftUI Charts (macOS 13+) |
-| Purge by content type | Targeted cleanup without losing everything | LOW | SwiftData predicates |
-| Purge by age within type | Fine-grained control: "delete images older than 1 week" | MEDIUM | Compound predicates |
-| Database compaction button | Reclaim disk space after bulk deletions; visible before/after | MEDIUM | SQLite VACUUM |
-| Configurable sensitive item expiry | No clipboard manager offers graduated expiry for user-marked items | LOW | ExpirationService (exists) |
-| Auto-re-blur after timed reveal | Security-conscious: reveals auto-hide after 5-10 seconds | LOW | Timer-based state reset |
-| Sensitive items in context menu (toggle) | Quick one-action marking, no dialogs | LOW | Context menu (exists) |
-| Deferred image compression (24h grace period) | Recent images stay full quality; older ones compress automatically | MEDIUM | Background task + ImageStorageService |
+| Feature | Value Proposition | Complexity | Integration Notes |
+|---------|-------------------|------------|-------------------|
+| Shift+double-click for plain text paste | No competitor offers modifier-click for plain text | LOW | Modifier detection in tap gesture |
+| "Ignore [App Name]" from card context menu | No competitor offers in-context ignore | LOW | Read sourceAppBundleID from the card's item |
+| Allow list mode (monitor only specific apps) | No macOS clipboard manager offers dual mode | LOW | Settings toggle; inverse of ignore logic |
+| Drag-and-drop items to other apps | Only premium managers support this; Maccy does not | MEDIUM | .onDrag on card views |
+| Drag preview with content snippet | Visual feedback during drag | LOW | .onDrag preview parameter |
+| Extensible export format (versioned JSON) | Future-proofs for cross-manager import | LOW | Built into format design |
+| Export with label preservation | No competitor exports organized history | MEDIUM | Part of export format |
+| Import with duplicate detection via hash | Smart merge, not blind append | MEDIUM | Use existing contentHash |
 
 ### Anti-Features (Things to Deliberately NOT Build)
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Auto-detect sensitive content (regex for CC#, SSN, API keys) | "Wouldn't it be smart to automatically detect passwords?" | False positives destroy trust; false negatives create false security; regex cannot reliably identify "sensitive" vs "looks like a number" | Manual marking -- user decides what is sensitive |
-| Encrypt clipboard history database | "For security!" | Degrades search performance (can't query encrypted fields); false sense of security (key stored on same machine); adds massive complexity | Clear history button, auto-expiry, manual sensitive marking |
-| HEIC image compression | "Better compression ratio than JPEG" | 2x slower decode = janky scrolling in panel; limited tooling outside Apple ecosystem; marginal benefit for clipboard previews | JPEG at quality 0.8 -- fast decode, universal, 5-8x savings |
-| Perceptual image deduplication (pHash) | "Detect similar screenshots" | CPU-intensive on every capture; complex dependency; marginal benefit for clipboard use case | SHA256 hash dedup (already implemented) |
-| Real-time storage monitoring (live counters) | "Show disk usage updating live" | Continuous filesystem polling wastes CPU; storage changes infrequently | Calculate on Settings tab open; refresh button |
-| Encrypted/password-protected reveal | "Require password to see sensitive items" | macOS clipboard managers run in user context; if attacker has user access, password adds no real security | Blur + click-to-reveal is sufficient for shoulder-surfing protection |
-| Import/export of sensitive items separately | "Export my sensitive clips encrypted" | Scope creep; import/export is deferred to v2 entirely | Defer to v2 |
+| Feature | Why It Seems Appealing | Why Problematic | Alternative |
+|---------|----------------------|-----------------|-------------|
+| Auto-detect sensitive apps (heuristic) | "Automatically ignore password managers!" | False negatives for lesser-known managers; false positives for legitimate apps; ConcealedType already handles this for compliant apps | Manual ignore list + existing ConcealedType handling |
+| iCloud sync for clipboard history | "Sync between my Macs!" | Massive complexity: conflict resolution, storage costs, privacy concerns. Apple's Universal Clipboard handles basic cross-device | Export/import for manual transfer between machines |
+| Import from other clipboard managers (v1.3) | "Let me switch from Maccy easily!" | Each manager has a different storage format; reverse-engineering proprietary formats is fragile | Define Pastel's own format first; add importers in v2+ |
+| Drag multiple items at once | "I want to drag 5 items to a text editor!" | Multi-drag UX is confusing (what order? concatenated or separate?); SwiftUI multi-drag support is limited | Single item drag in v1.3; multi-drag in v2 |
+| Export as CSV / plain text | "I want my clipboard history in a spreadsheet!" | Lossy: cannot preserve images, RTF, labels, metadata | JSON-based .pastel format preserves everything; users can extract text from JSON if needed |
+| Global "paste as plain text" hotkey (outside panel) | "I want Cmd+Shift+V to ALWAYS paste plain text, even without the panel!" | Conflicts with macOS system shortcuts and other apps; fundamentally different feature (system-wide text processing) | In-panel plain text paste covers the primary use case |
+| Real-time ignore/allow (mid-capture cancel) | "If I copy from an ignored app, undo the capture in progress" | Capture is atomic (0.5s poll interval); by the time we detect the copy, it's already a complete operation | Check ignore list before processing (which we do) |
+| Encrypted export | "Encrypt my clipboard export for security!" | Adds key management complexity; users have FileVault for disk encryption | Rely on macOS FileVault and user's own file security practices |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Mark as Sensitive]
+[Paste as Plain Text UI (PAST-20)]
+    |-- requires --> [PasteService.pastePlainText] (DONE in Phase 9)
+    |-- requires --> [PanelActions.pastePlainTextItem] (DONE in Phase 9)
     |-- requires --> [Context menu infrastructure] (DONE in Phase 4)
-    |-- requires --> [Model field: isSensitive] (NEW - extends ClipboardItem)
-    |
-    |-- enables --> [Blur/Redact display]
-    |                   |-- enables --> [Click-to-reveal]
-    |                   |-- enables --> [Auto-re-blur timer]
-    |
-    |-- enables --> [Sensitive item expiry setting]
-                        |-- reuses --> [ExpirationService] (DONE in Phase 1)
+    |-- requires --> [Keyboard navigation + .onKeyPress] (DONE in Phase 3)
+    |-- no model changes needed
+    |-- INDEPENDENT of other v1.3 features
 
-[Image Compression]
-    |-- requires --> [ImageStorageService] (DONE in Phase 1)
-    |-- requires --> [Background compression task] (NEW)
-    |-- enables --> [Storage savings visible in dashboard]
-
-[Storage Dashboard]
+[Allow/Ignore App Lists (PRIV-01)]
+    |-- requires --> [ClipboardMonitor] (DONE in Phase 1)
     |-- requires --> [Settings window infrastructure] (DONE in Phase 5)
-    |-- requires --> [SwiftUI Charts] (framework, no dependency to add)
-    |-- enhances --> [Purge by category]
-    |-- enhances --> [Database compaction]
+    |-- requires --> [NSWorkspace frontmostApplication] (already used in ClipboardMonitor)
+    |-- new: UserDefaults storage for bundle ID lists
+    |-- new: Settings UI with app picker
+    |-- new: Context menu "Ignore [App]" option
+    |-- INDEPENDENT of other v1.3 features
 
-[Duplicate bubble-up]
-    |-- modifies --> [ClipboardMonitor dedup logic] (DONE in Phase 1)
-    |-- independent of other v1.2 features
+[Import/Export (DATA-01)]
+    |-- requires --> [SwiftData model] (DONE in Phase 1+)
+    |-- requires --> [ImageStorageService] (DONE in Phase 1)
+    |-- requires --> [Settings window] (DONE in Phase 5)
+    |-- requires --> [Label model with relationships] (DONE in Phase 11)
+    |-- new: Codable serialization of ClipboardItem + Label
+    |-- new: File format definition (.pastel bundle)
+    |-- new: NSSavePanel / NSOpenPanel integration
+    |-- new: Conflict resolution logic
+    |-- INDEPENDENT of other v1.3 features
 
-[Purge by Category]
-    |-- requires --> [Storage tab UI] (part of Dashboard)
-    |-- enables --> [Database compaction] (run after large purge)
-
-[Database Compaction]
-    |-- requires --> [Access to SQLite store URL]
-    |-- follows --> [Purge by category] (most valuable after bulk delete)
+[Drag-and-Drop (HIST-02)]
+    |-- requires --> [ClipboardCardView] (DONE in Phase 2+)
+    |-- requires --> [ImageStorageService for image URLs] (DONE in Phase 1)
+    |-- requires --> [NSItemProvider / SwiftUI .onDrag] (framework)
+    |-- needs testing: NSPanel dismiss during drag
+    |-- INDEPENDENT of other v1.3 features
 ```
 
-### Dependency Notes
-
-- **Mark as Sensitive requires context menu:** Already built in Phase 4. Just needs a new menu item.
-- **Storage Dashboard requires Settings window:** Already built in Phase 5. Just needs a new tab.
-- **Image Compression and Sensitive Marking are independent:** Can be built in parallel or any order.
-- **Database Compaction follows Purge:** Most valuable after bulk deletions, but can be offered standalone too.
-- **Duplicate bubble-up is standalone:** No dependencies on other v1.2 features; can ship in any phase.
+**Key observation:** All four features are independent of each other. They can be built in any order and in parallel. No feature blocks another.
 
 ---
 
-## Milestone Scope Definition
+## Implementation Priority and Phase Ordering
 
-### Must Build (v1.2 Core)
+| Feature | User Value | Implementation Cost | Risk | Recommended Order |
+|---------|------------|---------------------|------|-------------------|
+| Paste as Plain Text (PAST-20) | HIGH (daily use) | LOW (infrastructure exists) | LOW | 1st (quick win) |
+| Allow/Ignore App Lists (PRIV-01) | HIGH (privacy) | MEDIUM (new Settings UI) | LOW | 2nd (standalone) |
+| Drag-and-Drop (HIST-02) | MEDIUM (power users) | MEDIUM (NSPanel interaction risk) | MEDIUM (NSPanel dismiss) | 3rd (needs testing) |
+| Import/Export (DATA-01) | MEDIUM (infrequent use) | MEDIUM-HIGH (most code) | LOW-MEDIUM (format design) | 4th (most work, least urgency) |
 
-- [ ] **Image compression** -- JPEG at 0.8 for images older than 24h; background task
-- [ ] **Duplicate bubble-up** -- Re-copied items update timestamp and appear at top
-- [ ] **Storage dashboard** -- New Settings tab showing item counts, disk usage, donut chart
-- [ ] **Purge by content type** -- Delete all items of a selected type
-- [ ] **Mark as sensitive** -- Context menu toggle on clipboard items
-- [ ] **Blur/redact display** -- Sensitive items show blurred in panel
-- [ ] **Click-to-reveal** -- Tap to temporarily show sensitive content
-- [ ] **Sensitive item expiry** -- Configurable shorter auto-expiry for marked items
-
-### Add If Time Allows (v1.2 Stretch)
-
-- [ ] **Database compaction** -- VACUUM button with before/after size display
-- [ ] **Purge unlabeled items** -- Delete items without any label assigned
-- [ ] **Auto-re-blur timer** -- Re-hide sensitive content after 5-10 seconds
-- [ ] **Purge by age within type** -- Compound filter: "images older than 1 week"
-
-### Defer to v1.3+ (Out of Scope)
-
-- [ ] **HEIC compression** -- Wait for decode performance to improve
-- [ ] **Perceptual image dedup** -- Overkill for clipboard use case
-- [ ] **Auto-detect sensitive content** -- False positive risk too high
-- [ ] **Encrypted database** -- Complexity without real security gain
+**Rationale:**
+1. **PAST-20 first:** Lowest effort, highest daily impact. All infrastructure exists. Can ship in one plan.
+2. **PRIV-01 second:** Important for privacy-conscious users. Self-contained Settings work.
+3. **HIST-02 third:** Needs testing with NSPanel behavior. Medium complexity, medium value.
+4. **DATA-01 fourth:** Most implementation work, least frequently used (export once, import once). The format design requires careful thought but low time pressure.
 
 ---
 
-## Feature Prioritization Matrix
+## Competitor Feature Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Mark as sensitive (context menu) | HIGH | LOW | P1 |
-| Blur/redact sensitive items | HIGH | LOW | P1 |
-| Click-to-reveal | HIGH | LOW | P1 |
-| Duplicate bubble-up on re-copy | HIGH | LOW | P1 |
-| Image compression (JPEG, 24h grace) | HIGH | MEDIUM | P1 |
-| Sensitive item expiry setting | MEDIUM | LOW | P1 |
-| Storage dashboard (item counts + disk usage) | MEDIUM | MEDIUM | P1 |
-| Purge by content type | MEDIUM | LOW | P1 |
-| Database compaction | LOW | MEDIUM | P2 |
-| Auto-re-blur timer | LOW | LOW | P2 |
-| Purge unlabeled items | LOW | LOW | P2 |
-| Purge by age within type | LOW | MEDIUM | P3 |
+| Feature | PastePal | Paste 2 | Maccy | Pastel v1.2 (current) | Pastel v1.3 (planned) |
+|---------|----------|---------|-------|----------------------|----------------------|
+| Paste as plain text (context menu) | Yes | Yes | Yes (keyboard only) | No (Cmd+Shift+1-9 only) | Yes (context menu + Shift+Enter + Shift+dbl-click) |
+| App ignore list | Filter by app | Exclude apps | Ignore pasteboard types | No | Yes (ignore list + context menu shortcut) |
+| App allow list | No | No | No | No | Yes (optional mode) |
+| Export history | No | No | No | No | Yes (.pastel format) |
+| Import history | No | No | No | No | Yes (with dedup) |
+| Drag to other apps | Yes | Unknown | No | No | Yes |
+| Drag preview | Unknown | Unknown | N/A | No | Yes |
 
----
-
-## Competitor Feature Analysis
-
-| Feature | PastePal | Paste 2 | Maccy | Pastel (v1.2) |
-|---------|----------|---------|-------|---------------|
-| Image compression | Unknown (likely yes, recent images full-quality) | Unknown | No image storage (text only by default) | JPEG 0.8 with 24h grace period |
-| Storage dashboard | None visible | None visible | None (lightweight, no images) | Donut chart + item counts + disk size |
-| Purge by type | None visible | None visible | None | Category-based purge |
-| Sensitive marking | Exclude apps list | Exclude apps list | Ignores ConcealedType | Manual mark + blur + reveal + expiry |
-| Deduplication | Bubble-up on re-copy | Bubble-up on re-copy | Bubble-up on re-copy | Bubble-up on re-copy (to be added) |
-| Auto-expiry for sensitive | Not user-configurable | Not user-configurable | N/A (deletes concealed items) | Configurable: 1h, 24h, 1w, or match retention |
-| Database compaction | Not exposed | Not exposed | Not exposed | Manual VACUUM button |
-
-**Pastel's competitive edge in v1.2:** Storage visibility and management. No surveyed competitor gives users visibility into how much disk space their clipboard history consumes or tools to manage it selectively. Combined with genuinely useful sensitive item protection (not just app exclusion lists), this positions Pastel as the most storage-conscious and privacy-respectful clipboard manager.
-
----
-
-## Critical Context: macOS Tahoe (macOS 26) Implications
-
-### Built-in Clipboard History
-
-macOS 26 Tahoe includes native clipboard history accessible via Spotlight (Cmd+4). Items retained for 8 hours, disabled by default. This is basic but represents Apple entering the space. It validates the clipboard manager category while raising the bar for third-party apps.
-
-**Impact on Pastel:** Reinforces the importance of features Apple's built-in solution lacks -- labels, search, image support, sensitive marking, storage management. Apple's version is intentionally minimal (8-hour retention, no organization, no images). Pastel's differentiators remain strong.
-
-### Clipboard Privacy Prompts
-
-macOS 16+ (and Tahoe) introduces clipboard privacy prompts when apps read the pasteboard programmatically. NSPasteboard polling (which Pastel uses) will trigger a one-time permission request.
-
-**Impact on v1.2 specifically:** The `isConcealed` check already works without reading pasteboard contents (it checks pasteboard types, not content). However, the new `detect` methods should be evaluated in a future phase to minimize permission friction. For v1.2, this is informational -- the permission prompt is a one-time user action, and clipboard managers are expected to request this access.
+**Pastel's v1.3 competitive position:** These four features fill the remaining gaps between Pastel and premium competitors while adding novel capabilities (context menu app ignore, allow list mode, versioned export format) that no competitor currently offers.
 
 ---
 
 ## Sources
 
-- [PastePal - App Store](https://apps.apple.com/us/app/clipboard-manager-pastepal/id1503446680) (feature list, MEDIUM confidence)
-- [Maccy - GitHub](https://github.com/p0deje/Maccy) (open source, storage approach, HIGH confidence)
-- [NSPasteboard.org](http://nspasteboard.org/) (ConcealedType specification, HIGH confidence)
-- [1Password - Clipboard Clearing](https://1password.community/discussions/1password/clipboard-clearing----too-aggressive/123881) (90s timeout, HIGH confidence)
-- [Bitwarden - ConcealedType Issue](https://github.com/bitwarden/desktop/issues/350) (ConcealedType gaps, HIGH confidence)
-- [SwiftUI redacted modifier](https://developer.apple.com/documentation/swiftui/view/redacted(reason:)) (Apple docs, HIGH confidence)
-- [macOS Tahoe Clipboard History](https://jimmytechsf.com/blog/macos-26-tahoe-gets-clipboard-history) (8-hour retention, MEDIUM confidence)
-- [macOS 16 Clipboard Privacy](https://9to5mac.com/2025/05/12/macos-16-clipboard-privacy-protection/) (privacy prompts, MEDIUM confidence)
-- [Pasteboard Privacy Developer Preview](https://mjtsai.com/blog/2025/05/12/pasteboard-privacy-preview-in-macos-15-4/) (detect APIs, MEDIUM confidence)
-- [macOS Tahoe 26.1 Clipboard Settings](https://www.macworld.com/article/2962021/this-macos-tahoe-26-1-setting-will-eliminate-embarrassing-clipboard-mishaps.html) (expiry options, MEDIUM confidence)
-- [SQLite VACUUM](https://sqlite.org/lang_vacuum.html) (database compaction, HIGH confidence)
-- [SwiftUI Charts SectorMark](https://swiftwithmajid.com/2023/09/26/mastering-charts-in-swiftui-pie-and-donut-charts/) (donut charts, HIGH confidence)
-- [NSImage JPEG compression](https://developer.apple.com/documentation/appkit/nsbitmapimagerep/representation(using:properties:)) (Apple API, HIGH confidence)
-- [HEIC vs JPEG performance](https://pspdfkit.com/blog/2018/ios-heic-performance/) (decode speed comparison, MEDIUM confidence)
-- [CoreData VACUUM approach](https://blog.eidinger.info/keep-your-coredata-store-small-by-vacuuming) (SQLite compaction from Swift, MEDIUM confidence)
+- [Paste Help Center](https://pasteapp.io/help/paste-on-mac) -- Paste as plain text UX, exclude apps (MEDIUM confidence)
+- [Maccy README / GitHub](https://github.com/p0deje/Maccy/blob/master/README.md) -- Ignore pasteboard types, no drag support (HIGH confidence)
+- [Maccy Issue #241](https://github.com/p0deje/Maccy/issues/241) -- Ignore by app feature request and implementation (HIGH confidence)
+- [Maccy Issue #79](https://github.com/p0deje/Maccy/issues/79) -- Sensitive app clipboard handling (HIGH confidence)
+- [Maccy Issue #1072](https://github.com/p0deje/Maccy/issues/1072) -- frontmostApplication vs actual clipboard source limitation (HIGH confidence)
+- [PastePal App Store](https://apps.apple.com/us/app/clipboard-manager-pastepal/id1503446680) -- Feature list, filter by app (MEDIUM confidence)
+- [PastePal Review](https://macsources.com/pastepal-clipboard-manager-for-macos-review/) -- Drag-and-drop, plain text paste (MEDIUM confidence)
+- [Pasta App Store](https://apps.apple.com/us/app/pasta-clipboard-manager/id1438389787?mt=12) -- Drag clippings to other apps (MEDIUM confidence)
+- [PasteNow](https://pastenow.app/) -- Drag and drop from list (MEDIUM confidence)
+- [Paste Review](https://josephnilo.com/blog/paste-setapp-review/) -- Exclude apps, privacy controls (MEDIUM confidence)
+- [BetterTouchTool Forum](https://community.folivora.ai/t/exclude-apps-from-clipboard-manager-passwords/16601) -- Exclude apps from clipboard manager (MEDIUM confidence)
+- [SwiftUI Drag and Drop - Eclectic Light](https://eclecticlight.co/2024/05/21/swiftui-on-macos-drag-and-drop-and-more/) -- NSItemProvider patterns, background thread gotchas (MEDIUM confidence)
+- [SwiftUI onDrag - Swift with Majid](https://swiftwithmajid.com/2020/04/01/drag-and-drop-in-swiftui/) -- NSItemProvider usage patterns (MEDIUM confidence)
+- [NSWorkspace frontmostApplication](https://developer.apple.com/documentation/appkit/nsworkspace/frontmostapplication) -- Apple API docs (HIGH confidence)
+- [Alfred Clipboard Archive Script](https://gist.github.com/pirate/6551e1c00a7c4b0c607762930e22804c) -- JSON export pattern for clipboard history (MEDIUM confidence)
 
 **Gaps requiring phase-specific research:**
-- SwiftData VACUUM access: Verify how to access the underlying SQLite store URL from a ModelContainer in the current SwiftData API. May require using the store's `url` property from `ModelConfiguration`.
-- macOS Tahoe detect APIs: Evaluate `NSPasteboard.detect()` methods for future compatibility. Not blocking for v1.2 but important for v1.3+.
-- Background image compression: Test JPEG compression quality 0.8 with real clipboard screenshots to verify acceptable visual quality for panel display.
+- NSPanel drag behavior: Verify that NSItemProvider data survives panel dismiss during an active drag operation. Test with each content type.
+- SwiftUI `.onDrag` on non-activating NSPanel: Confirm that .onDrag modifier works correctly inside an NSHostingView hosted in a non-activating NSPanel. No documentation specifically addresses this combination.
+- RTF data in NSItemProvider: Test whether rich text items can provide both plain text and RTF representations through a single NSItemProvider for maximum receiving-app compatibility.
+- Export file size: Profile the export of a large history (5K+ items, 500+ images) to determine if streaming or chunked writing is needed for memory management.
 
 ---
-*Feature research for: Pastel v1.2 -- Storage & Security*
-*Researched: 2026-02-07*
+*Feature research for: Pastel v1.3 -- Power User Features*
+*Researched: 2026-02-09*

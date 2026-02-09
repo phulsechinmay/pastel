@@ -1,191 +1,316 @@
-# Pitfalls Research: v1.2 Storage & Security
+# Pitfalls Research: v1.3 Power User Features
 
-**Domain:** macOS clipboard manager -- adding storage optimization (compression, deduplication, dashboard, purge) and sensitive item protection (manual marking, blur redaction, click-to-reveal, auto-expiry) to existing v1.0/v1.1 system
-**Researched:** 2026-02-07
-**Confidence:** MEDIUM-HIGH (verified against official SQLite docs, Apple developer forums, and existing codebase analysis; some macOS 15+ screenshot protection claims based on developer forum reports)
+**Domain:** macOS clipboard manager -- adding paste-as-plain-text UI (PAST-20), app filtering (PRIV-01), import/export (DATA-01), and drag-and-drop from panel (HIST-02) to existing v1.0/v1.1/v1.2 system
+**Researched:** 2026-02-09
+**Confidence:** MEDIUM-HIGH (verified against existing codebase, Apple documentation, Maccy open-source patterns, and NSPasteboard behavior research; some drag-and-drop interaction claims based on developer community reports)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause data loss, broken paste-back, or false sense of security requiring rework.
+Mistakes that cause broken paste behavior, data loss during import/export, or fundamental feature failures.
 
-### Pitfall 1: Lossy Image Compression Degrades Paste-Back Quality
+### Pitfall 1: writeToPasteboardPlainText Still Writes HTML, Defeating Plain Text Intent
 
 **What goes wrong:**
-Compressing stored images with lossy JPEG/HEIC to save disk space silently degrades paste-back fidelity. The user copies a pixel-perfect screenshot from Figma, Pastel compresses it to JPEG at 80% quality, and when the user pastes it back days later, the image has JPEG artifacts -- blurred text, color banding around sharp edges, and different dimensions. For developers and designers, this is a deal-breaker: a clipboard manager that corrupts images is worse than no clipboard manager.
+The existing `PasteService.writeToPasteboardPlainText(item:)` method at lines 218-240 strips `.rtf` data but **still writes `.html` content** to the pasteboard. When a user invokes "Paste as plain text" via Shift+Enter, Shift+double-click, or the context menu, receiving apps like Pages, Notes, and Google Docs see the `.html` type on the pasteboard and render it with full rich formatting -- bold, links, font sizes, colors. The user explicitly asked for plain text but gets rich text. This makes the entire paste-as-plain-text feature appear broken.
 
-The existing `ImageStorageService` stores images as PNG (lossless) after downscaling to 4K max. Switching to lossy compression changes a fundamental contract: what you copy is NOT what you paste back.
+The current code:
+```swift
+// Write string and HTML only -- NO .rtf data
+if let text = item.textContent {
+    pasteboard.setString(text, forType: .string)
+}
+if let html = item.htmlContent {
+    pasteboard.setString(html, forType: .html)  // <-- THIS DEFEATS PLAIN TEXT
+}
+```
+
+NSPasteboard supports multiple representations simultaneously. When both `.string` and `.html` are present, most macOS apps will prefer the richer `.html` representation. The result: what claims to be "plain text paste" actually delivers formatted HTML to the receiving app.
 
 **Why it happens:**
-The storage savings from lossy compression are dramatic (PNG screenshot: 2MB, JPEG 80%: 200KB). Developers see a 10x reduction and ship it without checking paste-back quality with critical content types: screenshots with text, UI mockups, diagrams with thin lines, pixel art, and images with transparency.
+The v1.1 implementation of `pastePlainText` was designed for the quick-paste hotkey (Cmd+Shift+1-9) where the primary concern was stripping RTF (formatted text from word processors). HTML was kept as a secondary text representation without considering that HTML itself carries formatting. The logic was "remove the richest format" when it should have been "keep ONLY the plainest format."
 
 **Specific risk in Pastel's architecture:**
-- `ImageStorageService.saveImage()` currently stores as PNG via `pngData(from:)`. Changing this to JPEG would lose alpha channel (transparency) silently -- JPEG does not support alpha.
-- `PasteService.writeToPasteboard()` reads the stored file and writes it as `.png` and `.tiff` to the pasteboard. If the stored file is JPEG, the types would need to change, and some receiving apps may not handle JPEG pasteboard data correctly.
-- The `computeImageHash()` function hashes the first 4KB of raw image data. Compressing an image changes its bytes, so re-hashing after compression would produce different hashes than the original -- breaking deduplication across compress/non-compress boundaries.
+- `ClipboardMonitor.processPasteboardContent()` captures `htmlContent` separately from `textContent`. When the item was originally rich text (from a web page, email, or formatted document), `htmlContent` contains full HTML markup with `<b>`, `<font>`, `<span style="...">` tags.
+- The `writeToPasteboardPlainText` method is called from three paths: Shift+Enter (keyboard), Shift+double-click (mouse), and Cmd+Shift+1-9 (quick paste). All three paths currently have this bug.
+- The context menu "Paste" entry does NOT have a plain-text variant yet. Adding "Paste as Plain Text" to the context menu must use the corrected implementation.
 
 **How to avoid:**
-- **Keep originals as PNG (lossless). Compress only the display thumbnails.** The existing 200px thumbnails are already small. Add a medium-resolution "preview" thumbnail (e.g., 800px) compressed as JPEG for the panel card display, but keep the full-size PNG for paste-back. This gives storage savings on display while preserving paste fidelity.
-- **If lossy compression is truly needed for storage:** Make it opt-in per item (not global). Show a clear warning: "Compressed images may lose quality when pasted." Never auto-compress. Let the user choose which old images to compress.
-- **Never compress images with alpha channel.** Detect transparency before compression. If the image has alpha, keep it as PNG regardless of compression settings.
-- **Store the original format metadata.** Add `imageFormat: String?` to ClipboardItem so paste-back can write the correct pasteboard type.
+- **For true plain text paste: write ONLY `.string` type.** Clear the pasteboard, then set exactly one type: `pasteboard.setString(text, forType: .string)`. No `.rtf`, no `.html`. This forces every receiving app to fall back to unformatted plain text.
+- **Do NOT write `.html` in the plain text path.** The HTML representation exists for paste-back fidelity when the user wants formatting preserved. Plain text paste explicitly abandons formatting fidelity.
+- **Test with receiving apps that prioritize HTML:** Safari's URL bar, Notes, Pages, TextEdit (rich text mode), Google Docs in Chrome. If any of these show bold/italic/colored text after a "plain text paste," the bug is present.
 
 **Warning signs:**
-- Paste a screenshot with text into a design tool. If the text looks fuzzy, compression is too aggressive.
-- Paste an image with transparency. If the background turns white/black, alpha channel was lost.
-- Users report "Pastel ruined my image" in feedback.
+- Paste-as-plain-text into Google Docs shows formatted text instead of plain text.
+- Paste-as-plain-text into Notes preserves link styling or font changes.
+- Users report "paste as plain text doesn't work" -- the feature works technically but the output looks rich.
 
-**Phase to address:** Image compression phase. Decide the compression strategy BEFORE writing any compression code. The preview-thumbnail approach avoids this pitfall entirely.
+**Affects:** PAST-20 (Paste as plain text)
+**Phase to address:** Must be fixed in the paste-as-plain-text implementation phase, before any UI work.
 
-**Confidence:** HIGH -- PNG vs JPEG quality differences and alpha channel loss are well-documented. Verified that current `ImageStorageService` uses PNG exclusively.
+**Confidence:** HIGH -- verified by reading PasteService.swift lines 218-240. The HTML write is plainly visible in the existing code. NSPasteboard type priority behavior (apps prefer richer types) is well-documented.
 
 ---
 
-### Pitfall 2: Purge Operations Delete Disk Files But Crash Before Deleting SwiftData Records (or Vice Versa)
+### Pitfall 2: Drag-and-Drop from Panel Writes to NSPasteboard.general, Triggering Self-Capture Loop
 
 **What goes wrong:**
-Purge operations (clear by category, clear by date range, compact storage) must delete both SwiftData records AND their associated disk files (images, thumbnails, favicons, preview images). If the operation deletes disk files first and then crashes before the SwiftData delete, the database has orphan records pointing to missing files. If SwiftData records are deleted first and the crash happens before disk cleanup, orphan files accumulate on disk consuming space invisibly.
-
-The existing `RetentionService.purgeExpiredItems()` and `AppState.clearAllHistory()` both exhibit this pattern: they iterate items, call `ImageStorageService.shared.deleteImage()` (which runs on a background queue), then delete from SwiftData. Since `deleteImage()` is fire-and-forget on `backgroundQueue.async`, the disk deletion and SwiftData deletion are NOT atomic -- they can partially complete.
+When implementing drag-and-drop from the panel to an external app, developers commonly write the dragged content to `NSPasteboard.general` as part of the drag operation. This triggers `ClipboardMonitor`'s 0.5s polling timer, which detects the `changeCount` change and re-captures the item as a "new" clipboard entry. The user drags an item to paste it, and Pastel creates a duplicate entry in the history. If the user drags the same item multiple times, the history fills with duplicates.
 
 **Why it happens:**
-There is no transaction that spans both file system operations and SwiftData. File deletion is immediate and irreversible (`FileManager.removeItem`). SwiftData deletion requires `modelContext.save()` which can fail. These two systems have independent failure modes.
+macOS drag-and-drop uses a **separate drag pasteboard** (`NSDragPboard`), NOT `NSPasteboard.general`. When using SwiftUI's `.draggable()` modifier with `Transferable`, the framework handles the drag pasteboard correctly. However, if the implementation accidentally also writes to the general pasteboard (for example, by calling `writeToPasteboard()` before initiating the drag), or if the drop target app copies the dropped content to its own clipboard (which then appears on `.general`), the monitor picks it up.
 
-For a small retention purge (deleting 5 expired items), partial failure is tolerable. For a bulk purge ("delete all images older than 30 days" -- potentially hundreds of items), partial failure means significant data inconsistency.
+The specific risk: after the drop completes, some receiving apps (TextEdit, Notes, Terminal) copy the dropped content to the system clipboard as part of their "insert" operation. This changes `NSPasteboard.general.changeCount`, and the monitor captures it as a new item -- even though it is the same content the user just dragged from Pastel.
 
 **Specific risk in Pastel's architecture:**
-- `ImageStorageService.deleteImage()` runs on `backgroundQueue` (`.utility` QoS). It's async and has no completion handler. The caller cannot know when or if disk deletion succeeded.
-- `RetentionService` deletes images in a loop, then deletes SwiftData records in another loop, then calls `modelContext.save()`. If `save()` throws, it rolls back the SwiftData deletes -- but the disk files are already gone.
-- Bulk purge of hundreds of items will be significantly slower than the current small-batch retention purge. SwiftData's `modelContext.delete(model:)` is a batch operation but does not support a `where:` predicate combined with pre-deletion hooks (to collect file paths).
+- `ClipboardMonitor.checkForChanges()` compares `changeCount` every 0.5s. It has no awareness of whether a change came from a drag-and-drop initiated by Pastel itself.
+- The existing `skipNextChange` flag is a boolean -- it skips exactly ONE change. If the drag operation causes two pasteboard changes (one from the drag write, one from the receiving app's insert), only the first is skipped.
+- Consecutive dedup (`isDuplicateOfMostRecent`) will catch exact duplicates, but the `@Attribute(.unique)` constraint on `contentHash` will cause a save failure and rollback for non-consecutive identical content. Neither provides clean UX -- the user sees no feedback but the save silently fails.
 
 **How to avoid:**
-- **Delete SwiftData records FIRST, then disk files.** If SwiftData deletion fails, roll back and abort -- no disk files were touched. If SwiftData succeeds but disk cleanup fails, orphan files are a minor issue (wasted space) that can be cleaned up later by a separate reconciliation task. This order ensures the more critical data (records) stays consistent.
-- **Collect all file paths before deleting records.** Fetch items, extract `imagePath`, `thumbnailPath`, `urlFaviconPath`, `urlPreviewImagePath` into an array. Delete records from SwiftData and save. Only then iterate the file paths array for disk cleanup.
-- **Add an orphan file cleanup task.** On app launch (or periodically), scan the `~/Library/Application Support/Pastel/images/` directory. For each file, check if any ClipboardItem references it. Delete unreferenced files. This catches any previous partial failures.
-- **For bulk purges, batch the SwiftData operations.** Delete in batches of 50-100 items with `modelContext.save()` between batches. This prevents a single massive transaction that could timeout or OOM.
+- **Use SwiftUI's `.draggable()` modifier with `Transferable` protocol.** This writes to the drag pasteboard (`NSDragPboard`), NOT to `NSPasteboard.general`. The monitor will NOT detect drag pasteboard changes because it only polls `.general`.
+- **Do NOT call `writeToPasteboard()` or `PasteService.paste()` as part of the drag flow.** The drag operation provides its own data transfer mechanism entirely separate from the clipboard.
+- **Set a "dragging in progress" flag on ClipboardMonitor** during drag operations. If a receiving app copies the dropped content to the general pasteboard, the monitor should skip that change. Use a time-window flag (e.g., skip changes for 2 seconds after a drag ends) since the receiving app's clipboard write is asynchronous and unpredictable.
+- **Consider whether `skipNextChange` should be extended to `skipChangesUntil: Date?`** to handle multi-change scenarios (drag completion + app insertion).
 
 **Warning signs:**
-- Image cards show broken thumbnails (file deleted, record exists).
-- Storage dashboard shows X items but disk usage keeps growing (records deleted, files remain).
-- `modelContext.save()` throws during large purge operations.
+- Dragging an item from the panel creates a duplicate entry at the top of history.
+- History count increases by 1 every time the user drags an item.
+- Console shows "Captured text item from [receiving app]" immediately after a drag-drop.
 
-**Phase to address:** Storage management / purge phase. The orphan cleanup reconciliation should be implemented alongside purge operations.
+**Affects:** HIST-02 (Drag-and-drop from panel)
+**Phase to address:** Drag-and-drop implementation phase. The `skipNextChange` extension should be designed before implementing the draggable modifier.
 
-**Confidence:** HIGH -- verified by reading existing `RetentionService` and `AppState.clearAllHistory()` code. The non-atomic file+record deletion pattern is already present.
+**Confidence:** HIGH -- verified that `ClipboardMonitor` polls only `NSPasteboard.general`. Confirmed via research that drag-and-drop uses a separate pasteboard (`NSDragPboard`). The receiving-app-copies-dropped-content behavior is a known macOS pattern.
 
 ---
 
-### Pitfall 3: "Mark as Sensitive" Creates False Sense of Security While Data Remains Plaintext on Disk
+### Pitfall 3: App Filtering Checks frontmostApplication at Capture Time, Not at Copy Time
 
 **What goes wrong:**
-The user marks a clipboard item as "sensitive." Pastel blurs it in the panel and maybe auto-expires it. The user feels protected. But the actual content (`textContent`, `imagePath`) is stored in plaintext in the SwiftData SQLite database and as unencrypted files on disk. Anyone with access to `~/Library/Application Support/Pastel/` can read every "sensitive" item directly from the database file using `sqlite3` or by opening the image files.
+App filtering (allow/ignore lists) uses `NSWorkspace.shared.frontmostApplication` to determine which app produced the clipboard content. But `frontmostApplication` returns the app that has focus **at the moment of the check**, not the app that performed the copy. Because `ClipboardMonitor` polls every 0.5s, there is a race condition: the user copies in App A (which is on the ignore list), then switches to App B within 500ms. By the time the monitor fires, `frontmostApplication` returns App B. The ignored item is captured because the monitor thinks it came from App B.
 
-This is worse than no security feature at all, because the user *believes* their sensitive data is protected. They might mark API keys, passwords, private messages, or financial data as "sensitive" and feel safe. But the protection is purely visual -- a blur overlay in the UI. The underlying data is fully exposed.
+This is worse than no filtering -- the user added App A to the ignore list specifically to prevent capturing from it, but the items still appear in history. The user loses trust in the privacy feature.
 
 **Why it happens:**
-True encryption is hard. Encrypting individual SwiftData fields breaks `#Predicate` queries (you can't search encrypted text). Encrypting files on disk requires key management. The easy path is "just blur it in the UI" -- which looks like security but isn't.
+`NSPasteboard.general` has no metadata about which process wrote to it. There is no API to query "which app last wrote to the pasteboard." The only available signal is `frontmostApplication`, which is the app with key focus -- not necessarily the app that most recently wrote to the pasteboard. Background processes, scripts, and AppleScript can write to the pasteboard without being frontmost.
 
-The project's own REQUIREMENTS.md has "Encrypted clipboard history" explicitly in Out of Scope with the rationale: "Degrades search performance, false sense of security." This is accurate for full-database encryption but does not address the scenario where users explicitly mark specific items as sensitive.
+The existing code in `ClipboardMonitor.processPasteboardContent()` already captures `NSWorkspace.shared.frontmostApplication` (lines 223-225). This is used for display purposes (`sourceAppName`, `sourceAppBundleID`). Using the same value for filtering inherits the same race condition.
 
 **Specific risk in Pastel's architecture:**
-- `textContent` is a plain `String?` in SwiftData. The SQLite file at `~/Library/Application Support/Pastel/default.store` contains this in cleartext.
-- No App Sandbox means the database and image files are readable by any process with the user's UID.
-- OSLog messages include content type and source app but not content itself -- this is good. However, adding logging for sensitive operations ("Marked item as sensitive") must not include the item's content.
-- The existing `isConcealed` field (for password manager items) auto-expires items after 60 seconds. "Mark as sensitive" is different -- the user wants to KEEP the item but redact it visually. If sensitive items use the same `expiresAt` mechanism, users will lose data they wanted to keep.
+- The 0.5s polling interval means up to 500ms can elapse between the actual clipboard change and the monitor detecting it. Users frequently switch apps within that window (copy, then Cmd+Tab to paste).
+- Background clipboard writes (from CLI tools, AppleScript, Shortcuts, password managers, screen-capture tools) have NO frontmost app or report the wrong one. The monitor would attribute the content to whatever app happens to be frontmost at poll time.
+- The Maccy open-source clipboard manager has the same limitation (uses `NSWorkspace.shared.frontmostApplication`). This is a known limitation of the macOS clipboard monitoring approach, not a solvable problem.
 
 **How to avoid:**
-- **Be honest in the UI.** Do NOT call this feature "secure" or "encrypted." Call it "redacted" or "hidden from view." Use language like "This item is hidden in the panel. It is still stored on your Mac." A tooltip or info icon can explain: "For full disk protection, enable FileVault."
-- **Do NOT encrypt individual items.** It adds complexity without real security (the encryption key must live somewhere on the same machine). Instead, rely on macOS FileVault (full-disk encryption) for at-rest protection.
-- **Redact sensitive items from specific export/sharing operations.** When implementing export (v2), skip sensitive items entirely or require confirmation.
-- **Sanitize logs.** Any new logging related to sensitive items must use `OSLog` privacy markers: `\(item.textContent ?? "", privacy: .private)` so content is redacted in system logs unless Console.app has device unlocked.
-- **Separate `isSensitive` from `isConcealed`.** The existing `isConcealed` is automatically detected from password managers and auto-expires in 60 seconds. The new `isSensitive` is manually set by the user and should NOT auto-expire by default. These are different concepts with different lifecycles. Using the same field would conflate them.
+- **Accept the race condition as a known limitation.** Document it in the UI: "App filtering is based on the active app when the copy is detected. Fast app-switching may cause some items to be attributed to the wrong app."
+- **Use the `sourceAppBundleID` at capture time (current behavior).** Even though it is imperfect, it is the best available signal. Do not try to infer the source app from pasteboard types or content -- this is unreliable.
+- **Implement BOTH allow-list and ignore-list modes** (as Maccy does). Allow-list mode ("only capture from these apps") is safer for privacy-sensitive users because it fails closed -- unrecognized apps are excluded by default.
+- **Filter at display/storage time, not just capture time.** Store ALL items with their `sourceAppBundleID`, then filter the display. If the user later removes an app from the ignore list, previously-filtered items can reappear. If filtering at capture time, those items are permanently lost.
+- **Handle nil bundleIdentifier gracefully.** Some processes (command-line tools, launchd services) have no bundle identifier. Decide whether nil-bundle-ID items are captured or ignored. The safe default: capture them (they are likely user-initiated).
 
 **Warning signs:**
-- Feature description or UI strings use words like "secure," "protected," or "encrypted."
-- User-marked sensitive items use the same `isConcealed` field (conflates auto-detected with manual).
-- Sensitive item content appears in OSLog or crash reports.
+- User copies from Terminal (on ignore list), switches to Safari immediately, and the Terminal item appears in history attributed to Safari.
+- Background password manager fills a field, and the item appears attributed to the browser.
+- Items from ignored apps appear intermittently but not consistently (timing-dependent).
 
-**Phase to address:** Sensitive item marking phase. The UI language and data model distinction (`isSensitive` vs `isConcealed`) must be decided before any implementation.
+**Affects:** PRIV-01 (Allow/ignore app lists)
+**Phase to address:** App filtering implementation phase. The architecture decision (filter at capture vs. filter at display) must be made before implementation.
 
-**Confidence:** HIGH -- verified that the database is unencrypted plaintext SQLite, no sandbox, and that `isConcealed` already serves a different purpose. Security claims verified against clipboard security analysis.
+**Confidence:** HIGH -- verified that `ClipboardMonitor` uses `NSWorkspace.shared.frontmostApplication` at poll time (line 223). Verified via Maccy source code that this is the standard approach. The race condition is inherent to the polling architecture.
 
 ---
 
-### Pitfall 4: Content Deduplication Silently Drops Different Content That Hashes the Same
+### Pitfall 4: Import Overwrites Existing Items Due to contentHash Unique Constraint Collision
 
 **What goes wrong:**
-The deduplication system uses SHA256 content hashes with a `@Attribute(.unique)` constraint. If two different clipboard contents produce the same hash, the second one is silently dropped (the SwiftData insert fails with a unique constraint violation, and `modelContext.rollback()` discards it). The user copies something, it never appears in history, and there is no indication of why.
+When importing clipboard history from a `.pastel` export file, imported items that share a `contentHash` with existing items in the database fail to insert. SwiftData's `@Attribute(.unique)` constraint on `contentHash` causes the `modelContext.save()` to throw, and `modelContext.rollback()` discards the imported item. The user imports a 500-item export, but only 200 items appear -- the other 300 were duplicates of existing history. There is no feedback about which items were skipped or why.
 
-The current system has TWO deduplication mechanisms:
-1. **Consecutive dedup** (`isDuplicateOfMostRecent`): Compares hash of new item to the most recent item. Skips if same.
-2. **Global dedup** (`@Attribute(.unique)` on `contentHash`): Any item with the same hash as ANY historical item is rejected.
-
-For v1.2 content deduplication, the question is whether to expand beyond consecutive dedup into true content-aware dedup (finding items with identical or near-identical content across the entire history).
+This is especially problematic for the "backup and restore" use case: export history, reinstall app, import history. If any items were captured between the export and the reimport, the overlapping items are silently dropped.
 
 **Why it happens:**
-SHA256 hash collisions are astronomically unlikely for genuinely different content. The real risk is not cryptographic collision but **implementation bugs in what gets hashed**:
-- Image hashing uses only the first 4KB of data (`ImageStorageService.computeImageHash`). Two different images with the same first 4KB (e.g., same EXIF header, different pixel data) would hash identically.
-- Text hashing uses `Data(primaryContent.utf8)`. If `primaryContent` is empty or nil, different empty items all hash to the same empty-string SHA256. (The current code guards against empty content, but new code paths might not.)
-- If compression changes image bytes, the same logical image has different hashes before and after compression.
+The `@Attribute(.unique)` constraint on `contentHash` is designed for live deduplication during clipboard monitoring. It prevents the exact same content from being stored twice. But during import, the user explicitly WANTS all items from the export file to be present -- even if some overlap with existing items.
+
+The dilemma: if you remove the unique constraint for import, duplicate items accumulate. If you keep it, imported items are silently dropped. Neither behavior matches user expectations.
 
 **Specific risk in Pastel's architecture:**
-- The current `@Attribute(.unique)` on `contentHash` means the global dedup is already live. Adding explicit dedup logic needs to interoperate with this constraint without causing confusing double-rejections.
-- The `isDuplicateOfMostRecent` function only checks the single most recent item. True dedup would need to check against all items, which is more expensive but also more correct.
-- The `modelContext.rollback()` in the catch block after failed `.save()` handles unique violations gracefully but invisibly. The user never knows an item was dropped.
+- `contentHash` is `@Attribute(.unique)` on `ClipboardItem` (line 49 of ClipboardItem.swift). This is a database-level constraint that cannot be bypassed per-operation.
+- `modelContext.rollback()` rolls back the ENTIRE pending transaction, not just the failed insert. If you insert 10 items, and the 5th has a duplicate hash, the rollback loses items 1-4 as well unless you save between each insert.
+- Images are stored as separate files on disk. An imported item's `imagePath` points to a filename that may not exist in the local images directory. The import must also copy/recreate the image files.
 
 **How to avoid:**
-- **For text dedup: Hash the full content, not a prefix.** The current text hashing is already correct (full UTF-8 content). Keep this.
-- **For image dedup: Hash more than 4KB.** The first 4KB is often metadata/headers. Hash at least the first 64KB, or better, hash the entire file. For very large images, use a two-stage approach: fast prefix hash for initial comparison, full hash for confirmation.
-- **For near-duplicate detection (e.g., same text with trailing whitespace differences):** Normalize before hashing. Trim whitespace, normalize Unicode (NFC), then hash. But store the ORIGINAL content for paste-back -- only use normalized form for dedup comparison.
-- **When adding compression: compute and store the hash BEFORE compression.** The hash should represent the logical content, not the storage representation. This way, the same image hashed before and after compression produces the same dedup key.
-- **Consider whether global dedup (`@Attribute(.unique)`) is actually desired.** Currently, if you copy the same text, go do other things, and copy it again a week later, the second copy is silently dropped. For a clipboard manager, the user might WANT the second copy to appear (with a new timestamp). Consider relaxing the unique constraint and using only consecutive dedup plus explicit user-initiated dedup.
+- **Insert items one at a time with individual save calls.** After each `modelContext.insert()`, call `modelContext.save()`. If it fails due to a unique constraint violation, call `modelContext.rollback()` and continue with the next item. This ensures one failed import does not roll back others.
+- **Pre-check for existing hashes before inserting.** Fetch all `contentHash` values from the database into a Set. For each imported item, check if its hash already exists. If it does, either skip silently (with a counter) or update the existing item's timestamp.
+- **Show import results to the user.** "Imported 200 items. 300 items were already in your history and were skipped." This sets expectations and prevents confusion.
+- **For image items: include image data in the export format.** Base64-encode images into the export file (or use a zip archive with images as separate files). During import, save the image data to disk first, then create the `ClipboardItem` with the new local path.
+- **Generate new `contentHash` values during import if the "merge" strategy is selected.** Append a UUID to the content before hashing to guarantee uniqueness. This creates duplicates but preserves all imported items. Let the user choose: "Skip duplicates" or "Import all."
 
 **Warning signs:**
-- User reports "I copied X but it doesn't appear in history" -- likely a hash collision with an older item.
-- After adding compression, previously-deduplicated images are no longer detected as duplicates (hash changed).
-- Two visually different images show the same hash in logs (4KB prefix collision).
+- User imports a file and sees fewer items than expected.
+- User reports "import didn't work" when all items were duplicates.
+- Image items show broken thumbnails after import (file paths don't exist locally).
+- Crash or hang during import of large export files (saving 1000+ items in a single transaction).
 
-**Phase to address:** Deduplication phase. The hashing strategy and unique constraint policy must be decided before implementing any new dedup logic.
+**Affects:** DATA-01 (Import/export)
+**Phase to address:** Import/export implementation phase. The duplicate handling strategy must be decided before implementing import logic.
 
-**Confidence:** HIGH -- verified the 4KB image prefix hashing in `ImageStorageService.computeImageHash()` and the `@Attribute(.unique)` constraint on `contentHash`.
+**Confidence:** HIGH -- verified `@Attribute(.unique)` on `contentHash` in ClipboardItem.swift. Verified `modelContext.rollback()` behavior in existing code (ClipboardMonitor line 298).
 
 ---
 
-### Pitfall 5: Database Compaction (VACUUM) Corrupts Data or Fails Under Active Use
+### Pitfall 5: Drag-and-Drop from Non-Activating NSPanel Fails Because Panel Cannot Initiate Drag Session
 
 **What goes wrong:**
-SQLite `VACUUM` creates a copy of the entire database, restructures it for optimal space, then replaces the original. During this process:
-1. It requires **twice the disk space** of the current database (original + copy).
-2. It **fails if there is an open transaction** on the same connection.
-3. It is a **write operation** that blocks all other writes during execution.
-4. If the app crashes or the user force-quits during VACUUM, the database can be left in an inconsistent state.
-5. It can **change ROWIDs** for tables without explicit INTEGER PRIMARY KEY (SwiftData uses its own ID scheme, which could be affected).
+SwiftUI's `.draggable()` modifier works by initiating a drag session through the view hierarchy's window. For a standard `NSWindow`, the window becomes the drag source and manages the drag lifecycle. But Pastel's panel is an `NSPanel` with `.nonactivatingPanel` style mask, which means it never becomes the main window and has restricted interaction with the window server. The drag session may fail to initiate, or the drag image may not appear, or the drag terminates immediately when the cursor leaves the panel's frame.
 
-For a clipboard manager that polls the pasteboard every 0.5 seconds and writes new items continuously, running VACUUM while the app is actively capturing clipboard changes creates a high-risk window where the capture write collides with the VACUUM write.
+The specific failure mode: the user long-presses or drags on a card in the panel. The drag preview appears briefly, then vanishes as the cursor crosses the panel boundary. The receiving app never sees a drop. Or worse: the drag appears to work, but no data is transferred because the drag pasteboard was not properly configured by the non-activating panel.
 
 **Why it happens:**
-Developers add a "Compact Database" button to the storage dashboard. The user clicks it. The VACUUM runs on the same `ModelContext` that `ClipboardMonitor` uses for clipboard capture. The timer fires, a new clipboard item arrives, `modelContext.save()` is called -- and it fails or corrupts because VACUUM is in progress.
+`NSPanel` with `.nonactivatingPanel` manages its window server tags differently from standard windows. The `kCGSPreventsActivationTagBit` affects how the window server routes events, including drag events. The panel can become key (receive keyboard events) but cannot become main. Drag sessions initiated from non-main windows have historically been unreliable in AppKit.
+
+SwiftUI's `.draggable()` modifier uses `NSItemProvider` under the hood, which creates an `NSDraggingSession` through the hosting view's window. If the window's activation behavior is restricted, the dragging session may not receive proper event routing.
 
 **Specific risk in Pastel's architecture:**
-- There is ONE `ModelContext` shared by `ClipboardMonitor`, `RetentionService`, `ExpirationService`, and the SwiftUI views. All are `@MainActor`. A VACUUM on this context blocks the main thread and conflicts with the 0.5s polling timer.
-- SwiftData wraps Core Data which wraps SQLite. Accessing SQLite's VACUUM through SwiftData is not directly supported -- you would need to drop down to Core Data's `NSPersistentStoreCoordinator` or use raw SQLite access, both of which bypass SwiftData's change tracking and can leave the `ModelContext` in an inconsistent state.
-- The database uses WAL mode (SwiftData's default). VACUUM in WAL mode has specific constraints -- it can only change the `auto_vacuum` property, not other pragmas.
+- `SlidingPanel` has `canBecomeMain: false` (line 43 of SlidingPanel.swift). This is correct for paste-back (panel must not steal focus) but may prevent drag sessions from initiating properly.
+- The panel uses `level: .floating` which places it above all other windows. Dragging TO other apps requires the drag to cross from a floating window to a normal-level window. The window server must handle this level transition.
+- The `globalClickMonitor` (PanelController line 200-203) dismisses the panel on any click outside it. A drag that starts inside the panel but moves outside will trigger this monitor, hiding the panel mid-drag.
 
 **How to avoid:**
-- **Do NOT implement VACUUM as a user-facing feature.** The risk-reward ratio is poor. SQLite databases for a clipboard manager are typically small (under 50MB even with thousands of items). The space savings from VACUUM are minimal and the corruption risk is real.
-- **If compaction is truly needed:** Use `VACUUM INTO` to create a compacted copy. This does not modify the original database. Then, shut down all database access (stop ClipboardMonitor, invalidate timers), swap the files, and restart. This is safer but complex.
-- **Prefer periodic cleanup over compaction.** Deleting old items via `RetentionService` and the orphan file cleanup (Pitfall 2) is sufficient for managing storage. The database file will have some wasted space from deletions, but SQLite reuses deleted pages for new insertions automatically.
-- **If implementing a storage dashboard:** Show the database file size and image directory size. Offer "Delete items older than X" and "Delete items by type" -- not "Compact Database." These achieve the user's goal (free up space) without VACUUM's risks.
+- **Test `.draggable()` on `SlidingPanel` early.** Before building any UI, create a minimal test: a card in the non-activating panel with `.draggable("test")`. Verify the drag initiates, crosses the panel boundary, and drops into TextEdit. If it fails, fall back to AppKit's `NSDraggingSource` protocol directly.
+- **Disable the globalClickMonitor during active drag sessions.** When a drag begins (detectable via SwiftUI's drag callbacks or NSEvent monitoring), temporarily remove the click-outside monitor. Restore it when the drag ends. Otherwise, the panel hides mid-drag.
+- **If `.draggable()` fails on NSPanel:** Use `NSDraggingSource` on the `NSHostingView` or a custom `NSView` subclass. Create the dragging session manually with `beginDraggingSession(with:event:source:)`. This gives direct control over the drag pasteboard and lifecycle, bypassing SwiftUI's abstraction.
+- **For image drag: provide multiple representations.** Write both `.png` and `.tiff` data to the drag pasteboard (via `NSPasteboardItem`). Some apps only accept `.tiff` (Finder), others prefer `.png` (web apps). Also write `.fileURL` for apps that want a file reference (the image is already stored on disk).
+- **For text drag: write `.string` only.** Do not include `.rtf` or `.html` in the drag representation -- the user is dragging plain text content, and drag-and-drop does not have the "preserve formatting" expectation that paste-back does.
 
 **Warning signs:**
-- The app freezes for several seconds when the user clicks "Compact" (VACUUM blocking main thread).
-- Clipboard monitoring stops capturing during compaction (timer fires can't write).
-- Crash reports with SQLite errors after compaction attempt.
+- Drag gesture starts but no drag preview appears.
+- Drag preview appears but vanishes when cursor leaves the panel.
+- Panel disappears mid-drag (click-outside monitor fires).
+- Drop completes but no data appears in the receiving app.
+- Drag works on some macOS versions but not others (window server behavior changes between releases).
 
-**Phase to address:** Storage dashboard / management phase. The decision to NOT implement VACUUM should be made during phase planning.
+**Affects:** HIST-02 (Drag-and-drop from panel)
+**Phase to address:** Drag-and-drop implementation phase. The feasibility test (can `.draggable()` work on non-activating NSPanel?) must be the FIRST task in this phase.
 
-**Confidence:** HIGH -- verified against official SQLite VACUUM documentation. VACUUM failure conditions during active transactions are well-documented. SwiftData's lack of direct VACUUM API confirmed via developer community sources.
+**Confidence:** MEDIUM -- the NSPanel non-activating style mask is known to have interaction limitations (verified via developer blog post). However, SwiftUI's `.draggable()` on NSPanel specifically has not been widely documented. The globalClickMonitor conflict is HIGH confidence (verified in PanelController.swift).
+
+---
+
+## Moderate Pitfalls
+
+Mistakes that cause degraded UX, inconsistent behavior, or technical debt.
+
+### Pitfall 6: Shift+Enter / Shift+Double-Click Conflict with Existing Keyboard Handling
+
+**What goes wrong:**
+The current `FilteredCardListView` handles `.return` for paste (line 231-234) and monitors Shift key state via `isShiftHeld` (set by NSEvent flags monitor in `PanelContentView`). Adding Shift+Enter for "paste as plain text" requires distinguishing between Enter (normal paste) and Shift+Enter (plain text paste) in the `.onKeyPress(.return)` handler. But `.onKeyPress` receives a `KeyPress` value whose `modifiers` may not reliably include `.shift` on all macOS versions, because the flags monitor and `.onKeyPress` use different event sources.
+
+Similarly, Shift+double-click requires distinguishing from a regular double-click on the `.onTapGesture(count: 2)` handler. SwiftUI's `onTapGesture` does not provide modifier key state. The current `isShiftHeld` state variable may be stale (set by `NSEvent.addLocalMonitorForEvents(.flagsChanged)`) if the Shift key was pressed after the last flags-changed event but before the tap.
+
+**Prevention:**
+- For Shift+Enter: Use the `keyPress.modifiers` property within `.onKeyPress(.return)` to check for Shift. This is more reliable than the external `isShiftHeld` state because it reads modifiers from the same event. Test on macOS 14 and macOS 15 to verify consistency.
+- For Shift+double-click: Continue using `isShiftHeld` (set by the flags monitor) since `onTapGesture` does not provide modifier access. The flags monitor fires synchronously on the main thread, so it should be current by the time `onTapGesture` fires. Test with rapid Shift-press-and-double-click to verify timing.
+- If `isShiftHeld` is unreliable for double-click: Use `NSEvent.modifierFlags.contains(.shift)` directly in the `onTapGesture` closure (class property, not instance-specific). This reads the current global modifier state at tap time.
+
+**Affects:** PAST-20 (Paste as plain text)
+
+**Confidence:** MEDIUM -- `isShiftHeld` already works for the keycap badge display (v1.1), suggesting the flags monitor is reliable. But double-click + Shift timing has not been tested.
+
+---
+
+### Pitfall 7: App Filtering UI Exposes Raw Bundle Identifiers Instead of Human-Readable App Names
+
+**What goes wrong:**
+The allow/ignore list settings UI stores and displays app bundle identifiers (e.g., `com.apple.Terminal`, `com.google.Chrome`). Users do not know their apps' bundle identifiers. If the UI shows only bundle IDs, users cannot identify which app is which. If the UI lets users type bundle IDs manually, they will make typos (`com.apple.terminal` vs `com.apple.Terminal`) and filtering silently fails.
+
+**Prevention:**
+- Use an app picker that resolves installed apps by name. `NSWorkspace.shared.urlsForApplications(withBundleIdentifier:)` resolves bundle ID to app URL, and `Bundle(url:)?.infoDictionary?["CFBundleName"]` gives the display name. Or use the `NSRunningApplication.localizedName` property.
+- Show the app icon alongside the name using `NSWorkspace.shared.icon(forFile:)` or the app's bundle icon.
+- Store bundle identifiers internally (stable across renames and updates) but display localized names and icons to the user.
+- Provide an "Add from running apps" button that lists currently running apps (via `NSWorkspace.shared.runningApplications`) for easy selection.
+- Consider also providing an "Add from recently captured" option showing apps that have appeared as `sourceAppBundleID` in the clipboard history.
+
+**Affects:** PRIV-01 (Allow/ignore app lists)
+
+**Confidence:** HIGH -- this is a UX standard. Maccy's implementation also uses app names + icons.
+
+---
+
+### Pitfall 8: Export Format Lacks Versioning, Breaking Future Import Compatibility
+
+**What goes wrong:**
+The initial export format is a JSON file with the current `ClipboardItem` fields. In v1.4 or v2, new fields are added to `ClipboardItem` (e.g., `isPinned`, `isSensitive`). Old export files do not contain these fields. The import code crashes or silently discards items when it encounters missing fields during JSON decoding. Users who exported their history before the update cannot import it after updating.
+
+Conversely, if a user exports from a newer version and tries to import into an older version, the import fails because the older version does not recognize new fields.
+
+**Prevention:**
+- **Include a format version number in the export file.** The top-level JSON should have `{ "version": 1, "exportDate": "...", "appVersion": "...", "items": [...] }`. On import, check the version and apply appropriate parsing logic.
+- **Use Codable with explicit CodingKeys and default values.** Every new field added to the export format must have a default value in `init(from decoder:)`. This ensures old exports (missing new fields) decode successfully. New fields are filled with defaults.
+- **Never remove or rename fields in the export format.** Only add new optional fields. This maintains backward compatibility. If a field must be renamed, keep the old key as an alias in the decoder.
+- **Test import of v1 exports after every model change.** Keep a reference export file from each version in the test suite. Run import tests against all previous versions.
+- **For image data: store as separate files in a .pastel directory (or .zip).** Do not base64-encode images inline in JSON -- this bloats the file 33% and makes it unreadable. Use a structured directory: `export.pastel/manifest.json` + `export.pastel/images/UUID.png`.
+
+**Affects:** DATA-01 (Import/export)
+
+**Confidence:** HIGH -- versioning in export formats is a well-established pattern. The risk of breaking imports with schema changes is virtually certain if versioning is omitted.
+
+---
+
+### Pitfall 9: Drag-and-Drop of Image Items Fails Because Image Data Is on Disk, Not in Memory
+
+**What goes wrong:**
+For text items, drag-and-drop is straightforward: the `textContent` string is available in memory and can be passed directly to `.draggable()`. For image items, the actual image data is stored on disk at `~/Library/Application Support/Pastel/images/{UUID}.png`. The `ClipboardItem` only stores the filename (`imagePath`), not the image data.
+
+If the `.draggable()` modifier attempts to provide the image via `Transferable` and the image must be loaded from disk synchronously, the drag initiation blocks the main thread. For large images (4K screenshots, 2-5MB PNGs), this causes a visible pause before the drag preview appears. If the file has been deleted (orphan record), the drag fails silently.
+
+**Prevention:**
+- **Load image data asynchronously before the drag begins.** When the user starts a long-press or drag gesture on an image card, begin loading the image from disk on a background queue. Provide the loaded data to the drag session via `NSItemProvider`'s async loading callback.
+- **Use `NSItemProvider(contentsOf: URL)` with the file URL directly.** This is the most efficient approach -- the system reads the file lazily when the drop target requests the data. No need to load the entire image into memory during drag initiation.
+- **Handle missing files gracefully.** Before initiating the drag, check if `FileManager.default.fileExists(atPath:)`. If the file is missing, show a brief error tooltip ("Image no longer available") and do not initiate the drag.
+- **Provide a drag preview from the thumbnail** (which is small and loads fast). The full image data is only needed when the drop target requests it.
+
+**Affects:** HIST-02 (Drag-and-drop from panel)
+
+**Confidence:** HIGH -- verified that `ClipboardItem.imagePath` stores only the filename (not data) and images are loaded from disk via `ImageStorageService.resolveImageURL()`.
+
+---
+
+### Pitfall 10: Export File Contains Full Disk Paths That Break on Other Machines
+
+**What goes wrong:**
+`ClipboardItem` stores `imagePath` as a filename (e.g., `"UUID.png"`) and resolves it at runtime via `ImageStorageService.resolveImageURL()`. This is correct for the local database. But if the export naively serializes `ClipboardItem` fields, the `imagePath` value is meaningless on a different machine -- the image file does not exist there. The import creates items with broken image references.
+
+Worse, `ClipboardItem.textContent` for `.file` type items stores an **absolute file path** (e.g., `/Users/alice/Documents/report.pdf`). Exporting this path and importing on another machine creates a file reference that points to a non-existent location. The card shows a file path that does not resolve.
+
+**Prevention:**
+- **For image items: embed the image data in the export.** Either base64-encode inline (simple but bloated) or use a zip/directory format with images as separate files (efficient, standard).
+- **For file items: export only the filename, not the full path.** File references are inherently non-portable. On import, show the file item with its name but mark it as "file not available" if the path does not exist on the importing machine. Do not silently discard file items.
+- **For URL metadata images (favicon, preview): include them in the export.** These are small (<100KB each) and can be base64-encoded without significant bloat.
+- **Store relative paths within the export archive.** The manifest JSON references `images/UUID.png`, and the archive contains `images/UUID.png`. On import, copy images to the local images directory and update paths.
+
+**Affects:** DATA-01 (Import/export)
+
+**Confidence:** HIGH -- verified that `imagePath` is a filename, `textContent` for file items is an absolute path. Both patterns are visible in ClipboardItem.swift.
+
+---
+
+## Integration Gotchas
+
+Mistakes specific to adding v1.3 features alongside the existing v1.0/v1.1/v1.2 system.
+
+| Integration Point | Common Mistake | Correct Approach |
+|-------------------|----------------|------------------|
+| `writeToPasteboardPlainText` + HTML | Keeping existing HTML write when adding new UI triggers for plain text paste | Remove `.html` write from `writeToPasteboardPlainText()`. Write ONLY `.string` type. Verify with Pages, Notes, Google Docs |
+| `globalClickMonitor` + drag-and-drop | Panel dismisses when drag cursor leaves panel boundary | Disable click-outside monitor during active drag. Restore on drag end |
+| `skipNextChange` + drag-and-drop | Single-skip flag insufficient for drag operations that cause multiple pasteboard changes | Extend to time-window skip: `skipChangesUntil: Date?` set to 2 seconds after drag end |
+| App filter + `sourceAppBundleID` | Filtering at capture time permanently discards items from ignored apps | Store all items with `sourceAppBundleID`, filter at display/query time. User can change filters without losing data |
+| Export + `@Attribute(.unique)` on `contentHash` | Batch import fails on first duplicate, rolling back all pending inserts | Insert one item at a time with individual `save()` calls. Count skipped duplicates and report to user |
+| Export + `imagePath` filenames | Export contains filenames but not image data. Import creates broken references | Include image data in export (zip with images directory, or base64 inline) |
+| Export + `labels` relationship | Importing items with label references creates orphan labels or duplicates | Export labels separately. On import, match labels by name+color. Reuse existing labels, create new ones only if no match |
+| Context menu + paste plain text | Adding "Paste as Plain Text" to context menu duplicates code from keyboard handler | Extract paste-as-plain-text action to a single method on `PanelActions`. Call from context menu, Shift+Enter, Shift+double-click, and Cmd+Shift+1-9 |
+| Drag-and-drop + `.onTapGesture(count: 1)` | SwiftUI's gesture recognizers conflict: long-press for drag vs. single-click to select | Use `.simultaneousGesture()` or prioritize the drag gesture with a minimum drag distance. Single click selects; drag gesture requires 5px+ movement |
+| App filter + `isConcealed` | Password manager items already have `org.nspasteboard.ConcealedType` detection. Adding app filtering on top may double-filter or conflict | App filter and concealed detection are independent. App filter controls capture. Concealed detection controls expiry. Both can apply to the same item without conflict. Document this clearly |
 
 ---
 
@@ -195,27 +320,11 @@ Shortcuts that seem reasonable but create long-term problems.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Reuse `isConcealed` for user-marked sensitive items | No new field, less migration | Conflates auto-detected (60s expiry) with user-chosen (persist). Users lose items they wanted to keep. | Never -- these are fundamentally different concepts |
-| JPEG compression for all stored images | Massive storage savings (5-10x) | Lossy paste-back, alpha channel loss, user trust erosion | Never for paste-back source; acceptable for display-only thumbnails |
-| Sync file deletion with SwiftData deletion in same operation | Simpler code, no orphan handling | Partial failures leave inconsistent state; no recovery path | Acceptable for single-item delete (low risk); never for bulk purge |
-| Calculate storage stats synchronously on every panel open | Simple implementation, always current | Panel open latency grows with history size; blocks main thread | Only if history is under 100 items. Cache stats and recalculate periodically for larger histories |
-| Store compression metadata only in filename (e.g., `.jpg` vs `.png`) | No schema change needed | Filename parsing is fragile; renaming files breaks detection; no room for quality parameters | Never -- use explicit model fields |
-| Use `blur(radius:)` alone for sensitive item redaction | Quick to implement, looks good in demo | VoiceOver reads the content behind the blur; blur can be circumvented by reading SwiftUI view hierarchy | Acceptable as visual layer but must be combined with content replacement in the view |
-
----
-
-## Integration Gotchas
-
-Mistakes specific to adding v1.2 features alongside the existing v1.0/v1.1 system.
-
-| Integration Point | Common Mistake | Correct Approach |
-|-------------------|----------------|------------------|
-| `isConcealed` vs `isSensitive` | Using the same Bool field for both auto-detected concealed items (password managers) and user-marked sensitive items | Add new `isSensitive: Bool? = nil` field. ExpirationService handles `isConcealed`; new SensitiveService handles `isSensitive`. Different expiry defaults, different UI treatment |
-| RetentionService purge + new purge-by-category | Adding category purge to RetentionService, making it do too much | Create a separate PurgeService for user-initiated purges. RetentionService remains automated-only. Both share the same file cleanup helper |
-| Image hash stability across compression | Compressing an image changes its bytes, changing its hash. If hash is recomputed after compression, dedup breaks for items that were identical pre-compression | Compute and store hash from ORIGINAL image data at capture time. Never recompute hash after compression. If compression is retroactive, preserve the original hash |
-| FilteredCardListView + sensitive blur | Adding blur to card views while maintaining keyboard navigation and paste-back | The blur is a visual overlay only. The item is still fully selectable, navigable, and pasteable. Click-to-reveal toggles the blur state on the view, NOT on the data model. The underlying `ClipboardItem.textContent` is never modified |
-| ExpirationService + sensitive auto-expiry | Reusing ExpirationService (designed for 60s concealed items) for configurable sensitive expiry (hours/days) | ExpirationService uses `DispatchWorkItem` timers, which are not suitable for long-duration expiries (survive app restarts poorly). For sensitive auto-expiry, use the same approach as RetentionService: periodic polling with date comparison. Add `sensitiveExpiresAt: Date?` field |
-| Storage dashboard + ImageStorageService | Calculating image directory size by iterating all files on every dashboard open | Cache the total image directory size. Update it incrementally when images are added/deleted. Recalculate fully only on first launch or user request |
+| Store app filter list in `UserDefaults` as `[String]` | Simple, no SwiftData model needed | Cannot store metadata (app name, icon, date added). Must serialize/deserialize on every check. Performance degrades with 100+ entries | Acceptable for v1.3 (lists will be small). Migrate to SwiftData model in v2 if needed |
+| Export as flat JSON (no versioning) | Simpler implementation, faster to ship | Any model change in v1.4+ breaks import of v1.3 exports. No migration path | Never -- always include version number in format |
+| Base64 images inline in JSON | Single-file export, simple to implement | 33% file size bloat (base64 overhead). Export of 100 images = 300MB+ JSON file. Unreadable, unparseable by tools | Acceptable for small exports (<20 images). Use zip for larger exports |
+| Hardcode drag data types | No configuration needed, works for common cases | Some apps only accept specific UTTypes. Hard to add support for new types later | Acceptable if providing at least `.string` + `.fileURL` + `.png`/`.tiff` |
+| Single-boolean `skipNextChange` for drag | Minimal change to existing code | Drag operations may cause 2+ pasteboard changes (drag write + app insert). Only first is skipped | Never -- extend to time-window skip for drag operations |
 
 ---
 
@@ -225,42 +334,27 @@ Patterns that work at small scale but fail as usage grows.
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Scanning entire images directory for storage stats | Dashboard takes 2+ seconds to open, main thread blocked | Cache directory size at launch. Update incrementally on add/delete. Use `FileManager.enumerator(at:includingPropertiesForKeys:[.fileSizeKey])` with prefetched keys | ~500+ images on disk (common after months of use) |
-| Fetching ALL ClipboardItems to calculate per-type counts | Memory spike loading thousands of items into memory | Use separate `FetchDescriptor` with `fetchCount` for each content type, using `#Predicate` to filter. No items loaded into memory | ~5,000+ items (months of heavy use) |
-| Dedup scan comparing new item against entire history | O(n) hash comparison on every clipboard capture, slowing the 0.5s poll loop | Use `@Attribute(.unique)` (already in place) instead of manual iteration. For near-duplicate detection, use SwiftData `#Predicate` with `contentHash` field, not in-memory comparison | ~10,000+ items |
-| Rendering blur effect on every card in a lazy list | GPU overhead from multiple simultaneous `blur(radius:)` modifiers during scroll | Only apply blur to VISIBLE sensitive cards. Use a boolean `isRevealed` state per card, not a global toggle. LazyVStack already handles view lifecycle, but blur calculation adds per-frame cost | ~20+ sensitive items visible in a scroll session |
-| Full-database size calculation via `FileManager.attributesOfItem` on the SQLite file | Inaccurate (doesn't include WAL and SHM files), potentially misleading | Sum sizes of `.store`, `.store-wal`, and `.store-shm` files for accurate database size. Or use `NSSQLiteStoreFileProtectionKey` metadata | Immediately inaccurate if only checking main file |
-
----
-
-## Security Mistakes
-
-Domain-specific security issues for a clipboard manager with sensitive item features.
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Logging sensitive item content in OSLog | Sensitive text appears in Console.app / system log, readable by any process | Use OSLog privacy markers: `\(text, privacy: .private)`. Log only item ID, type, and timestamp -- never content. Review ALL new log statements for content leakage |
-| Blur without replacing accessible text | VoiceOver reads the full text content behind the blur. Screen readers bypass visual redaction entirely | Set `.accessibilityLabel("Sensitive item")` on blurred cards. Use `.accessibilityHidden(true)` on the actual text content when blurred. Replace readable content, not just overlay it |
-| Sensitive content in pasteboard after paste-back | User marks item as sensitive, then pastes it. The content is now on `NSPasteboard.general`, visible to all apps monitoring the clipboard | After paste-back of a sensitive item, optionally clear the pasteboard after a configurable delay (e.g., 30 seconds). Warn the user that pasting places content on the system clipboard |
-| Screenshot captures sensitive content through blur | macOS screenshots (`Cmd+Shift+4`) and screen recording capture the composited window, including any blur overlays. However, `NSWindow.sharingType = .none` no longer prevents capture on macOS 15+ (ScreenCaptureKit ignores it) | Accept that screenshot protection is not possible on macOS 15+. Document this honestly. The blur is a casual-viewing deterrent, NOT a screenshot-proof mechanism. Do not claim screenshot protection |
-| Sensitive items survive in SwiftData journal/WAL | Even after deleting a sensitive item from SwiftData, the SQLite WAL file may contain the deleted content until the next checkpoint | Accept this as a limitation of SQLite. For users requiring true data destruction, recommend FileVault and point them to the "Clear All History" feature. Do not promise "secure deletion" |
-| Auto-expiry deletes items the user wanted to keep | User marks item sensitive with auto-expiry enabled. Days later, wonders where their important API key went. No undo, no recovery | Auto-expiry for sensitive items should be OFF by default (opt-in). When enabled, show a clear countdown or expiry date on the card. Provide a Settings option, not a per-item toggle, to avoid complexity |
+| Exporting all items with images as base64 in a single JSON | Export hangs, memory spike, 500MB+ JSON file | Use streaming JSON encoder or zip format with separate image files. Export in batches | 100+ image items (common after weeks of use) |
+| Importing 1000+ items in a single SwiftData transaction | UI freezes, `modelContext.save()` takes 10+ seconds, potential crash | Insert in batches of 50. Show progress indicator. Use background context | 500+ items in import file |
+| Querying `contentHash` for duplicate check on every import item | O(n*m) where n=import items, m=existing items | Pre-load all existing hashes into a Set. O(1) lookup per import item | 5000+ existing items and 500+ import items |
+| Loading full image data for drag preview | 2-5 second freeze on drag initiation for 4K screenshots | Use thumbnail for drag preview. Load full image data lazily via NSItemProvider callback | Any image over 1MB |
+| App filter list checked via `UserDefaults.array(forKey:)` on every poll | UserDefaults access on every 0.5s timer fire adds latency | Cache the filter list in memory. Update cache when UserDefaults changes (via KVO or Notification) | UserDefaults access is fast for small arrays, but the pattern is wasteful |
 
 ---
 
 ## UX Pitfalls
 
-Common user experience mistakes when adding storage and security features.
+Common user experience mistakes when adding these features.
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Storage dashboard shows bytes only (e.g., "142,387,456 bytes") | Numbers are meaningless to users. Cannot compare or act on them | Show human-readable sizes ("135.7 MB") with breakdown by type: "Images: 120 MB (312 items), Text: 8 MB (4,201 items), URLs: 7 MB (890 items)" |
-| "Compact Database" button with no progress indicator | User clicks, app freezes, user force-quits (the worst outcome during compaction) | If offering any long operation, show a progress indicator. Better: don't offer VACUUM (see Pitfall 5) |
-| Mark-as-sensitive requires two-step confirmation | Every mark action: right-click, "Mark Sensitive," confirm dialog. Friction discourages use | Single action with undo support. Right-click, "Mark Sensitive," done. Show a brief toast "Marked as sensitive. Undo?" for 3 seconds |
-| Blur radius is too low (partially readable) or too high (obliterates card shape) | Too low: text is guessable. Too high: user cannot distinguish between sensitive items | Use `blur(radius: 10)` (tested: sufficient to make text unreadable at callout font size). Overlay a lock icon or "Sensitive" label so the card is identifiable without revealing content |
-| Click-to-reveal has no auto-re-hide | User reveals sensitive content, walks away from desk. Content remains visible indefinitely | Auto-re-hide after 10 seconds of no interaction. Or re-hide when the panel closes. Configurable in Settings |
-| Purge operations have no undo | User accidentally purges "all images." Hundreds of screenshots gone. No recovery | Show a confirmation dialog listing what will be deleted ("This will permanently delete 312 images (120 MB). This cannot be undone."). For single-item delete, the existing immediate delete is fine (low impact) |
-| Deduplication runs silently with no user feedback | User copies something, it doesn't appear. They don't know why. They copy it again. Still doesn't appear | When a non-consecutive duplicate is detected, update the existing item's timestamp to bring it to the top of the list. This way, the item "reappears" at the top without creating a true duplicate |
+| "Paste as Plain Text" pastes with HTML formatting | User explicitly requested plain text, gets formatted text. Fundamental broken promise | Write ONLY `.string` type to pasteboard. No `.html`, no `.rtf`. Test with multiple receiving apps |
+| App filter has no "test" or "preview" | User adds apps to ignore list but has no way to verify it works without copying from each app | Show a "last captured from" indicator in the panel or settings. When an item is skipped due to filter, briefly show "Skipped (app filtered)" in the status area |
+| Import shows no progress for large files | User imports a 2000-item file. App appears frozen for 30 seconds. User force-quits | Show a progress bar: "Importing... 450 of 2000 items" with a cancel button |
+| Export includes sensitive/concealed items without warning | User exports history to share with a colleague. Export includes password manager entries (even if they expired from the UI, they may still be in the database) | Show a pre-export summary: "This export contains 5 concealed items. Exclude them?" with a checkbox |
+| Drag-and-drop has no visual feedback | User drags a card. Nothing happens (drag failed). No indication of why | Show a drag preview (card thumbnail). If drag fails, show a brief tooltip: "Drag not supported for this item type" |
+| "Paste as Plain Text" context menu next to "Paste" is confusing | Two "Paste" entries that do different things. User clicks the wrong one | Use clear labels: "Paste" and "Paste without Formatting". Add a keyboard shortcut hint in the menu: "Paste without Formatting  Shift+Enter" |
+| App filter does not explain what "ignore" means | User thinks "ignore" means "delete existing items from that app." Actually means "stop capturing new items" | Explain in the UI: "New copies from ignored apps will not be saved. Existing items are not affected." |
 
 ---
 
@@ -268,32 +362,11 @@ Common user experience mistakes when adding storage and security features.
 
 Things that appear complete but are missing critical pieces.
 
-- [ ] **Image compression:** Looks done when screenshots compress smaller -- but verify paste-back quality with text-heavy screenshots, transparent PNGs, and pixel art. Test in Figma, Photoshop, and Preview.
-- [ ] **Deduplication:** Looks done when identical text is deduplicated -- but verify with near-duplicates (trailing newline, different whitespace), and verify images with different content but same 4KB prefix are NOT falsely deduplicated.
-- [ ] **Storage dashboard:** Looks done when showing total size -- but verify it includes WAL/SHM files, image directory size (not just database), and that it updates after purge operations.
-- [ ] **Blur redaction:** Looks done when text is visually blurred -- but test with VoiceOver (does it read the content?), test with screenshot (is content captured?), test with large text (is it still readable at any angle?).
-- [ ] **Click-to-reveal:** Looks done when click toggles blur -- but verify state resets when panel closes, verify reveal does not persist across app restarts (it's a transient view state, not a model property), verify keyboard navigation still works on revealed items.
-- [ ] **Sensitive auto-expiry:** Looks done when items expire -- but verify expiry survives app restart (uses date comparison, not in-memory timer), verify the user understands the item will be deleted (not just hidden), verify expiry does not affect non-sensitive items using the same `expiresAt` field.
-- [ ] **Purge by category:** Looks done when items are removed from the list -- but verify disk files are cleaned up (check images directory manually), verify the database size decreases (may need WAL checkpoint), verify item count updates correctly.
-- [ ] **New SwiftData fields:** Looks done when the app runs on a fresh database -- but verify migration from v1.1 database with existing items. All new fields must be `Optional` with `nil` default.
-
----
-
-## Recovery Strategies
-
-When pitfalls occur despite prevention, how to recover.
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Lossy compression damaged stored images | HIGH | No recovery for already-compressed images. Revert to PNG storage for new captures. Communicate to users that previously compressed images cannot be restored |
-| Purge left orphan files on disk | LOW | Run orphan file cleanup: scan images directory, cross-reference with SwiftData records, delete unreferenced files. Automate as periodic task |
-| Purge left orphan SwiftData records | MEDIUM | Scan all ClipboardItems with non-nil `imagePath`. Check if file exists. Delete records where file is missing. Show "Image unavailable" placeholder while cleanup runs |
-| Sensitive item content leaked in logs | LOW | Remove logging of content. Cannot recall already-written logs. File rotation will eventually clear old entries. No user-facing impact unless logs were exfiltrated |
-| VoiceOver reads blurred content | LOW | Add accessibility label override. Fix in next update. No data loss |
-| VACUUM corrupted database | HIGH | If app crashes during VACUUM: check if the database is recoverable. If not, restore from Time Machine or start fresh. This is why VACUUM should not be offered (Pitfall 5) |
-| `isConcealed` and `isSensitive` conflated | MEDIUM | Add new `isSensitive` field via migration. Write a one-time migration script to move user-marked items from `isConcealed` to `isSensitive`. Reset `expiresAt` for items that should not auto-expire |
-| Hash instability after compression | MEDIUM | Recompute hashes for all items from their stored content. Update `contentHash` field. Run dedup pass to find any duplicates that slipped through |
-| Auto-expiry deleted items user wanted | HIGH | No recovery -- items are permanently deleted. This is why auto-expiry should be opt-in with clear UI warning. Consider a "recently deleted" holding area (like Photos) for future versions |
+- [ ] **Paste as plain text:** Looks done when text pastes without bold in TextEdit. But test with: (1) Google Docs in Chrome (reads HTML from pasteboard), (2) Notes app (renders HTML links), (3) Slack desktop app (preserves rich formatting), (4) a rich text item with inline images (should paste text only, no images). If any show formatting, the HTML type is still being written.
+- [ ] **App filtering:** Looks done when copies from Terminal are ignored. But test with: (1) copy from Terminal then immediately Cmd+Tab to Safari -- does the item appear attributed to Safari? (2) copy from an app with no bundle ID (CLI tool) -- is it captured or filtered? (3) switch from ignore-list to allow-list mode -- do previously captured items from non-listed apps disappear? They should not.
+- [ ] **Export:** Looks done when JSON file is created. But verify: (1) import the exported file on a clean install -- do all items appear? (2) export includes image data, not just filenames. (3) export file has a version number. (4) concealed items are handled (excluded or warned about). (5) labels are exported and re-imported correctly (matched by name, not by PersistentIdentifier).
+- [ ] **Import:** Looks done when items appear in history. But verify: (1) duplicate items are handled (skip with counter, not crash). (2) imported images are saved to the local images directory. (3) import of 1000+ items does not freeze the UI (background processing with progress). (4) import of an older-version export file works (version migration). (5) item timestamps are preserved from the export, not set to import time.
+- [ ] **Drag-and-drop:** Looks done when text drags to TextEdit. But verify: (1) image drag to Finder creates a .png file. (2) URL drag to Safari opens the URL. (3) drag does not trigger clipboard monitor (no duplicate capture). (4) panel does not dismiss mid-drag. (5) drag from horizontal panel layout (top/bottom edge) works the same as vertical (left/right edge).
 
 ---
 
@@ -303,31 +376,50 @@ How roadmap phases should address these pitfalls.
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Lossy image compression (1) | Image compression phase | Paste-back test: copy screenshot with text + transparency, compress, paste into Figma/Preview, verify pixel-perfect match |
-| Non-atomic purge operations (2) | Storage management / purge phase | Kill app during bulk purge (force quit). Restart. Verify no orphan files AND no orphan records. Run orphan cleanup |
-| False security from "Mark Sensitive" (3) | Sensitive item marking phase | Review all UI strings for security claims. Open SQLite database directly and verify sensitive content is readable (confirming honest UI language) |
-| Dedup hash collision / instability (4) | Deduplication phase | Create two images with same EXIF but different pixels. Verify both are stored. Change compression settings. Verify existing hashes unchanged |
-| VACUUM corruption risk (5) | Storage dashboard phase | Decision: do NOT implement VACUUM. Verify storage management achieves user goals without compaction |
-| Blur bypassed by VoiceOver (Security) | Blur redaction phase | Enable VoiceOver. Navigate to a blurred sensitive card. Verify VoiceOver reads "Sensitive item" not the actual content |
-| Click-to-reveal state persistence (UX) | Click-to-reveal phase | Reveal a sensitive item. Close panel. Reopen panel. Verify item is re-blurred. Quit app. Relaunch. Verify still blurred |
-| Auto-expiry data loss (UX) | Auto-expiry phase | Mark item sensitive with auto-expiry. Quit app. Wait past expiry time. Relaunch. Verify item is deleted. Verify the UI warned about expiry before it happened |
+| HTML in plain text paste (1) | Paste-as-plain-text phase | Paste into Google Docs, Notes, Pages. Verify NO formatting appears. Inspect pasteboard types with Pasteboard Viewer app |
+| Drag triggers self-capture (2) | Drag-and-drop phase | Drag 5 items to TextEdit. Check history count -- should not increase by 5. Check console for "Captured" log lines |
+| App filter race condition (3) | App filtering phase | Copy from Terminal (ignored), Cmd+Tab to Safari within 200ms. Check if item appears. Repeat 10 times -- race is probabilistic |
+| Import hash collision (4) | Import/export phase | Export 100 items. Import on same install. Verify "100 items skipped (already in history)" message. No crash |
+| Drag fails from NSPanel (5) | Drag-and-drop phase -- FIRST TASK | Create minimal test: single card with `.draggable("test")` in non-activating NSPanel. Verify drag crosses panel boundary and drops into TextEdit. If fails, switch to AppKit NSDraggingSource |
+| Shift+Enter conflict (6) | Paste-as-plain-text phase | Hold Shift, press Enter on selected card. Verify plain text paste. Release Shift, press Enter on same card. Verify normal paste. Test rapid alternation |
+| Bundle ID display (7) | App filtering phase | Open app filter settings. Verify apps show name + icon, not `com.apple.xxx`. Test with apps that have no icon (CLI wrappers) |
+| Export versioning (8) | Import/export phase | Export from v1.3. Add a new field to ClipboardItem. Import v1.3 export. Verify all items import successfully with default value for new field |
+| Image drag disk loading (9) | Drag-and-drop phase | Drag a 5MB screenshot from panel. Verify no freeze (drag preview should appear within 200ms using thumbnail) |
+| File paths in export (10) | Import/export phase | Export with images. Import on clean install (different images directory). Verify all image thumbnails display correctly |
+
+---
+
+## Recovery Strategies
+
+When pitfalls occur despite prevention, how to recover.
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| HTML still written in plain text paste (1) | LOW | Fix `writeToPasteboardPlainText()` to exclude `.html`. Ship as patch update. No data loss, only UX issue |
+| Drag creates duplicate history entries (2) | LOW | Extend `skipNextChange` to time-window. Add dedup pass to remove duplicates created during testing. No data loss |
+| App filter attributes item to wrong app (3) | MEDIUM | Cannot retroactively fix misattributed items (the real source app is unknown). Clear affected items manually. Add UI disclaimer about race condition |
+| Import silently drops items (4) | MEDIUM | Re-export from source (if available). Fix import to handle duplicates gracefully. Re-import. If source export is lost, items are unrecoverable |
+| Drag fails from NSPanel (5) | HIGH | If `.draggable()` does not work on NSPanel, must rewrite using AppKit `NSDraggingSource`. This is a fundamentally different approach. Test BEFORE building the feature |
+| Export lacks version number (8) | MEDIUM | Retroactively add version detection by field inspection (v1.3 exports have certain fields that v1.4 exports have). Fragile but workable. Always include version going forward |
+| Import breaks image references (10) | MEDIUM | Re-export with image data included. Re-import. If original export had no images, those items show broken thumbnails permanently |
 
 ---
 
 ## Sources
 
-- [SQLite VACUUM documentation](https://sqlite.org/lang_vacuum.html) -- VACUUM failure conditions, disk space requirements, WAL interaction (HIGH confidence)
-- [SwiftData pitfalls -- Wade Tregaskis](https://wadetregaskis.com/swiftdata-pitfalls/) -- auto-save failure, relationship corruption (MEDIUM confidence -- opinionated blog, but findings verified against Apple Forums)
-- [Key Considerations Before Using SwiftData -- Fat Bob Man](https://fatbobman.com/en/posts/key-considerations-before-using-swiftdata/) -- batch operation limitations, performance hierarchy (MEDIUM confidence)
-- [Apple Developer Forums: macOS 15 NSWindow.sharingType](https://developer.apple.com/forums/thread/792152) -- ScreenCaptureKit ignores sharingType on macOS 15+ (HIGH confidence -- Apple Forums, multiple confirmations)
-- [Clipboard security -- Ctrl Blog](https://www.ctrl.blog/entry/clipboard-security.html) -- clipboard manager security fundamentals, plaintext storage risks (HIGH confidence)
-- [OSLog privacy documentation](https://developer.apple.com/documentation/os/oslogprivacy) -- log privacy markers for sensitive data (HIGH confidence -- official Apple docs)
-- [Hash collision risks in deduplication](https://backupcentral.com/de-dupe-hash-collisions/) -- silent data loss from false positive matches (HIGH confidence)
-- [SQLite forum: Does VACUUM ever result in data loss](https://sqlite.org/forum/info/3bd787a793af66aaaa41898374160bceee7fca52c995c2351279b642162f662d) -- VACUUM safety during concurrent access (HIGH confidence -- official SQLite forum)
-- [Prevent screenshot capture of sensitive SwiftUI views](https://www.createwithswift.com/prevent-screenshot-capture-of-sensitive-swiftui-views/) -- iOS-only UITextField technique, not applicable to macOS (MEDIUM confidence)
-- [SwiftData batch delete -- Fat Bob Man](https://fatbobman.com/en/snippet/how-to-batch-delete-data-in-swiftdata/) -- batch delete API, save requirement (MEDIUM confidence)
-- Direct analysis of Pastel codebase: `ImageStorageService.swift`, `RetentionService.swift`, `ClipboardMonitor.swift`, `ExpirationService.swift`, `ClipboardItem.swift`, `PasteService.swift`, `ClipboardCardView.swift` (HIGH confidence -- source code inspection)
+- [Maccy Clipboard.swift -- app filtering implementation](https://github.com/p0deje/Maccy/blob/master/Maccy/Clipboard.swift) -- ignore/allow list pattern, frontmostApplication usage (HIGH confidence -- open-source reference implementation)
+- [NSPanel nonactivating style mask blog analysis](https://philz.blog/nspanel-nonactivating-style-mask-flag/) -- window server tag behavior, activation limitations (HIGH confidence)
+- [NSPasteboard type priority -- Kodeco Forums](https://forums.kodeco.com/t/dealing-with-formatted-text-in-nspasteboard/59650) -- apps prefer richer pasteboard types when multiple are present (MEDIUM confidence)
+- [NSTextView plain text pasteboard handling -- Christian Tietze](https://christiantietze.de/posts/2022/09/nstextview-plain-text-pasteboard-string-not-included/) -- NSStringPboardType vs .string type compatibility (HIGH confidence)
+- [macOS paste plain text shortcuts -- Apple Community](https://discussions.apple.com/thread/253654093) -- Cmd+Shift+V vs Cmd+Shift+Option+V inconsistency across apps (HIGH confidence)
+- [Drag-and-drop uses separate drag pasteboard -- Eclectic Light](https://eclecticlight.co/2026/01/10/explainer-copy-and-paste-drag-and-drop/) -- drag-and-drop does not use NSPasteboard.general (HIGH confidence)
+- [NSPasteboard changeCount -- Apple Developer Documentation](https://developer.apple.com/documentation/appkit/nspasteboard/1533544-changecount) -- independent change counts per named pasteboard (HIGH confidence)
+- [SwiftUI draggable and Transferable -- Apple Developer Documentation](https://developer.apple.com/documentation/SwiftUI/Adopting-drag-and-drop-using-SwiftUI) -- .draggable() modifier behavior (HIGH confidence)
+- [SwiftData Codable conformance -- Hacking with Swift](https://www.hackingwithswift.com/quick-start/swiftdata/how-to-make-swiftdata-models-conform-to-codable) -- manual Codable implementation for SwiftData models (HIGH confidence)
+- [Floating panel in SwiftUI -- Cindori](https://cindori.com/developer/floating-panel) -- NSPanel configuration for non-activating floating windows (HIGH confidence)
+- [Maccy issue #79 -- ignore sensitive apps](https://github.com/p0deje/Maccy/issues/79) -- community discussion on app-specific clipboard filtering (MEDIUM confidence)
+- Direct analysis of Pastel codebase: `PasteService.swift`, `ClipboardMonitor.swift`, `PanelController.swift`, `FilteredCardListView.swift`, `ClipboardItem.swift`, `SlidingPanel.swift`, `AppState.swift`, `ImageStorageService.swift`, `ClipboardCardView.swift` (HIGH confidence -- source code inspection)
 
 ---
-*Pitfalls research for: Pastel v1.2 Storage & Security*
-*Researched: 2026-02-07*
+*Pitfalls research for: Pastel v1.3 Power User Features*
+*Researched: 2026-02-09*
