@@ -4,6 +4,7 @@
 
 - v1.0 MVP - Phases 1-5 (shipped 2026-02-06)
 - v1.1 Rich Content & Enhanced Paste - Phases 6-10 (in progress)
+- v1.2 Storage & Security - Phases 11+ (planned)
 
 ## Phases
 
@@ -152,6 +153,31 @@ Plans:
 Plans:
 - [ ] 10-01-PLAN.md -- PersistentIdentifier transfer helpers, draggable chip bar (Button to onTapGesture refactor), per-card drop targets with visual feedback
 
+### v1.2 Storage & Security
+
+**Milestone Goal:** Item titles for easier discovery, multi-label support, edit modal for item management, plus storage optimization and sensitive data protection.
+
+- [ ] **Phase 11: Item Titles, Multi-Label Support, and Edit Modal** - User-assigned titles on clipboard items, multi-label relationships, and a right-click edit modal for title and label management
+
+## Phase Details (v1.2)
+
+### Phase 11: Item Titles, Multi-Label Support, and Edit Modal
+**Goal**: Users can assign titles to clipboard items for easier discovery via search, items support multiple labels, and a right-click "Edit" modal provides title and label management
+**Depends on**: Phase 10 (v1.1 complete)
+**Success Criteria** (what must be TRUE):
+  1. User right-clicks a clipboard card and selects "Edit" to open a modal where they can add/update a title
+  2. The title appears on the card instead of the character count / image size footer, in a visually distinct style
+  3. Search matches against item titles in addition to content text
+  4. User can assign multiple labels to a single clipboard item (via the edit modal and existing context menu)
+  5. Chip bar filtering shows items that have ANY of the selected label(s)
+  6. Items with multiple labels display all assigned label chips/emojis on the card
+**Plans**: 3 plans
+
+Plans:
+- [ ] 11-01-PLAN.md -- Data model updates (title, labels array), Label inverse relationship, MigrationService, EditItemView modal
+- [ ] 11-02-PLAN.md -- ClipboardCardView restructure (title in header, labels in footer, multi-label context menu, edit sheet, abbreviated time)
+- [ ] 11-03-PLAN.md -- Multi-select chip bar, hybrid label filtering (predicate + in-memory), title search, drag-drop label append
+
 ## Progress
 
 **Execution Order:**
@@ -169,3 +195,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10
 | 8. URL Preview Cards | v1.1 | 1/2 | In progress | - |
 | 9. Quick Paste Hotkeys | v1.1 | 2/2 | Complete | 2026-02-07 |
 | 10. Drag-and-Drop Label Assignment | v1.1 | 1/1 | Complete | 2026-02-07 |
+| 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 0/3 | Not started | - |
