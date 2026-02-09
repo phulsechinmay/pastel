@@ -86,26 +86,89 @@ Requirements for v1.1 milestone: Rich Content & Enhanced Paste.
 - [x] **LABL-02**: Labels support optional emoji that replaces the color dot in chips and card headers
 - [x] **LABL-03**: Label settings view provides emoji input (system emoji picker accessible via keyboard)
 
-## v2 Requirements
+## v1.2 Requirements
 
-Deferred to future release. Tracked but not in current roadmap.
+Requirements for v1.2 milestone: Item Management.
+
+### Item Management
+
+- [x] **ITEM-01**: User can assign custom titles to clipboard items
+- [x] **ITEM-02**: User can assign multiple labels to a single clipboard item
+- [x] **ITEM-03**: User can edit item title and labels via right-click "Edit" modal
+- [x] **ITEM-04**: Search matches against item titles in addition to content
+- [x] **ITEM-05**: Items with multiple labels display all label chips on cards
+- [x] **ITEM-06**: Chip bar filtering shows items with ANY selected label (OR logic)
+
+### History Browser
+
+- [x] **HIST-01**: Settings has "History" tab with full clipboard history in responsive grid
+- [x] **HIST-02**: History browser supports same search and label filtering as panel
+- [x] **HIST-03**: User can multi-select items via Cmd-click, Shift-click, and Cmd+A
+- [x] **HIST-04**: User can bulk copy selected items (concatenate with newlines)
+- [x] **HIST-05**: User can bulk paste selected items into active app
+- [x] **HIST-06**: User can bulk delete selected items with confirmation dialog
+
+## v1.3 Requirements
+
+Requirements for v1.3 milestone: Power User Features.
+
+### Enhanced Paste — Plain Text Support
+
+- [ ] **PAST-20**: Context menu shows "Paste as Plain Text" option on all clipboard cards
+- [ ] **PAST-21**: Shift+Enter pastes selected item as plain text (RTF and HTML stripped)
+- [ ] **PAST-22**: Shift+double-click pastes item as plain text
+- [ ] **PAST-23**: Plain text paste correctly strips ALL formatting (fix existing HTML bug in PasteService)
+
+### Privacy — App Filtering
+
+- [ ] **PRIV-01**: User can configure ignore-list of apps to exclude from clipboard monitoring
+- [ ] **PRIV-02**: Settings has "Privacy" section with app ignore-list management
+- [ ] **PRIV-03**: User can add apps to ignore-list via app picker showing running apps
+- [ ] **PRIV-04**: User can remove apps from ignore-list
+- [ ] **PRIV-05**: ClipboardMonitor respects ignore-list during capture (skips ignored app bundles)
+
+### Data Portability — Import/Export
+
+- [ ] **DATA-01**: User can export clipboard history to `.pastel` file (JSON format)
+- [ ] **DATA-02**: Export preserves all metadata (titles, labels, timestamps, source apps, content)
+- [ ] **DATA-03**: Export format excludes images (text-based export only)
+- [ ] **DATA-04**: User can import clipboard history from `.pastel` file
+- [ ] **DATA-05**: Import handles duplicate content gracefully (skip or update timestamp)
+- [ ] **DATA-06**: Import preserves label relationships and creates missing labels
+- [ ] **DATA-07**: Settings has "Import/Export" section with export and import buttons
+- [ ] **DATA-08**: Export/import shows progress feedback for large histories
+
+### Advanced Interaction — Drag-and-Drop
+
+- [ ] **DRAG-01**: User can drag clipboard items from panel to other applications
+- [ ] **DRAG-02**: Drag-and-drop supports text, images, URLs, and files
+- [ ] **DRAG-03**: Drag provides correct NSItemProvider UTTypes for receiving apps
+- [ ] **DRAG-04**: Panel remains visible during drag session (does not dismiss on drag)
+- [ ] **DRAG-05**: Drag session does not trigger clipboard monitor self-capture
+
+## Future Requirements
+
+Deferred to future releases. Tracked but not in current roadmap.
 
 ### Enhanced Paste
 
-- **PAST-20**: User can paste as plain text (strip formatting)
+- **PAST-30**: User can paste with formatting options (keep source, match destination, plain text) via submenu
 
 ### History Management
 
-- **HIST-01**: User can pin/favorite items that persist beyond retention limits
-- **HIST-02**: User can drag-and-drop items from panel into other apps
+- **HIST-10**: User can pin/favorite items that persist beyond retention limits
+- **HIST-11**: User can star frequently used items for quick access
 
 ### Privacy
 
-- **PRIV-01**: User can configure allow/ignore app lists for clipboard monitoring
+- **PRIV-10**: User can configure allow-list mode (only monitor specific apps)
+- **PRIV-11**: Settings shows real-time filtering status indicator
 
-### Data
+### Data Portability
 
-- **DATA-01**: User can import/export clipboard history
+- **DATA-10**: Selective export by date range, labels, or content type
+- **DATA-11**: Import from other clipboard manager formats (Maccy, Paste 2, CopyClip)
+- **DATA-12**: Export includes images (directory bundle format)
 
 ## Out of Scope
 
@@ -176,6 +239,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PAST-10b | Phase 9 | Complete |
 | PAST-11 | Phase 9 | Complete |
 | PAST-12 | Phase 9 | Complete |
+| ITEM-01 | Phase 11 | Complete |
+| ITEM-02 | Phase 11 | Complete |
+| ITEM-03 | Phase 11 | Complete |
+| ITEM-04 | Phase 11 | Complete |
+| ITEM-05 | Phase 11 | Complete |
+| ITEM-06 | Phase 11 | Complete |
+| HIST-01 | Phase 12 | Complete |
+| HIST-02 | Phase 12 | Complete |
+| HIST-03 | Phase 12 | Complete |
+| HIST-04 | Phase 12 | Complete |
+| HIST-05 | Phase 12 | Complete |
+| HIST-06 | Phase 12 | Complete |
 
 **v1.0 Coverage:**
 - v1 requirements: 29 total
@@ -187,6 +262,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Mapped to phases: 15
 - Unmapped: 0
 
+**v1.2 Coverage:**
+- v1.2 requirements: 12 total
+- Mapped to phases: 12
+- Unmapped: 0
+
+**v1.3 Coverage:**
+- v1.3 requirements: 21 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 21
+
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-07 after v1.1 milestone completion*
+*Last updated: 2026-02-09 after v1.3 milestone definition*
