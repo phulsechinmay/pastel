@@ -26,6 +26,7 @@ struct ClipboardCardView: View {
     @State private var isHovered = false
     @State private var imageDimensions: String?
     @State private var dominantColor: Color?
+    @State private var showingEditSheet = false
 
     /// Whether this card is a color item (entire card uses the detected color).
     private var isColorCard: Bool { item.type == .color }
@@ -78,8 +79,8 @@ struct ClipboardCardView: View {
             // Content preview (full-width)
             contentPreview
 
-            // Footer row: metadata text (left) + badge (right)
-            if footerMetadataText != nil || badgePosition != nil {
+            // Footer row: metadata + label chips (max 3) + overflow badge + keycap badge
+            if footerMetadataText != nil || !item.labels.isEmpty || badgePosition != nil {
                 HStack(spacing: 4) {
                     if let metadata = footerMetadataText {
                         Text(metadata)
@@ -87,7 +88,25 @@ struct ClipboardCardView: View {
                             .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.5) : .secondary.opacity(0.7))
                             .lineLimit(1)
                     }
+
+                    let visibleLabels = Array(item.labels.prefix(3))
+                    ForEach(visibleLabels) { label in
+                        labelChipSmall(for: label)
+                    }
+                    if item.labels.count > 3 {
+                        Text("+\(item.labels.count - 3)")
+                            .font(.caption2)
+                            .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(
+                                isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1),
+                                in: Capsule()
+                            )
+                    }
+
                     Spacer()
+
                     if let badgePosition {
                         KeycapBadge(number: badgePosition, isShiftHeld: isShiftHeld)
                     }
@@ -151,22 +170,42 @@ struct ClipboardCardView: View {
 
             Divider()
 
-            // Label assignment submenu
+            Button("Edit...") {
+                showingEditSheet = true
+            }
+
+            Divider()
+
+            // Label assignment submenu with toggle checkmarks
             Menu("Label") {
                 ForEach(labels) { label in
+                    let isAssigned = item.labels.contains {
+                        $0.persistentModelID == label.persistentModelID
+                    }
                     Button {
-                        item.label = label
+                        if isAssigned {
+                            item.labels.removeAll {
+                                $0.persistentModelID == label.persistentModelID
+                            }
+                        } else {
+                            item.labels.append(label)
+                        }
                         try? modelContext.save()
                     } label: {
-                        Image(nsImage: menuIcon(for: label))
-                        Text(label.name)
+                        HStack {
+                            Image(nsImage: menuIcon(for: label))
+                            Text(label.name)
+                            if isAssigned {
+                                Image(systemName: "checkmark")
+                            }
+                        }
                     }
                 }
 
-                if item.label != nil {
+                if !item.labels.isEmpty {
                     Divider()
-                    Button("Remove Label") {
-                        item.label = nil
+                    Button("Remove All Labels") {
+                        item.labels.removeAll()
                         try? modelContext.save()
                     }
                 }
@@ -177,6 +216,9 @@ struct ClipboardCardView: View {
             Button("Delete", role: .destructive) {
                 deleteItem()
             }
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            EditItemView(item: item)
         }
     }
 
@@ -238,6 +280,30 @@ struct ClipboardCardView: View {
             let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
             return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.45)
         }
+    }
+
+    /// Small label chip for the card footer (compact: smaller font, tighter padding).
+    @ViewBuilder
+    private func labelChipSmall(for label: Label) -> some View {
+        HStack(spacing: 2) {
+            if let emoji = label.emoji, !emoji.isEmpty {
+                Text(emoji)
+                    .font(.system(size: 8))
+            } else {
+                Circle()
+                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                    .frame(width: 6, height: 6)
+            }
+            Text(label.name)
+                .font(.system(size: 9))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(
+            cardLabelChipBackground(label),
+            in: Capsule()
+        )
     }
 
     // MARK: - Helpers
