@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.3 -- Phase 14: App Ignore List
+**Current focus:** Milestone v1.3 -- Phase 15: Import/Export
 
 ## Current Position
 
 Phase: 14 of 16 (App Ignore List)
-Plan: 1 of 2 (service layer complete)
-Status: In progress
-Last activity: 2026-02-09 -- Completed 14-01-PLAN.md
+Plan: 2 of 2 (complete)
+Status: Phase complete
+Last activity: 2026-02-09 -- Completed 14-02-PLAN.md
 
-Progress: [██████████░░░░░░░░░░] 50% (v1.3 -- 2/4 phases started, Phase 14 Plan 1 of 2 done)
+Progress: [██████████░░░░░░░░░░] 50% (v1.3 -- 2/4 phases complete)
 
 ## Previous Milestones
 
@@ -51,6 +51,7 @@ Key decisions from v1.3:
 - [14-01]: Ignore check in checkForChanges() not processPasteboardContent() -- filters ALL content types uniformly including images
 - [14-01]: Fresh UserDefaults read each poll cycle for ignore list -- no caching, matches RetentionService pattern
 - [14-01]: ignoredAppBundleIDs UserDefaults key stores [String] array of bundle IDs
+- [14-02]: Three separate UserDefaults keys (IDs, dates, names) for ignore list persistence -- simpler than Codable, and ignoredAppBundleIDs already consumed by ClipboardMonitor
 
 ### Research Flags (v1.3)
 
@@ -69,5 +70,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 14-01-PLAN.md (Phase 14 Plan 1 of 2)
+Stopped at: Completed 14-02-PLAN.md (Phase 14 complete)
 Resume file: None
