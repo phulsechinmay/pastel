@@ -139,6 +139,15 @@ final class ClipboardMonitor {
             return
         }
 
+        // Phase 14: App ignore list filtering
+        if let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
+            let ignored = Set(UserDefaults.standard.stringArray(forKey: "ignoredAppBundleIDs") ?? [])
+            if ignored.contains(bundleID) {
+                Self.logger.debug("Skipping capture from ignored app: \(bundleID)")
+                return
+            }
+        }
+
         processPasteboardContent()
     }
 
