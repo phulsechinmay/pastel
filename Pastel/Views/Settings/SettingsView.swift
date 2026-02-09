@@ -4,12 +4,14 @@ import SwiftUI
 private enum SettingsTab: String, CaseIterable {
     case general
     case labels
+    case privacy
     case history
 
     var iconName: String {
         switch self {
         case .general: return "gearshape"
         case .labels: return "tag"
+        case .privacy: return "hand.raised"
         case .history: return "clock.arrow.circlepath"
         }
     }
@@ -18,6 +20,7 @@ private enum SettingsTab: String, CaseIterable {
         switch self {
         case .general: return "General"
         case .labels: return "Labels"
+        case .privacy: return "Privacy"
         case .history: return "History"
         }
     }
@@ -25,8 +28,8 @@ private enum SettingsTab: String, CaseIterable {
 
 /// Root settings view with a custom horizontal tab bar.
 ///
-/// Three tabs: General (all settings), Labels (CRUD label management),
-/// and History (full history browser with search and grid).
+/// Four tabs: General (all settings), Labels (CRUD label management),
+/// Privacy (app ignore list), and History (full history browser with search and grid).
 /// The tab bar uses a compact icon-above-text layout with accent highlighting.
 struct SettingsView: View {
 
@@ -73,6 +76,8 @@ struct SettingsView: View {
                     GeneralSettingsView()
                 case .labels:
                     LabelSettingsView()
+                case .privacy:
+                    PrivacySettingsView()
                 case .history:
                     HistoryBrowserView()
                 }
