@@ -228,15 +228,12 @@ final class PasteService {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
-        // Write string and HTML only -- NO .rtf data
+        // Write ONLY plain string -- no .rtf, no .html
         if let text = item.textContent {
             pasteboard.setString(text, forType: .string)
         }
-        if let html = item.htmlContent {
-            pasteboard.setString(html, forType: .html)
-        }
 
-        logger.info("Wrote \(item.type.rawValue) content to pasteboard (plain text, RTF stripped)")
+        logger.info("Wrote \(item.type.rawValue) content to pasteboard (plain text, RTF and HTML stripped)")
     }
 
     // MARK: - CGEvent Paste Simulation

@@ -170,6 +170,9 @@ struct ClipboardCardView: View {
             Button("Copy + Paste") {
                 panelActions.pasteItem?(item)
             }
+            Button("Paste as Plain Text") {
+                panelActions.pastePlainTextItem?(item)
+            }
 
             Divider()
 

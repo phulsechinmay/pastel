@@ -118,7 +118,11 @@ struct FilteredCardListView: View {
                                 .frame(width: 260, height: 195)
                                 .clipped()
                                 .onTapGesture(count: 2) {
-                                    onPaste(item)
+                                    if NSEvent.modifierFlags.contains(.shift) {
+                                        onPastePlainText(item)
+                                    } else {
+                                        onPaste(item)
+                                    }
                                 }
                                 .onTapGesture(count: 1) {
                                     selectedIndex = index
@@ -170,7 +174,11 @@ struct FilteredCardListView: View {
                                     isShiftHeld: isShiftHeld
                                 )
                                 .onTapGesture(count: 2) {
-                                    onPaste(item)
+                                    if NSEvent.modifierFlags.contains(.shift) {
+                                        onPastePlainText(item)
+                                    } else {
+                                        onPaste(item)
+                                    }
                                 }
                                 .onTapGesture(count: 1) {
                                     selectedIndex = index
@@ -227,9 +235,13 @@ struct FilteredCardListView: View {
             if isHorizontal { moveSelection(by: 1) }
             return isHorizontal ? .handled : .ignored
         }
-        .onKeyPress(.return) {
+        .onKeyPress(keys: [.return]) { keyPress in
             if let index = selectedIndex, index < filteredItems.count {
-                onPaste(filteredItems[index])
+                if keyPress.modifiers.contains(.shift) {
+                    onPastePlainText(filteredItems[index])
+                } else {
+                    onPaste(filteredItems[index])
+                }
             }
             return .handled
         }
