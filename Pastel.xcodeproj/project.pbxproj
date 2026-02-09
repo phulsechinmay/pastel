@@ -60,6 +60,7 @@
 		FC28C1E1511F71298087486A /* PasteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */; };
 		FF2C5CE75C36A126A3782DF2 /* ClipboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */; };
 		1101A2B3C4D5E60718293A4B /* MigrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1101A2B3C4D5E60718293A4C /* MigrationService.swift */; };
+		1102A2B3C4D5E60718293A4B /* EditItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1102A2B3C4D5E60718293A4C /* EditItemView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -116,6 +117,7 @@
 		F8A1B2C3D4E50617182930B2 /* URLMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLMetadataService.swift; sourceTree = "<group>"; };
 		F8A1B2C3D4E50617182930C2 /* AppIconColorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconColorService.swift; sourceTree = "<group>"; };
 		1101A2B3C4D5E60718293A4C /* MigrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationService.swift; sourceTree = "<group>"; };
+		1102A2B3C4D5E60718293A4C /* EditItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditItemView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -230,6 +232,7 @@
 				30EA2DC6C129FA8392D0E5CA /* ClipboardCardView.swift */,
 				D4E5F6071829304B5C6D7E90 /* CodeCardView.swift */,
 				E5F6071829304B5C6D7E8FA2 /* ColorCardView.swift */,
+				1102A2B3C4D5E60718293A4C /* EditItemView.swift */,
 				B3C99DE2608198777D57CA9B /* EmptyStateView.swift */,
 				10FC617DD35144DF808D4822 /* FileCardView.swift */,
 				3E5CCEAC25DB293F9A16462A /* FilteredCardListView.swift */,
@@ -377,6 +380,7 @@
 				A7B1C2D3E4F50617182930A3 /* CodeDetectionService.swift in Sources */,
 				A7B1C2D3E4F50617182930A1 /* ColorDetectionService.swift in Sources */,
 				B0CFC974AD1AC32A0A15644C /* ContentType.swift in Sources */,
+				1102A2B3C4D5E60718293A4B /* EditItemView.swift in Sources */,
 				D6F7C0FF5984EC498B94BCC3 /* EmptyStateView.swift in Sources */,
 				CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */,
 				E42B5A361ECF65BE3C4B1EF2 /* FileCardView.swift in Sources */,

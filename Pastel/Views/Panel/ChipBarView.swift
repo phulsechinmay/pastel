@@ -19,7 +19,6 @@ struct ChipBarView: View {
     @State private var newLabelName = ""
     @State private var newLabelColor: LabelColor = .blue
     @State private var newLabelEmoji: String?
-    @FocusState private var isHiddenEmojiFieldFocused: Bool
 
     /// Curated label-friendly emojis for quick selection.
     private static let curatedEmojis: [String] = [
@@ -120,7 +119,7 @@ struct ChipBarView: View {
                 .background(Color.white.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
-        .popover(isPresented: $showingCreateLabel, arrowEdge: .bottom) {
+        .sheet(isPresented: $showingCreateLabel) {
             createLabelPopover
         }
     }
@@ -180,34 +179,7 @@ struct ChipBarView: View {
                         }
                 }
 
-                // "..." fallback for full system emoji picker
-                Button {
-                    isHiddenEmojiFieldFocused = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        NSApp.orderFrontCharacterPalette(nil)
-                    }
-                } label: {
-                    Text("...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                .help("More emojis")
             }
-
-            // Hidden TextField to receive system emoji picker input
-            TextField("", text: Binding(
-                get: { newLabelEmoji ?? "" },
-                set: { newValue in
-                    let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                    newLabelEmoji = trimmed.isEmpty ? nil : String(trimmed.prefix(1))
-                }
-            ))
-            .focused($isHiddenEmojiFieldFocused)
-            .frame(width: 0, height: 0)
-            .opacity(0)
-            .allowsHitTesting(false)
 
             HStack {
                 Button("Cancel") {
@@ -223,6 +195,7 @@ struct ChipBarView: View {
             }
         }
         .padding(12)
+        .frame(width: 220)
     }
 
     // MARK: - Actions
@@ -249,7 +222,7 @@ struct ChipBarView: View {
 // MARK: - Centered Flow Layout
 
 /// A layout that arranges subviews in rows, wrapping to new lines and centering each row.
-private struct CenteredFlowLayout: Layout {
+struct CenteredFlowLayout: Layout {
 
     var horizontalSpacing: CGFloat
     var verticalSpacing: CGFloat
