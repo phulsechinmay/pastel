@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A3E14B7C9D0F28A4E6C51730 /* AppDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D42E1FA8C3906D14E5B82A /* AppDiscoveryService.swift */; };
 		04769AF24E5670F5A628D811 /* ClipboardItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59995DCA4628743D59C35FFA /* ClipboardItem.swift */; };
 		06AA48B5B881CDC6751CA40B /* ColorCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F774B6CD032B1A682BACC9D7 /* ColorCardView.swift */; };
 		0718766F684C890B0D3CC008 /* LabelColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A1A38C2FA151019789426E /* LabelColor.swift */; };
@@ -68,6 +69,7 @@
 
 /* Begin PBXFileReference section */
 		00804B3DBC5EB02EA738DEC2 /* NSWorkspace+AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSWorkspace+AppIcon.swift"; sourceTree = "<group>"; };
+		B7D42E1FA8C3906D14E5B82A /* AppDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiscoveryService.swift; sourceTree = "<group>"; };
 		03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardMonitor.swift; sourceTree = "<group>"; };
 		10FC617DD35144DF808D4822 /* FileCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCardView.swift; sourceTree = "<group>"; };
 		12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryBrowserView.swift; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 			isa = PBXGroup;
 			children = (
 				71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */,
+				B7D42E1FA8C3906D14E5B82A /* AppDiscoveryService.swift */,
 				D74628F6FDF4E2185687683A /* AppIconColorService.swift */,
 				03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */,
 				72D7644ACF10CD4DC890BE9E /* CodeDetectionService.swift */,
@@ -382,6 +385,7 @@
 			files = (
 				0E86EEAF47C438D35E602BE4 /* AccessibilityPromptView.swift in Sources */,
 				9568A5C18B45B7183E87ABE3 /* AccessibilityService.swift in Sources */,
+				A3E14B7C9D0F28A4E6C51730 /* AppDiscoveryService.swift in Sources */,
 				DA56D7DCAB8FE7ABF5DFD32E /* AppIconColorService.swift in Sources */,
 				D784DF24180305D270E7DDED /* AppState.swift in Sources */,
 				1FF817C58BBCAC1F6A6DA2DD /* AsyncThumbnailView.swift in Sources */,
