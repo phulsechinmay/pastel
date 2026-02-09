@@ -21,6 +21,7 @@ struct PastelApp: App {
         state.setup(modelContext: container.mainContext)
         state.setupPanel(modelContainer: container)
         state.modelContainer = container
+        MigrationService.migrateLabelsIfNeeded(modelContext: container.mainContext)
         state.handleFirstLaunch()
         self._appState = State(initialValue: state)
     }

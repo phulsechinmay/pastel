@@ -49,7 +49,17 @@ final class ClipboardItem {
     @Attribute(.unique) var contentHash: String
 
     /// Optional label for organization/filtering
+    // DEPRECATED: Kept for migration. Remove in v1.3+.
     var label: Label?
+
+    /// User-assigned title for easier discovery via search.
+    /// Nil means no title was set. Displayed in card header when present.
+    var title: String?
+
+    /// Multiple labels for organization/filtering (many-to-many).
+    /// New in Phase 11. SwiftData auto-initializes to empty array.
+    @Relationship(deleteRule: .nullify, inverse: \Label.items)
+    var labels: [Label]
 
     /// Detected programming language (e.g., "swift", "python"). Nil = not code.
     /// Populated by CodeDetectionService in Phase 7.
@@ -117,5 +127,7 @@ final class ClipboardItem {
         self.isConcealed = isConcealed
         self.expiresAt = expiresAt
         self.contentHash = contentHash
+        self.title = nil
+        self.labels = []
     }
 }
