@@ -18,7 +18,7 @@ struct PanelContentView: View {
 
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
-    @State private var selectedLabel: Label? = nil
+    @State private var selectedLabelIDs: Set<PersistentIdentifier> = []
     @State private var selectedIndex: Int? = nil
     @State private var isShiftHeld = false
     @State private var flagsMonitor: Any?
@@ -48,7 +48,7 @@ struct PanelContentView: View {
                     SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
                         .frame(maxWidth: 200)
 
-                    ChipBarView(labels: labels, selectedLabel: $selectedLabel)
+                    ChipBarView(labels: labels, selectedLabelIDs: $selectedLabelIDs)
 
                     Spacer()
 
@@ -96,13 +96,13 @@ struct PanelContentView: View {
                 Divider()
 
                 SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
-                ChipBarView(labels: labels, selectedLabel: $selectedLabel)
+                ChipBarView(labels: labels, selectedLabelIDs: $selectedLabelIDs)
             }
 
             // Filtered content area with keyboard navigation
             FilteredCardListView(
                 searchText: debouncedSearchText,
-                selectedLabelID: selectedLabel?.persistentModelID,
+                selectedLabelIDs: selectedLabelIDs,
                 selectedIndex: $selectedIndex,
                 isShiftHeld: isShiftHeld,
                 onPaste: { item in pasteItem(item) },
@@ -114,7 +114,7 @@ struct PanelContentView: View {
                 }
             )
             .focused($panelFocus, equals: .cardList)
-            .id("\(debouncedSearchText)\(selectedLabel?.persistentModelID.hashValue ?? 0)\(appState.itemCount)")
+            .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())\(appState.itemCount)")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .defaultFocus($panelFocus, .cardList)
@@ -139,7 +139,7 @@ struct PanelContentView: View {
             isSearchFocused = false
             panelFocus = .cardList
         }
-        .onChange(of: selectedLabel) { _, _ in
+        .onChange(of: selectedLabelIDs) { _, _ in
             panelFocus = .cardList
         }
         .task(id: searchText) {

@@ -9,7 +9,7 @@ import SwiftData
 struct ChipBarView: View {
 
     let labels: [Label]
-    @Binding var selectedLabel: Label?
+    @Binding var selectedLabelIDs: Set<PersistentIdentifier>
 
     @Environment(\.modelContext) private var modelContext
 
@@ -43,7 +43,7 @@ struct ChipBarView: View {
 
     @ViewBuilder
     private func labelChip(for label: Label) -> some View {
-        let isActive = selectedLabel?.persistentModelID == label.persistentModelID
+        let isActive = selectedLabelIDs.contains(label.persistentModelID)
 
         HStack(spacing: 4) {
             if let emoji = label.emoji, !emoji.isEmpty {
@@ -71,9 +71,9 @@ struct ChipBarView: View {
         .contentShape(Capsule())
         .onTapGesture {
             if isActive {
-                selectedLabel = nil
+                selectedLabelIDs.remove(label.persistentModelID)
             } else {
-                selectedLabel = label
+                selectedLabelIDs.insert(label.persistentModelID)
             }
         }
         .draggable(label.persistentModelID.asTransferString) {
