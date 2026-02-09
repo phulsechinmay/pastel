@@ -34,6 +34,8 @@ struct HistoryBrowserView: View {
         VStack(spacing: 0) {
             // Top bar: search + chip bar
             SearchFieldView(searchText: $searchText)
+                .frame(maxWidth: 350)
+                .frame(maxWidth: .infinity)
             ChipBarView(labels: labels, selectedLabelIDs: $selectedLabelIDs)
 
             Divider()
@@ -43,7 +45,10 @@ struct HistoryBrowserView: View {
                 searchText: debouncedSearchText,
                 selectedLabelIDs: selectedLabelIDs,
                 selectedIDs: $selectedIDs,
-                resolvedItems: $resolvedItems
+                resolvedItems: $resolvedItems,
+                onBulkCopy: { bulkCopy() },
+                onBulkPaste: { bulkPaste() },
+                onRequestBulkDelete: { showDeleteConfirmation = true }
             )
             .environment(PanelActions())
             .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")

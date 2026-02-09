@@ -6,7 +6,6 @@ struct StatusPopoverView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
 
-    @State private var showingClearConfirmation = false
     @State private var panelShortcutDescription: String?
 
     var body: some View {
@@ -53,9 +52,20 @@ struct StatusPopoverView: View {
             }
             .buttonStyle(.plain)
 
-            // Clear All History button (destructive action with confirmation)
+            // Clear All History button (destructive action with NSAlert confirmation)
             Button(role: .destructive) {
-                showingClearConfirmation = true
+                let alert = NSAlert()
+                alert.messageText = "Clear All History"
+                alert.informativeText = "This will permanently delete all clipboard items. This action cannot be undone."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Clear All")
+                alert.addButton(withTitle: "Cancel")
+                // Style the destructive button
+                alert.buttons.first?.hasDestructiveAction = true
+
+                if alert.runModal() == .alertFirstButtonReturn {
+                    appState.clearAllHistory(modelContext: modelContext)
+                }
             } label: {
                 HStack {
                     Image(systemName: "trash")
@@ -65,18 +75,6 @@ struct StatusPopoverView: View {
                 .foregroundColor(.red)
             }
             .buttonStyle(.plain)
-            .confirmationDialog(
-                "Clear All History",
-                isPresented: $showingClearConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Clear All", role: .destructive) {
-                    appState.clearAllHistory(modelContext: modelContext)
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will permanently delete all clipboard items. This action cannot be undone.")
-            }
 
             Divider()
 

@@ -12,6 +12,9 @@ packages:
   LaunchAtLogin:
     url: https://github.com/sindresorhus/LaunchAtLogin-Modern
     from: "1.1.0"
+  HighlightSwift:
+    url: https://github.com/appstefan/HighlightSwift
+    from: "1.0.0"
 targets:
   Pastel:
     type: application
@@ -35,3 +38,4 @@ targets:
     dependencies:
       - package: KeyboardShortcuts
       - package: LaunchAtLogin
+      - package: HighlightSwift

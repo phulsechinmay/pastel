@@ -9,6 +9,10 @@ import SwiftData
 ///
 /// Label filtering is done in-memory (OR logic) because SwiftData #Predicate
 /// cannot use .contains() on to-many relationships.
+///
+/// Context menus are selection-aware: right-clicking a selected item shows bulk
+/// actions for all selected items; right-clicking an unselected item selects it
+/// and shows single-item actions.
 struct HistoryGridView: View {
 
     @Query private var items: [ClipboardItem]
@@ -23,14 +27,22 @@ struct HistoryGridView: View {
     // Label filtering (in-memory, same reason as FilteredCardListView)
     private let selectedLabelIDs: Set<PersistentIdentifier>
 
+    // Bulk action closures (provided by parent HistoryBrowserView)
+    private let onBulkCopy: () -> Void
+    private let onBulkPaste: () -> Void
+    private let onRequestBulkDelete: () -> Void
+
     private let columns = [
         GridItem(.adaptive(minimum: 280, maximum: 400), spacing: 12)
     ]
 
-    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>) {
+    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}) {
         self.selectedLabelIDs = selectedLabelIDs
         _selectedIDs = selectedIDs
         _resolvedItems = resolvedItems
+        self.onBulkCopy = onBulkCopy
+        self.onBulkPaste = onBulkPaste
+        self.onRequestBulkDelete = onRequestBulkDelete
 
         let predicate: Predicate<ClipboardItem>
         if !searchText.isEmpty {
@@ -74,12 +86,48 @@ struct HistoryGridView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                            let isInSelection = selectedIDs.contains(item.persistentModelID)
                             ClipboardCardView(
                                 item: item,
-                                isSelected: selectedIDs.contains(item.persistentModelID)
+                                isSelected: isInSelection,
+                                hideContextMenu: true
                             )
                             .onTapGesture {
                                 handleTap(item: item, index: index)
+                            }
+                            .contextMenu {
+                                if isInSelection && selectedIDs.count > 1 {
+                                    // Bulk actions for multi-selection
+                                    Button("Copy \(selectedIDs.count) Items") {
+                                        onBulkCopy()
+                                    }
+                                    Button("Paste \(selectedIDs.count) Items") {
+                                        onBulkPaste()
+                                    }
+                                    Divider()
+                                    Button("Delete \(selectedIDs.count) Items", role: .destructive) {
+                                        onRequestBulkDelete()
+                                    }
+                                } else {
+                                    // Single-item actions (auto-selects this item)
+                                    Button("Copy") {
+                                        selectedIDs = [item.persistentModelID]
+                                        onBulkCopy()
+                                    }
+                                    Button("Paste") {
+                                        selectedIDs = [item.persistentModelID]
+                                        onBulkPaste()
+                                    }
+                                    Divider()
+                                    Button("Edit...") {
+                                        EditItemWindow.show(for: item, modelContainer: modelContext.container)
+                                    }
+                                    Divider()
+                                    Button("Delete", role: .destructive) {
+                                        selectedIDs = [item.persistentModelID]
+                                        onRequestBulkDelete()
+                                    }
+                                }
                             }
                         }
                     }

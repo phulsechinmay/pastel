@@ -13,6 +13,9 @@ import KeyboardShortcuts
 struct GeneralSettingsView: View {
 
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var showingClearConfirmation = false
 
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("historyRetention") private var retentionDays: Int = 90
@@ -100,6 +103,32 @@ struct GeneralSettingsView: View {
                     Toggle("Fetch page title, favicon, and preview image for copied URLs", isOn: $fetchURLMetadata)
                         .toggleStyle(.switch)
                     Text("When disabled, URL cards show only the raw link text.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+
+                // 7. Clear History
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Data")
+                            .font(.headline)
+                        Spacer()
+                        Button("Clear All History...") {
+                            showingClearConfirmation = true
+                        }
+                        .foregroundStyle(.red)
+                        .alert("Clear All History", isPresented: $showingClearConfirmation) {
+                            Button("Clear All", role: .destructive) {
+                                appState.clearAllHistory(modelContext: modelContext)
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This will permanently delete all clipboard items. This action cannot be undone.")
+                        }
+                    }
+                    Text("Labels are preserved. Only clipboard items and their images are deleted.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

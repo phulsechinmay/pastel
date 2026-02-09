@@ -81,7 +81,6 @@ private struct LabelRow: View {
     @Environment(\.modelContext) private var modelContext
     @State private var isEditing = false
     @State private var showingPalette = false
-    @FocusState private var isHiddenEmojiFieldFocused: Bool
 
     var onDelete: () -> Void
 
@@ -92,18 +91,6 @@ private struct LabelRow: View {
         "✅", "❌", "⚡", "🎨", "🔧", "🐛",
         "💬", "📧", "🔒", "🌟", "💎", "🚀"
     ]
-
-    /// Binding that truncates emoji input to a single grapheme cluster.
-    private var emojiBinding: Binding<String> {
-        Binding(
-            get: { label.emoji ?? "" },
-            set: { newValue in
-                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                label.emoji = trimmed.isEmpty ? nil : String(trimmed.prefix(1))
-                try? modelContext.save()
-            }
-        )
-    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -123,7 +110,7 @@ private struct LabelRow: View {
                 }
             }
             .buttonStyle(.plain)
-            .popover(isPresented: $showingPalette, arrowEdge: .trailing) {
+            .sheet(isPresented: $showingPalette) {
                 colorEmojiPalette
             }
 
@@ -210,28 +197,7 @@ private struct LabelRow: View {
                         }
                 }
 
-                // "..." fallback for full system emoji picker
-                Button {
-                    isHiddenEmojiFieldFocused = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        NSApp.orderFrontCharacterPalette(nil)
-                    }
-                } label: {
-                    Text("...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(.plain)
-                .help("More emojis")
             }
-
-            // Hidden TextField to receive system emoji picker input
-            TextField("", text: emojiBinding)
-                .focused($isHiddenEmojiFieldFocused)
-                .frame(width: 0, height: 0)
-                .opacity(0)
-                .allowsHitTesting(false)
         }
         .padding(10)
         .frame(width: 170)

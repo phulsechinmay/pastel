@@ -155,21 +155,21 @@ final class AppState {
             let descriptor = FetchDescriptor<ClipboardItem>()
             let allItems = try modelContext.fetch(descriptor)
 
-            // Delete all image files from disk
+            // Delete each item individually: clean up disk images and clear
+            // many-to-many label relationships before removing the model.
+            // Batch delete (modelContext.delete(model:)) cannot handle MTM relationships.
             for item in allItems {
                 ImageStorageService.shared.deleteImage(
                     imagePath: item.imagePath,
                     thumbnailPath: item.thumbnailPath
                 )
-                // Clean up URL metadata cached images
                 ImageStorageService.shared.deleteImage(
                     imagePath: item.urlFaviconPath,
                     thumbnailPath: item.urlPreviewImagePath
                 )
+                item.labels.removeAll()
+                modelContext.delete(item)
             }
-
-            // Batch delete all clipboard items
-            try modelContext.delete(model: ClipboardItem.self)
             try modelContext.save()
 
             // Reset item count

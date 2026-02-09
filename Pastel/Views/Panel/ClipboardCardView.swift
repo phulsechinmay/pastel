@@ -26,7 +26,6 @@ struct ClipboardCardView: View {
     @State private var isHovered = false
     @State private var imageDimensions: String?
     @State private var dominantColor: Color?
-    @State private var showingEditSheet = false
 
     /// Whether this card is a color item (entire card uses the detected color).
     private var isColorCard: Bool { item.type == .color }
@@ -45,12 +44,16 @@ struct ClipboardCardView: View {
     /// Whether the Shift key is currently held (for dynamic badge display).
     var isShiftHeld: Bool
 
-    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, isDropTarget: Bool = false, isShiftHeld: Bool = false, onPaste: (() -> Void)? = nil) {
+    /// When true, the built-in context menu is suppressed (caller provides its own).
+    var hideContextMenu: Bool
+
+    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, isDropTarget: Bool = false, isShiftHeld: Bool = false, hideContextMenu: Bool = false, onPaste: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
         self.badgePosition = badgePosition
         self.isDropTarget = isDropTarget
         self.isShiftHeld = isShiftHeld
+        self.hideContextMenu = hideContextMenu
         self.onPaste = onPaste
     }
 
@@ -91,7 +94,7 @@ struct ClipboardCardView: View {
 
                     let visibleLabels = Array(item.labels.prefix(3))
                     ForEach(visibleLabels) { label in
-                        labelChipSmall(for: label)
+                        LabelChipView(label: label, size: .compact, tintOverride: isColorCard ? colorCardTextColor : nil)
                     }
                     if item.labels.count > 3 {
                         Text("+\(item.labels.count - 3)")
@@ -157,7 +160,7 @@ struct ClipboardCardView: View {
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
         .animation(.easeInOut(duration: 0.15), value: isDropTarget)
-        .contextMenu {
+        .contextMenu(hideContextMenu ? nil : ContextMenu {
             Button("Copy") {
                 panelActions.copyOnlyItem?(item)
             }
@@ -171,7 +174,7 @@ struct ClipboardCardView: View {
             Divider()
 
             Button("Edit...") {
-                showingEditSheet = true
+                EditItemWindow.show(for: item, modelContainer: modelContext.container)
             }
 
             Divider()
@@ -216,10 +219,7 @@ struct ClipboardCardView: View {
             Button("Delete", role: .destructive) {
                 deleteItem()
             }
-        }
-        .sheet(isPresented: $showingEditSheet) {
-            EditItemView(item: item)
-        }
+        })
     }
 
     // MARK: - Actions
@@ -272,39 +272,6 @@ struct ClipboardCardView: View {
         return image
     }
 
-    /// Label chip background on cards: label color for non-emoji labels, standard for emoji.
-    private func cardLabelChipBackground(_ label: Label) -> Color {
-        if let emoji = label.emoji, !emoji.isEmpty {
-            return isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1)
-        } else {
-            let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
-            return isColorCard ? colorCardTextColor.opacity(0.15) : labelColor.opacity(0.45)
-        }
-    }
-
-    /// Small label chip for the card footer (compact: smaller font, tighter padding).
-    @ViewBuilder
-    private func labelChipSmall(for label: Label) -> some View {
-        HStack(spacing: 2) {
-            if let emoji = label.emoji, !emoji.isEmpty {
-                Text(emoji)
-                    .font(.system(size: 8))
-            } else {
-                Circle()
-                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                    .frame(width: 6, height: 6)
-            }
-            Text(label.name)
-                .font(.system(size: 9))
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 5)
-        .padding(.vertical, 2)
-        .background(
-            cardLabelChipBackground(label),
-            in: Capsule()
-        )
-    }
 
     // MARK: - Helpers
 

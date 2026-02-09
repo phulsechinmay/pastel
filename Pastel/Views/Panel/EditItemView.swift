@@ -1,10 +1,15 @@
 import SwiftUI
 import SwiftData
+import AppKit
 
 struct EditItemView: View {
     @Bindable var item: ClipboardItem
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
     @Environment(\.dismiss) private var dismiss
+
+    /// Optional close callback for standalone window presentation.
+    /// When nil, falls back to SwiftUI dismiss (sheet context).
+    var onDone: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -24,19 +29,43 @@ struct EditItemView: View {
                 // Reuse CenteredFlowLayout from ChipBarView
                 CenteredFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
                     ForEach(allLabels) { label in
-                        labelToggleChip(for: label)
+                        let isAssigned = item.labels.contains {
+                            $0.persistentModelID == label.persistentModelID
+                        }
+                        LabelChipView(label: label, isActive: isAssigned)
+                            .contentShape(Capsule())
+                            .onTapGesture {
+                                if isAssigned {
+                                    item.labels.removeAll {
+                                        $0.persistentModelID == label.persistentModelID
+                                    }
+                                } else {
+                                    item.labels.append(label)
+                                }
+                            }
                     }
                 }
             }
 
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }
+                Button("Done") { closeSelf() }
                     .keyboardShortcut(.return, modifiers: [])
             }
         }
         .padding()
         .frame(width: 280)
+        .onExitCommand { closeSelf() }
+    }
+
+    // MARK: - Dismiss
+
+    private func closeSelf() {
+        if let onDone {
+            onDone()
+        } else {
+            dismiss()
+        }
     }
 
     // MARK: - Title Binding
@@ -53,50 +82,60 @@ struct EditItemView: View {
         )
     }
 
-    // MARK: - Label Toggle Chip
+}
 
-    @ViewBuilder
-    private func labelToggleChip(for label: Label) -> some View {
-        let isAssigned = item.labels.contains {
-            $0.persistentModelID == label.persistentModelID
+// MARK: - Standalone Modal Window
+
+/// Presents EditItemView in a standalone NSPanel that can become key and
+/// receive keyboard input, unlike sheets on the non-activating sliding panel.
+@MainActor
+enum EditItemWindow {
+    private static var currentPanel: NSPanel?
+
+    static func show(for item: ClipboardItem, modelContainer: ModelContainer) {
+        currentPanel?.close()
+
+        let panel = NSPanel(
+            contentRect: .zero,
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: true
+        )
+
+        let editView = EditItemView(item: item, onDone: {
+            panel.close()
+        })
+        .environment(\.colorScheme, .dark)
+        .modelContainer(modelContainer)
+
+        let hostingView = NSHostingView(rootView: editView)
+        panel.contentView = hostingView
+        panel.title = "Edit Item"
+        panel.level = .floating
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.isReleasedWhenClosed = false
+
+        // Use intrinsic size from the hosting view; fall back to a reasonable default
+        // since fittingSize can return zero before the view's @Query resolves.
+        var size = hostingView.fittingSize
+        if size.width < 100 || size.height < 100 {
+            size = NSSize(width: 300, height: 250)
+        }
+        panel.setContentSize(size)
+        panel.center()
+
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Clean up reference when window closes (handles both Done and close button)
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: panel,
+            queue: .main
+        ) { _ in
+            currentPanel = nil
         }
 
-        HStack(spacing: 4) {
-            if let emoji = label.emoji, !emoji.isEmpty {
-                Text(emoji)
-                    .font(.system(size: 10))
-            } else {
-                Circle()
-                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                    .frame(width: 8, height: 8)
-            }
-            Text(label.name)
-                .font(.caption)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            isAssigned
-                ? Color.accentColor.opacity(0.3)
-                : Color.white.opacity(0.1),
-            in: Capsule()
-        )
-        .overlay(
-            Capsule().strokeBorder(
-                isAssigned ? Color.accentColor.opacity(0.6) : Color.clear,
-                lineWidth: 1
-            )
-        )
-        .contentShape(Capsule())
-        .onTapGesture {
-            if isAssigned {
-                item.labels.removeAll {
-                    $0.persistentModelID == label.persistentModelID
-                }
-            } else {
-                item.labels.append(label)
-            }
-        }
+        currentPanel = panel
     }
 }

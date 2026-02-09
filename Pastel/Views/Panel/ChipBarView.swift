@@ -45,62 +45,18 @@ struct ChipBarView: View {
     private func labelChip(for label: Label) -> some View {
         let isActive = selectedLabelIDs.contains(label.persistentModelID)
 
-        HStack(spacing: 4) {
-            if let emoji = label.emoji, !emoji.isEmpty {
-                Text(emoji)
-                    .font(.system(size: 10))
-            }
-
-            Text(label.name)
-                .font(.caption)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            chipBackground(isActive: isActive, label: label),
-            in: Capsule()
-        )
-        .overlay(
-            Capsule()
-                .strokeBorder(
-                    isActive ? Color.accentColor.opacity(0.6) : Color.clear,
-                    lineWidth: 1
-                )
-        )
-        .contentShape(Capsule())
-        .onTapGesture {
-            if isActive {
-                selectedLabelIDs.remove(label.persistentModelID)
-            } else {
-                selectedLabelIDs.insert(label.persistentModelID)
-            }
-        }
-        .draggable(label.persistentModelID.asTransferString) {
-            HStack(spacing: 4) {
-                if let emoji = label.emoji, !emoji.isEmpty {
-                    Text(emoji).font(.system(size: 10))
+        LabelChipView(label: label, isActive: isActive)
+            .contentShape(Capsule())
+            .onTapGesture {
+                if isActive {
+                    selectedLabelIDs.remove(label.persistentModelID)
+                } else {
+                    selectedLabelIDs.insert(label.persistentModelID)
                 }
-                Text(label.name)
-                    .font(.caption)
-                    .lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(chipBackground(isActive: false, label: label), in: Capsule())
-        }
-    }
-
-    /// Chip background: label color for non-emoji labels, standard for emoji labels.
-    private func chipBackground(isActive: Bool, label: Label) -> Color {
-        if let emoji = label.emoji, !emoji.isEmpty {
-            // Emoji labels use standard chip background
-            return isActive ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.1)
-        } else {
-            // Color labels use the label color as background
-            let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
-            return isActive ? labelColor.opacity(0.7) : labelColor.opacity(0.45)
-        }
+            .draggable(label.persistentModelID.asTransferString) {
+                LabelChipView(label: label)
+            }
     }
 
     // MARK: - Create Chip
