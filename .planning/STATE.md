@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Phase: 12 — History Browser and Bulk Actions
-Plan: 01 of 3
+Plan: 02 of 3
 Status: In progress
-Last activity: 2026-02-09 — Completed 12-01-PLAN.md (resizable settings window, History tab with search and chip bar)
+Last activity: 2026-02-09 — Completed 12-02-PLAN.md (responsive grid with multi-selection for History browser)
 
-Progress: [███████░░░░░░░░░░░░░] 33% of Phase 12 (1/3 plans)
+Progress: [██████████████░░░░░░] 67% of Phase 12 (2/3 plans)
 
 ## Previous Milestones
 
@@ -53,6 +53,9 @@ Key decisions from v1.1 carrying forward:
 - [11-03]: Drag-drop appends labels with duplicate guard instead of replacing
 - [12-01]: Conditional frame sizing per tab -- General/Labels fixed 500pt, History flexible
 - [12-01]: HistoryBrowserView reuses SearchFieldView and ChipBarView with 200ms debounce
+- [12-02]: Multi-selection state (selectedIDs) owned by parent HistoryBrowserView, cleared on filter changes
+- [12-02]: PanelActions() injected as dummy environment for ClipboardCardView reuse outside panel
+- [12-02]: Shift-click anchor stored as PersistentIdentifier (not index) for stability across filter changes
 
 ### Pending Todos
 
@@ -76,5 +79,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 12-01-PLAN.md (resizable settings window, History tab with search and chip bar)
+Stopped at: Completed 12-02-PLAN.md (responsive grid with multi-selection for History browser)
 Resume file: None
