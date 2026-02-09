@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 
 ## Current Position
 
-Phase: 14 of 16 (App Ignore List)
-Plan: 2 of 2 (complete)
-Status: Phase complete
-Last activity: 2026-02-09 -- Completed 14-02-PLAN.md
+Phase: 15 of 16 (Import/Export)
+Plan: 1 of 2
+Status: In progress
+Last activity: 2026-02-09 -- Completed 15-01-PLAN.md
 
-Progress: [██████████░░░░░░░░░░] 50% (v1.3 -- 2/4 phases complete)
+Progress: [████████████░░░░░░░░] 60% (v1.3 -- 2/4 phases complete, plan 1/2 of phase 15)
 
 ## Previous Milestones
 
@@ -52,12 +52,15 @@ Key decisions from v1.3:
 - [14-01]: Fresh UserDefaults read each poll cycle for ignore list -- no caching, matches RetentionService pattern
 - [14-01]: ignoredAppBundleIDs UserDefaults key stores [String] array of bundle IDs
 - [14-02]: Three separate UserDefaults keys (IDs, dates, names) for ignore list persistence -- simpler than Codable, and ignoredAppBundleIDs already consumed by ClipboardMonitor
+- [15-01]: Separate Codable transfer structs (ExportedItem, ExportedLabel) decoupled from SwiftData @Model -- avoids fragile persistence state serialization
+- [15-01]: Pre-check fetchCount deduplication instead of relying on SwiftData @Attribute(.unique) upsert
+- [15-01]: Exclude concealed and image items from export (security-first, images not portable)
 
 ### Research Flags (v1.3)
 
 - ~~Phase 13: PAST-23 (fix HTML bug) must be first task before adding UI~~ DONE
 - Phase 16: MANDATORY feasibility test of .draggable() on NSPanel before building feature
-- Phase 15: One-at-a-time insert for import (SwiftData @Attribute(.unique) constraint)
+- ~~Phase 15: One-at-a-time insert for import (SwiftData @Attribute(.unique) constraint)~~ DONE (pre-check fetchCount before each insert)
 
 ### Pending Todos
 
@@ -70,5 +73,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 14-02-PLAN.md (Phase 14 complete)
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None
