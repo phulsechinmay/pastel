@@ -202,10 +202,10 @@ Plans:
   2. User selects a card and presses Shift+Enter to paste as plain text
   3. User Shift+double-clicks a card to paste as plain text
   4. User pastes rich HTML content as plain text into Google Docs or Notes and zero formatting appears (HTML bug fixed)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 13-01-PLAN.md -- TBD
+- [ ] 13-01-PLAN.md -- Fix HTML bug in writeToPasteboardPlainText, add context menu/Shift+Enter/Shift+double-click to panel, add context menu to History browser
 
 ### Phase 14: App Ignore List
 **Goal**: Users can exclude specific applications from clipboard monitoring so copies from password managers and sensitive apps are never captured
@@ -271,7 +271,7 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 | 10. Drag-and-Drop Label Assignment | v1.1 | 1/1 | Complete | 2026-02-07 |
 | 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 3/3 | Complete | 2026-02-09 |
 | 12. History Browser and Bulk Actions | v1.2 | 3/3 | Complete | 2026-02-08 |
-| 13. Paste as Plain Text | v1.3 | 0/TBD | Not started | - |
+| 13. Paste as Plain Text | v1.3 | 0/1 | Planned | - |
 | 14. App Ignore List | v1.3 | 0/TBD | Not started | - |
 | 15. Import/Export | v1.3 | 0/TBD | Not started | - |
 | 16. Drag-and-Drop from Panel | v1.3 | 0/TBD | Not started | - |
