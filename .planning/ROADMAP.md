@@ -158,7 +158,7 @@ Plans:
 **Milestone Goal:** Item titles for easier discovery, multi-label support, edit modal for item management, plus storage optimization and sensitive data protection.
 
 - [x] **Phase 11: Item Titles, Multi-Label Support, and Edit Modal** - User-assigned titles on clipboard items, multi-label relationships, and a right-click edit modal for title and label management
-- [ ] **Phase 12: History Browser and Bulk Actions** - Full-window history browser in Settings with responsive grid layout, search/label filtering, multi-select, and bulk copy/paste/delete
+- [x] **Phase 12: History Browser and Bulk Actions** - Full-window history browser in Settings with responsive grid layout, search/label filtering, multi-select, and bulk copy/paste/delete
 
 ## Phase Details (v1.2)
 
@@ -192,9 +192,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 12-01-PLAN.md -- Resizable settings window, History tab in SettingsView, HistoryBrowserView shell with search and chip bar
-- [ ] 12-02-PLAN.md -- HistoryGridView with adaptive LazyVGrid, @Query with in-memory label filtering, Cmd-click/Shift-click multi-selection
-- [ ] 12-03-PLAN.md -- Bulk action toolbar (Copy, Paste, Delete) with confirmation dialog, image cleanup, and paste-back from settings
+- [x] 12-01-PLAN.md -- Resizable settings window, History tab in SettingsView, HistoryBrowserView shell with search and chip bar
+- [x] 12-02-PLAN.md -- HistoryGridView with adaptive LazyVGrid, @Query with in-memory label filtering, Cmd-click/Shift-click multi-selection
+- [x] 12-03-PLAN.md -- Bulk action toolbar (Copy, Paste, Delete) with confirmation dialog, image cleanup, and paste-back from settings
 
 ## Progress
 
@@ -214,4 +214,4 @@ Phases execute in numeric order: 6 -> 7 -> 8 -> 9 -> 10
 | 9. Quick Paste Hotkeys | v1.1 | 2/2 | Complete | 2026-02-07 |
 | 10. Drag-and-Drop Label Assignment | v1.1 | 1/1 | Complete | 2026-02-07 |
 | 11. Item Titles, Multi-Label Support, and Edit Modal | v1.2 | 3/3 | Complete | 2026-02-09 |
-| 12. History Browser and Bulk Actions | v1.2 | 0/3 | Planned | - |
+| 12. History Browser and Bulk Actions | v1.2 | 3/3 | Complete | 2026-02-08 |
