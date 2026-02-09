@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 ## Current Position
 
 Phase: 13 of 16 (Paste as Plain Text)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-09 -- v1.3 roadmap created (Phases 13-16)
+Plan: 1 of 1 (complete)
+Status: Phase complete
+Last activity: 2026-02-09 -- Completed 13-01-PLAN.md
 
-Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.3)
+Progress: [█████░░░░░░░░░░░░░░░] 25% (v1.3 -- 1/4 phases)
 
 ## Previous Milestones
 
@@ -44,9 +44,14 @@ Key decisions from v1.2 carrying forward:
 - [12-02]: PanelActions() injected as dummy environment for ClipboardCardView reuse outside panel
 - [12-03]: resolvedItems @Binding passes filteredItems from HistoryGridView to parent for bulk operations
 
+Key decisions from v1.3:
+
+- [13-01]: Use onKeyPress(keys:) instead of onKeyPress(KeyEquivalent) when modifier detection is needed (latter has no KeyPress parameter)
+- [13-01]: No bulk paste-as-plain-text in History browser multi-selection (out of scope for Phase 13)
+
 ### Research Flags (v1.3)
 
-- Phase 13: PAST-23 (fix HTML bug) must be first task before adding UI
+- ~~Phase 13: PAST-23 (fix HTML bug) must be first task before adding UI~~ DONE
 - Phase 16: MANDATORY feasibility test of .draggable() on NSPanel before building feature
 - Phase 15: One-at-a-time insert for import (SwiftData @Attribute(.unique) constraint)
 
@@ -61,5 +66,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed v1.3 roadmap creation (Phases 13-16)
+Stopped at: Completed 13-01-PLAN.md (Phase 13 complete)
 Resume file: None
