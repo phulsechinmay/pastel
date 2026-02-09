@@ -31,18 +31,20 @@ struct HistoryGridView: View {
     private let onBulkCopy: () -> Void
     private let onBulkPaste: () -> Void
     private let onRequestBulkDelete: () -> Void
+    private let onPastePlainText: (ClipboardItem) -> Void
 
     private let columns = [
         GridItem(.adaptive(minimum: 280, maximum: 400), spacing: 12)
     ]
 
-    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}) {
+    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}, onPastePlainText: @escaping (ClipboardItem) -> Void = { _ in }) {
         self.selectedLabelIDs = selectedLabelIDs
         _selectedIDs = selectedIDs
         _resolvedItems = resolvedItems
         self.onBulkCopy = onBulkCopy
         self.onBulkPaste = onBulkPaste
         self.onRequestBulkDelete = onRequestBulkDelete
+        self.onPastePlainText = onPastePlainText
 
         let predicate: Predicate<ClipboardItem>
         if !searchText.isEmpty {
@@ -117,6 +119,9 @@ struct HistoryGridView: View {
                                     Button("Paste") {
                                         selectedIDs = [item.persistentModelID]
                                         onBulkPaste()
+                                    }
+                                    Button("Paste as Plain Text") {
+                                        onPastePlainText(item)
                                     }
                                     Divider()
                                     Button("Edit...") {

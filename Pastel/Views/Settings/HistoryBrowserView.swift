@@ -48,7 +48,8 @@ struct HistoryBrowserView: View {
                 resolvedItems: $resolvedItems,
                 onBulkCopy: { bulkCopy() },
                 onBulkPaste: { bulkPaste() },
-                onRequestBulkDelete: { showDeleteConfirmation = true }
+                onRequestBulkDelete: { showDeleteConfirmation = true },
+                onPastePlainText: { item in singlePastePlainText(item) }
             )
             .environment(PanelActions())
             .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
@@ -149,6 +150,11 @@ struct HistoryBrowserView: View {
             keyDown?.post(tap: .cgSessionEventTap)
             keyUp?.post(tap: .cgSessionEventTap)
         }
+    }
+
+    /// Paste a single item as plain text via AppState (same flow as panel paste-as-plain-text).
+    private func singlePastePlainText(_ item: ClipboardItem) {
+        appState.pastePlainText(item: item)
     }
 
     /// Delete selected items with full cleanup: disk images, label relationships, and model deletion.
