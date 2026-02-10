@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 ## Current Position
 
 Phase: 15 of 16 (Import/Export)
-Plan: 1 of 2
-Status: In progress
-Last activity: 2026-02-09 -- Completed 15-01-PLAN.md
+Plan: 2 of 2
+Status: Phase complete
+Last activity: 2026-02-09 -- Completed 15-02-PLAN.md
 
-Progress: [████████████░░░░░░░░] 60% (v1.3 -- 2/4 phases complete, plan 1/2 of phase 15)
+Progress: [███████████████░░░░░] 75% (v1.3 -- 3/4 phases complete, phase 15 done)
 
 ## Previous Milestones
 
@@ -55,6 +55,8 @@ Key decisions from v1.3:
 - [15-01]: Separate Codable transfer structs (ExportedItem, ExportedLabel) decoupled from SwiftData @Model -- avoids fragile persistence state serialization
 - [15-01]: Pre-check fetchCount deduplication instead of relying on SwiftData @Attribute(.unique) upsert
 - [15-01]: Exclude concealed and image items from export (security-first, images not portable)
+- [15-02]: lastExportCount property on ImportExportService for post-export alert count display
+- [15-02]: User-selected file read/write entitlement needed for NSSavePanel/NSOpenPanel file access
 
 ### Research Flags (v1.3)
 
@@ -73,5 +75,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 15-01-PLAN.md
+Stopped at: Completed 15-02-PLAN.md (Phase 15 complete)
 Resume file: None
