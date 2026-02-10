@@ -111,6 +111,9 @@ struct PanelContentView: View {
                     searchText.append(char)
                     panelFocus = nil
                     isSearchFocused = true
+                },
+                onDragStarted: {
+                    panelActions.onDragStarted?()
                 }
             )
             .focused($panelFocus, equals: .cardList)

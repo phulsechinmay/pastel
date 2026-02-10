@@ -71,6 +71,11 @@ final class AppState {
             self?.copyOnly(item: item)
         }
 
+        // Wire drag-started callback: SwiftUI -> PanelActions -> PanelController -> AppState -> ClipboardMonitor
+        panelController.onDragStarted = { [weak self] in
+            self?.clipboardMonitor?.skipNextChange = true
+        }
+
         // Register global hotkey for panel toggle
         KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in
             MainActor.assumeIsolated {

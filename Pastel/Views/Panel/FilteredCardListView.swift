@@ -31,6 +31,7 @@ struct FilteredCardListView: View {
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
     var onTypeToSearch: ((Character) -> Void)?
+    var onDragStarted: (() -> Void)?
 
     /// Selected label IDs for in-memory post-filtering (OR logic).
     private let selectedLabelIDs: Set<PersistentIdentifier>
@@ -59,7 +60,8 @@ struct FilteredCardListView: View {
         isShiftHeld: Bool = false,
         onPaste: @escaping (ClipboardItem) -> Void,
         onPastePlainText: @escaping (ClipboardItem) -> Void,
-        onTypeToSearch: ((Character) -> Void)? = nil
+        onTypeToSearch: ((Character) -> Void)? = nil,
+        onDragStarted: (() -> Void)? = nil
     ) {
         self.selectedLabelIDs = selectedLabelIDs
 
@@ -87,6 +89,7 @@ struct FilteredCardListView: View {
         self.onPaste = onPaste
         self.onPastePlainText = onPastePlainText
         self.onTypeToSearch = onTypeToSearch
+        self.onDragStarted = onDragStarted
     }
 
     var body: some View {
@@ -118,7 +121,8 @@ struct FilteredCardListView: View {
                                 .frame(width: 260, height: 195)
                                 .clipped()
                                 .onDrag {
-                                    DragItemProviderService.createItemProvider(for: item)
+                                    onDragStarted?()
+                                    return DragItemProviderService.createItemProvider(for: item)
                                 }
                                 .onTapGesture(count: 2) {
                                     if NSEvent.modifierFlags.contains(.shift) {
@@ -177,7 +181,8 @@ struct FilteredCardListView: View {
                                     isShiftHeld: isShiftHeld
                                 )
                                 .onDrag {
-                                    DragItemProviderService.createItemProvider(for: item)
+                                    onDragStarted?()
+                                    return DragItemProviderService.createItemProvider(for: item)
                                 }
                                 .onTapGesture(count: 2) {
                                     if NSEvent.modifierFlags.contains(.shift) {
