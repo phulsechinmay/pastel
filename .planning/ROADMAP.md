@@ -249,10 +249,11 @@ Plans:
   3. User drags a URL card from the panel and drops it into Safari's address bar, and the URL is accepted
   4. Panel remains visible throughout the entire drag session (does not dismiss when cursor leaves panel bounds)
   5. Dragging an item from the panel does not create a duplicate entry in clipboard history (no self-capture)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md -- TBD
+- [ ] 16-01-PLAN.md -- DragItemProviderService + .onDrag() on clipboard cards for all content types
+- [ ] 16-02-PLAN.md -- Panel dismiss suppression during drag + self-capture prevention via skipNextChange
 
 ## Progress
 
@@ -276,4 +277,4 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 | 13. Paste as Plain Text | v1.3 | 1/1 | Complete | 2026-02-09 |
 | 14. App Ignore List | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 15. Import/Export | v1.3 | 2/2 | Complete | 2026-02-09 |
-| 16. Drag-and-Drop from Panel | v1.3 | 0/TBD | Not started | - |
+| 16. Drag-and-Drop from Panel | v1.3 | 0/2 | Not started | - |
