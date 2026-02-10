@@ -189,7 +189,7 @@ Plans:
 - [ ] **Phase 13: Paste as Plain Text** - Context menu, Shift+Enter, and Shift+double-click for plain text pasting with HTML bug fix
 - [x] **Phase 14: App Ignore List** - Privacy-focused app filtering to exclude specific apps from clipboard monitoring
 - [x] **Phase 15: Import/Export** - Data portability via custom .pastel format with duplicate-aware import
-- [ ] **Phase 16: Drag-and-Drop from Panel** - Native macOS drag of clipboard items from panel to other applications
+- [x] **Phase 16: Drag-and-Drop from Panel** - Native macOS drag of clipboard items from panel to other applications
 
 ## Phase Details (v1.3)
 
@@ -252,8 +252,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md -- DragItemProviderService + .onDrag() on clipboard cards for all content types
-- [ ] 16-02-PLAN.md -- Panel dismiss suppression during drag + self-capture prevention via skipNextChange
+- [x] 16-01-PLAN.md -- DragItemProviderService + .onDrag() on clipboard cards for all content types
+- [x] 16-02-PLAN.md -- Panel dismiss suppression during drag + self-capture prevention via skipNextChange
 
 ## Progress
 
@@ -277,4 +277,4 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 | 13. Paste as Plain Text | v1.3 | 1/1 | Complete | 2026-02-09 |
 | 14. App Ignore List | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 15. Import/Export | v1.3 | 2/2 | Complete | 2026-02-09 |
-| 16. Drag-and-Drop from Panel | v1.3 | 0/2 | Not started | - |
+| 16. Drag-and-Drop from Panel | v1.3 | 2/2 | Complete | 2026-02-09 |

@@ -140,11 +140,11 @@ Requirements for v1.3 milestone: Power User Features.
 
 ### Advanced Interaction — Drag-and-Drop
 
-- [ ] **DRAG-01**: User can drag clipboard items from panel to other applications
-- [ ] **DRAG-02**: Drag-and-drop supports text, images, URLs, and files
-- [ ] **DRAG-03**: Drag provides correct NSItemProvider UTTypes for receiving apps
-- [ ] **DRAG-04**: Panel remains visible during drag session (does not dismiss on drag)
-- [ ] **DRAG-05**: Drag session does not trigger clipboard monitor self-capture
+- [x] **DRAG-01**: User can drag clipboard items from panel to other applications
+- [x] **DRAG-02**: Drag-and-drop supports text, images, URLs, and files
+- [x] **DRAG-03**: Drag provides correct NSItemProvider UTTypes for receiving apps
+- [x] **DRAG-04**: Panel remains visible during drag session (does not dismiss on drag)
+- [x] **DRAG-05**: Drag session does not trigger clipboard monitor self-capture
 
 ## Future Requirements
 
@@ -268,11 +268,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-06 | Phase 15 | Complete |
 | DATA-07 | Phase 15 | Complete |
 | DATA-08 | Phase 15 | Complete |
-| DRAG-01 | Phase 16 | Pending |
-| DRAG-02 | Phase 16 | Pending |
-| DRAG-03 | Phase 16 | Pending |
-| DRAG-04 | Phase 16 | Pending |
-| DRAG-05 | Phase 16 | Pending |
+| DRAG-01 | Phase 16 | Complete |
+| DRAG-02 | Phase 16 | Complete |
+| DRAG-03 | Phase 16 | Complete |
+| DRAG-04 | Phase 16 | Complete |
+| DRAG-05 | Phase 16 | Complete |
 
 **v1.0 Coverage:**
 - v1 requirements: 29 total
