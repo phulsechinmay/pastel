@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.3 -- Phase 16: Drag-and-Drop from Panel
+**Current focus:** Milestone v1.3 -- Phase 16: Drag-and-Drop from Panel (COMPLETE)
 
 ## Current Position
 
 Phase: 16 of 16 (Drag-and-Drop from Panel)
-Plan: 01 of 02 complete
-Status: In progress
-Last activity: 2026-02-09 -- Completed 16-01-PLAN.md
+Plan: 02 of 02 complete
+Status: Phase complete -- v1.3 milestone complete
+Last activity: 2026-02-09 -- Completed 16-02-PLAN.md
 
-Progress: [████████████████░░░░] 80% (v1.3 -- 3/4 phases complete, phase 16 plan 01 done)
+Progress: [████████████████████] 100% (v1.3 -- 4/4 phases complete)
 
 ## Previous Milestones
 
@@ -60,6 +60,10 @@ Key decisions from v1.3:
 - [16-01]: Use .onDrag() instead of .draggable() to avoid type collision with existing .dropDestination(for: String.self) for label assignment
 - [16-01]: DragItemProviderService as pure Foundation/UTI enum -- no SwiftUI/SwiftData imports
 - [16-01]: RTF registered before plain text fallback for richText items
+- [16-02]: Callback chain pattern (not NotificationCenter) for drag state propagation through PanelActions bridge
+- [16-02]: One-shot global leftMouseUp monitor for drag end detection, self-removes after firing
+- [16-02]: 500ms delay before isDragging reset matches existing paste-back timing
+- [16-02]: skipNextChange (not full monitor pause) for self-capture prevention during drag
 
 ### Research Flags (v1.3)
 
@@ -78,5 +82,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 16-01-PLAN.md
+Stopped at: Completed 16-02-PLAN.md (Phase 16 complete, v1.3 milestone complete)
 Resume file: None
