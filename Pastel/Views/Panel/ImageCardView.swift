@@ -10,8 +10,8 @@ struct ImageCardView: View {
 
     var body: some View {
         Group {
-            if let thumbnailPath = item.thumbnailPath {
-                AsyncThumbnailView(filename: thumbnailPath)
+            if let imagePath = item.imagePath ?? item.thumbnailPath {
+                AsyncThumbnailView(filename: imagePath)
                     .frame(maxWidth: .infinity, maxHeight: 140)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
