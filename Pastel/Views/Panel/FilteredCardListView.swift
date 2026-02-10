@@ -117,6 +117,9 @@ struct FilteredCardListView: View {
                                 )
                                 .frame(width: 260, height: 195)
                                 .clipped()
+                                .onDrag {
+                                    DragItemProviderService.createItemProvider(for: item)
+                                }
                                 .onTapGesture(count: 2) {
                                     if NSEvent.modifierFlags.contains(.shift) {
                                         onPastePlainText(item)
@@ -173,6 +176,9 @@ struct FilteredCardListView: View {
                                     isDropTarget: dropTargetIndex == index,
                                     isShiftHeld: isShiftHeld
                                 )
+                                .onDrag {
+                                    DragItemProviderService.createItemProvider(for: item)
+                                }
                                 .onTapGesture(count: 2) {
                                     if NSEvent.modifierFlags.contains(.shift) {
                                         onPastePlainText(item)
