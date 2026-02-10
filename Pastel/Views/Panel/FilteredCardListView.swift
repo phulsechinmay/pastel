@@ -257,27 +257,38 @@ struct FilteredCardListView: View {
             return .handled
         }
         .onKeyPress(characters: .decimalDigits) { keyPress in
-            // Only handle when Command is held and quick paste is enabled
+            // Cmd+N: Normal paste (preserving formatting)
             guard quickPasteEnabled, keyPress.modifiers.contains(.command) else { return .ignored }
 
-            // Extract digit 1-9 (ignore 0)
             guard let digit = keyPress.characters.first,
                   let number = digit.wholeNumberValue,
                   number >= 1, number <= 9 else { return .ignored }
 
-            let index = number - 1  // Convert 1-based to 0-based
+            let index = number - 1
             guard index < filteredItems.count else { return .ignored }
 
-            let item = filteredItems[index]
+            onPaste(filteredItems[index])
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "!@#$%^&*(")) { keyPress in
+            // Cmd+Shift+N: Plain text paste
+            // Shift+1-9 produces !@#$%^&*( so .decimalDigits won't match
+            guard quickPasteEnabled,
+                  keyPress.modifiers.contains(.command),
+                  keyPress.modifiers.contains(.shift) else { return .ignored }
 
-            if keyPress.modifiers.contains(.shift) {
-                // Cmd+Shift+N: Plain text paste
-                onPastePlainText(item)
-            } else {
-                // Cmd+N: Normal paste (preserving formatting)
-                onPaste(item)
-            }
+            let shiftedDigitMap: [Character: Int] = [
+                "!": 1, "@": 2, "#": 3, "$": 4, "%": 5,
+                "^": 6, "&": 7, "*": 8, "(": 9
+            ]
 
+            guard let char = keyPress.characters.first,
+                  let number = shiftedDigitMap[char] else { return .ignored }
+
+            let index = number - 1
+            guard index < filteredItems.count else { return .ignored }
+
+            onPastePlainText(filteredItems[index])
             return .handled
         }
         .onKeyPress(characters: .alphanumerics.union(.punctuationCharacters)) { keyPress in
