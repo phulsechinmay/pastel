@@ -188,7 +188,7 @@ Plans:
 
 - [ ] **Phase 13: Paste as Plain Text** - Context menu, Shift+Enter, and Shift+double-click for plain text pasting with HTML bug fix
 - [x] **Phase 14: App Ignore List** - Privacy-focused app filtering to exclude specific apps from clipboard monitoring
-- [ ] **Phase 15: Import/Export** - Data portability via custom .pastel format with duplicate-aware import
+- [x] **Phase 15: Import/Export** - Data portability via custom .pastel format with duplicate-aware import
 - [ ] **Phase 16: Drag-and-Drop from Panel** - Native macOS drag of clipboard items from panel to other applications
 
 ## Phase Details (v1.3)
@@ -236,8 +236,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 15-01-PLAN.md -- ImportExportService with Codable transfer structs, export/import logic, .pastel UTType registration
-- [ ] 15-02-PLAN.md -- Export/Import buttons in GeneralSettingsView Data section, NSSavePanel/NSOpenPanel, progress bar, result alerts
+- [x] 15-01-PLAN.md -- ImportExportService with Codable transfer structs, export/import logic, .pastel UTType registration
+- [x] 15-02-PLAN.md -- Export/Import buttons in GeneralSettingsView Data section, NSSavePanel/NSOpenPanel, progress bar, result alerts
 
 ### Phase 16: Drag-and-Drop from Panel
 **Goal**: Users can drag clipboard items directly from the sliding panel into other macOS applications as a natural alternative to paste-back
@@ -275,5 +275,5 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 | 12. History Browser and Bulk Actions | v1.2 | 3/3 | Complete | 2026-02-08 |
 | 13. Paste as Plain Text | v1.3 | 1/1 | Complete | 2026-02-09 |
 | 14. App Ignore List | v1.3 | 2/2 | Complete | 2026-02-09 |
-| 15. Import/Export | v1.3 | 0/2 | Not started | - |
+| 15. Import/Export | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 16. Drag-and-Drop from Panel | v1.3 | 0/TBD | Not started | - |

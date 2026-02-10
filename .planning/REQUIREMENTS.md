@@ -129,14 +129,14 @@ Requirements for v1.3 milestone: Power User Features.
 
 ### Data Portability — Import/Export
 
-- [ ] **DATA-01**: User can export clipboard history to `.pastel` file (JSON format)
-- [ ] **DATA-02**: Export preserves all metadata (titles, labels, timestamps, source apps, content)
-- [ ] **DATA-03**: Export format excludes images (text-based export only)
-- [ ] **DATA-04**: User can import clipboard history from `.pastel` file
-- [ ] **DATA-05**: Import handles duplicate content gracefully (skip or update timestamp)
-- [ ] **DATA-06**: Import preserves label relationships and creates missing labels
-- [ ] **DATA-07**: Settings has "Import/Export" section with export and import buttons
-- [ ] **DATA-08**: Export/import shows progress feedback for large histories
+- [x] **DATA-01**: User can export clipboard history to `.pastel` file (JSON format)
+- [x] **DATA-02**: Export preserves all metadata (titles, labels, timestamps, source apps, content)
+- [x] **DATA-03**: Export format excludes images (text-based export only)
+- [x] **DATA-04**: User can import clipboard history from `.pastel` file
+- [x] **DATA-05**: Import handles duplicate content gracefully (skip or update timestamp)
+- [x] **DATA-06**: Import preserves label relationships and creates missing labels
+- [x] **DATA-07**: Settings has "Import/Export" section with export and import buttons
+- [x] **DATA-08**: Export/import shows progress feedback for large histories
 
 ### Advanced Interaction — Drag-and-Drop
 
@@ -260,14 +260,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRIV-03 | Phase 14 | Complete |
 | PRIV-04 | Phase 14 | Complete |
 | PRIV-05 | Phase 14 | Complete |
-| DATA-01 | Phase 15 | Pending |
-| DATA-02 | Phase 15 | Pending |
-| DATA-03 | Phase 15 | Pending |
-| DATA-04 | Phase 15 | Pending |
-| DATA-05 | Phase 15 | Pending |
-| DATA-06 | Phase 15 | Pending |
-| DATA-07 | Phase 15 | Pending |
-| DATA-08 | Phase 15 | Pending |
+| DATA-01 | Phase 15 | Complete |
+| DATA-02 | Phase 15 | Complete |
+| DATA-03 | Phase 15 | Complete |
+| DATA-04 | Phase 15 | Complete |
+| DATA-05 | Phase 15 | Complete |
+| DATA-06 | Phase 15 | Complete |
+| DATA-07 | Phase 15 | Complete |
+| DATA-08 | Phase 15 | Complete |
 | DRAG-01 | Phase 16 | Pending |
 | DRAG-02 | Phase 16 | Pending |
 | DRAG-03 | Phase 16 | Pending |
