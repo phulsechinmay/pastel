@@ -21,7 +21,7 @@ final class SlidingPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
 
-        // Transparent background -- NSVisualEffectView provides the material
+        // Transparent background -- SwiftUI .glassEffect (macOS 26+) or NSVisualEffectView (pre-26) provides the material
         isOpaque = false
         backgroundColor = .clear
 

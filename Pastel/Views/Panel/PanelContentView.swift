@@ -193,7 +193,8 @@ private struct AdaptiveGlassButtonStyle: ViewModifier {
 }
 
 /// Availability-gated glass effect modifier.
-/// Uses SwiftUI `.glassEffect` on macOS 26+, falls back to a translucent dark background on older versions.
+/// Uses SwiftUI `.glassEffect` on macOS 26+; on older versions, clips to the edge-aware
+/// shape and relies on the NSVisualEffectView in PanelController for the behind-window blur.
 private struct GlassEffectModifier: ViewModifier {
     let shape: UnevenRoundedRectangle
 
@@ -201,10 +202,9 @@ private struct GlassEffectModifier: ViewModifier {
         if #available(macOS 26, *) {
             content.glassEffect(.regular, in: shape)
         } else {
-            content.background(
-                shape.fill(.ultraThinMaterial)
-            )
-            .clipShape(shape)
+            // NSVisualEffectView in PanelController provides the behind-window blur;
+            // just clip to the edge-aware shape here.
+            content.clipShape(shape)
         }
     }
 }

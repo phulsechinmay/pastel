@@ -289,34 +289,34 @@ final class PanelController {
 
     // MARK: - Panel Creation
 
-    /// Create the SlidingPanel with NSVisualEffectView background and hosted SwiftUI content.
+    /// Create the SlidingPanel with transparent background and hosted SwiftUI content
+    /// using `.glassEffect` for the Liquid Glass appearance.
     private func createPanel() {
         let slidingPanel = SlidingPanel()
 
-        // Frosted glass material background
-        let visualEffectView = NSVisualEffectView()
-        visualEffectView.material = .hudWindow
-        visualEffectView.blendingMode = .behindWindow
-        visualEffectView.state = .active
-        visualEffectView.appearance = NSAppearance(named: .darkAqua)
+        // Transparent background — glass effect is handled by SwiftUI's .glassEffect
+        slidingPanel.backgroundColor = .clear
+        slidingPanel.isOpaque = false
 
-        slidingPanel.contentView = visualEffectView
+        let containerView = NSView()
+        slidingPanel.contentView = containerView
 
-        // Round corners on the inward-facing edges (away from screen edge)
-        let edge = currentEdge
-        visualEffectView.wantsLayer = true
-        visualEffectView.layer?.cornerRadius = 12
-        switch edge {
-        case .right:
-            visualEffectView.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
-        case .left:
-            visualEffectView.layer?.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
-        case .top:
-            visualEffectView.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        case .bottom:
-            visualEffectView.layer?.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        // Add always-active blur background for pre-macOS 26
+        // (On macOS 26+, SwiftUI .glassEffect handles the panel's visual treatment)
+        if #unavailable(macOS 26) {
+            let visualEffect = NSVisualEffectView()
+            visualEffect.blendingMode = .behindWindow
+            visualEffect.state = .active          // Forces active appearance even when app is not frontmost
+            visualEffect.material = .hudWindow    // Dark translucent material matching panel aesthetic
+            visualEffect.translatesAutoresizingMaskIntoConstraints = false
+            containerView.addSubview(visualEffect)
+            NSLayoutConstraint.activate([
+                visualEffect.topAnchor.constraint(equalTo: containerView.topAnchor),
+                visualEffect.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+                visualEffect.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                visualEffect.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            ])
         }
-        visualEffectView.layer?.masksToBounds = true
 
         // Sync paste callbacks into panelActions before creating SwiftUI view
         panelActions.pasteItem = onPasteItem
@@ -326,7 +326,7 @@ final class PanelController {
             self?.dragSessionStarted()
         }
 
-        // Host SwiftUI content inside the visual effect view
+        // Host SwiftUI content with .glassEffect applied in PanelContentView
         let contentView = PanelContentView()
             .environment(\.colorScheme, .dark)
             .environment(panelActions)
@@ -350,13 +350,13 @@ final class PanelController {
             logger.warning("Panel created without ModelContainer -- @Query will not work")
         }
 
-        visualEffectView.addSubview(hostingView)
+        containerView.addSubview(hostingView)
 
         NSLayoutConstraint.activate([
-            hostingView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor),
-            hostingView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            hostingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
         ])
 
         self.panel = slidingPanel
