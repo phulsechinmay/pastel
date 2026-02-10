@@ -255,10 +255,36 @@ Plans:
 - [x] 16-01-PLAN.md -- DragItemProviderService + .onDrag() on clipboard cards for all content types
 - [x] 16-02-PLAN.md -- Panel dismiss suppression during drag + self-capture prevention via skipNextChange
 
+### v1.4 Panel Liquid Glass
+
+**Milestone Goal:** Fix the panel's Liquid Glass rendering so it displays proper lensing, refraction, and specular highlights consistently — regardless of whether the panel was triggered via hotkey, notification, or any other mechanism.
+
+- [ ] **Phase 17: Liquid Glass Panel Fix** - Iterative visual feedback loop to fix glass rendering on hotkey-triggered panel
+
+## Phase Details (v1.4)
+
+### Phase 17: Liquid Glass Panel Fix
+**Goal**: The sliding panel renders identical Liquid Glass material whether opened via the global hotkey (Carbon RegisterEventHotKey), a DistributedNotification, or any other trigger — no dark/degraded glass, consistent with macOS 26 system-native glass appearance
+**Depends on**: Phase 16 (v1.3 complete)
+**Requirements**: GLASS-01
+**Success Criteria** (what must be TRUE):
+  1. User presses Option+V hotkey and the panel shows full Liquid Glass (lensing, refraction, specular highlights) — NOT a dark muted blur
+  2. Panel glass appearance is identical whether triggered via hotkey or DistributedNotification
+  3. Automated screenshot comparison between hotkey-triggered and notification-triggered panels shows matching glass quality
+  4. Paste-back still works correctly after the fix (previous app regains focus, Cmd+V fires)
+  5. Panel dismisses correctly on click-outside, Escape, and Cmd+Tab
+  6. No private APIs used (App Store safe)
+**Execution Method**: Visual feedback loop (build -> launch -> CGEvent trigger -> screenshot -> compare -> iterate)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 17-01-PLAN.md -- Expose panel window ID, build/verify Liquid Glass rendering via hotkey and notification triggers
+- [ ] 17-02-PLAN.md -- Functional verification of dismiss/paste-back behaviors, debug logging cleanup
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 13 -> 14 -> 15 -> 16
+Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -278,3 +304,4 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16
 | 14. App Ignore List | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 15. Import/Export | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 16. Drag-and-Drop from Panel | v1.3 | 2/2 | Complete | 2026-02-09 |
+| 17. Liquid Glass Panel Fix | v1.4 | 0/2 | Not started | - |
