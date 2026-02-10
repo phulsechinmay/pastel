@@ -15,9 +15,9 @@ final class SlidingPanel: NSPanel {
             defer: true
         )
 
-        // Floating behavior -- always visible above regular windows
+        // Floating behavior -- above regular windows and the dock
         isFloatingPanel = true
-        level = .floating
+        level = .statusBar
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
 

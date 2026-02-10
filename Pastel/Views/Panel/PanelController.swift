@@ -130,7 +130,18 @@ final class PanelController {
 
         let edge = currentEdge
         let screen = screenWithMouse()
-        let screenFrame = screen.visibleFrame
+
+        // Build a frame that covers the dock but not the menu bar.
+        // screen.frame includes everything; screen.visibleFrame excludes dock + menu bar.
+        // Menu bar is at the top (maxY in Cocoa coordinates).
+        let fullFrame = screen.frame
+        let menuBarHeight = fullFrame.maxY - screen.visibleFrame.maxY
+        let screenFrame = NSRect(
+            x: fullFrame.origin.x,
+            y: fullFrame.origin.y,
+            width: fullFrame.width,
+            height: fullFrame.height - menuBarHeight
+        )
 
         // If the panel exists but orientation changed (vertical<->horizontal), recreate it.
         if let existingPanel = panel {
@@ -178,9 +189,17 @@ final class PanelController {
         guard let panel, panel.isVisible else { return }
 
         let edge = currentEdge
-        let screenFrame = panel.screen?.visibleFrame
-            ?? NSScreen.main?.visibleFrame
-            ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+
+        // Compute expanded frame covering dock but not menu bar (mirrors show())
+        let activeScreen = panel.screen ?? NSScreen.main ?? NSScreen.screens[0]
+        let fullFrame = activeScreen.frame
+        let menuBarHeight = fullFrame.maxY - activeScreen.visibleFrame.maxY
+        let screenFrame = NSRect(
+            x: fullFrame.origin.x,
+            y: fullFrame.origin.y,
+            width: fullFrame.width,
+            height: fullFrame.height - menuBarHeight
+        )
 
         let offScreen = edge.offScreenFrame(screenFrame: screenFrame)
 
