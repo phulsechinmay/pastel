@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.3 -- Phase 15: Import/Export
+**Current focus:** Milestone v1.3 -- Phase 16: Drag-and-Drop from Panel
 
 ## Current Position
 
-Phase: 15 of 16 (Import/Export)
-Plan: 2 of 2
-Status: Phase complete
-Last activity: 2026-02-09 -- Completed 15-02-PLAN.md
+Phase: 16 of 16 (Drag-and-Drop from Panel)
+Plan: 01 of 02 complete
+Status: In progress
+Last activity: 2026-02-09 -- Completed 16-01-PLAN.md
 
-Progress: [███████████████░░░░░] 75% (v1.3 -- 3/4 phases complete, phase 15 done)
+Progress: [████████████████░░░░] 80% (v1.3 -- 3/4 phases complete, phase 16 plan 01 done)
 
 ## Previous Milestones
 
@@ -57,11 +57,14 @@ Key decisions from v1.3:
 - [15-01]: Exclude concealed and image items from export (security-first, images not portable)
 - [15-02]: lastExportCount property on ImportExportService for post-export alert count display
 - [15-02]: User-selected file read/write entitlement needed for NSSavePanel/NSOpenPanel file access
+- [16-01]: Use .onDrag() instead of .draggable() to avoid type collision with existing .dropDestination(for: String.self) for label assignment
+- [16-01]: DragItemProviderService as pure Foundation/UTI enum -- no SwiftUI/SwiftData imports
+- [16-01]: RTF registered before plain text fallback for richText items
 
 ### Research Flags (v1.3)
 
 - ~~Phase 13: PAST-23 (fix HTML bug) must be first task before adding UI~~ DONE
-- Phase 16: MANDATORY feasibility test of .draggable() on NSPanel before building feature
+- ~~Phase 16: MANDATORY feasibility test of .draggable() on NSPanel before building feature~~ DONE -- Research confirmed feasibility: existing .draggable() on label chips proves SwiftUI drag works from NSPanel. Using .onDrag() instead to avoid type collision.
 - ~~Phase 15: One-at-a-time insert for import (SwiftData @Attribute(.unique) constraint)~~ DONE (pre-check fetchCount before each insert)
 
 ### Pending Todos
@@ -75,5 +78,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 15-02-PLAN.md (Phase 15 complete)
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
