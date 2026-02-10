@@ -1,20 +1,31 @@
 import Foundation
-import LinkPresentation
 import OSLog
 import SwiftData
 import UniformTypeIdentifiers
 
-/// Fetches URL page metadata (title, favicon, og:image) using LPMetadataProvider
+/// Fetches URL page metadata (title, favicon, og:image) using URLSession + HTML parsing
 /// and persists results to ClipboardItem fields via SwiftData.
 ///
 /// Static service matching ColorDetectionService pattern. All SwiftData operations
-/// run on @MainActor. LPMetadataProvider is created fresh per fetch (not Sendable).
+/// run on @MainActor. URLSession uses ephemeral configuration with short timeouts.
 struct URLMetadataService {
 
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "app.pastel.Pastel",
         category: "URLMetadataService"
     )
+
+    // MARK: - URLSession Configuration
+
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 10
+        config.httpAdditionalHeaders = [
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        ]
+        return URLSession(configuration: config)
+    }()
 
     // MARK: - Public API
 
@@ -48,7 +59,7 @@ struct URLMetadataService {
     /// Fetch URL metadata and update the ClipboardItem in SwiftData.
     ///
     /// Called as fire-and-forget from ClipboardMonitor after saving a URL item.
-    /// Handles duplicate reuse, LPMetadataProvider fetch with 5s timeout, and
+    /// Handles duplicate reuse, URLSession HTML fetch with parsing, and
     /// favicon/og:image disk caching.
     @MainActor
     static func fetchMetadata(
@@ -71,30 +82,54 @@ struct URLMetadataService {
             return
         }
 
-        // Fetch metadata via LPMetadataProvider (created locally -- NOT Sendable)
+        // Fetch metadata via URLSession + HTML parsing
         do {
-            let metadata = try await fetchLinkMetadata(for: url)
+            let (data, response) = try await session.data(from: url)
 
-            // Extract title
-            item.urlTitle = metadata.title
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode)
+            else {
+                item.urlMetadataFetched = false
+                try? modelContext.save()
+                logger.warning("URL metadata fetch got non-success status for \(urlString)")
+                return
+            }
 
-            // Extract and save favicon
-            if let iconProvider = metadata.iconProvider {
-                if let iconData = await loadImageData(from: iconProvider) {
-                    item.urlFaviconPath = await ImageStorageService.shared.saveFavicon(data: iconData)
+            guard let html = String(data: data, encoding: .utf8) else {
+                item.urlMetadataFetched = false
+                try? modelContext.save()
+                logger.warning("URL metadata fetch could not decode HTML as UTF-8 for \(urlString)")
+                return
+            }
+
+            let parsed = parseHTML(html, baseURL: url)
+
+            // Set title
+            item.urlTitle = parsed.title
+
+            // Download and save favicon
+            if let faviconURL = parsed.faviconURL {
+                do {
+                    let (faviconData, _) = try await session.data(from: faviconURL)
+                    item.urlFaviconPath = await ImageStorageService.shared.saveFavicon(data: faviconData)
+                } catch {
+                    logger.warning("Favicon download failed for \(urlString): \(error.localizedDescription)")
                 }
             }
 
-            // Extract and save og:image
-            if let imageProvider = metadata.imageProvider {
-                if let imageData = await loadImageData(from: imageProvider) {
+            // Download and save og:image
+            if let ogImageURL = parsed.ogImageURL {
+                do {
+                    let (imageData, _) = try await session.data(from: ogImageURL)
                     item.urlPreviewImagePath = await ImageStorageService.shared.savePreviewImage(data: imageData)
+                } catch {
+                    logger.warning("og:image download failed for \(urlString): \(error.localizedDescription)")
                 }
             }
 
             item.urlMetadataFetched = true
             try modelContext.save()
-            logger.info("Fetched URL metadata for \(urlString): title=\(metadata.title ?? "nil")")
+            logger.info("Fetched URL metadata for \(urlString): title=\(parsed.title ?? "nil")")
 
         } catch {
             // Mark as failed so we don't retry endlessly
@@ -170,27 +205,156 @@ struct URLMetadataService {
         return true
     }
 
-    /// Fetch link metadata using LPMetadataProvider with a 5-second timeout.
-    @MainActor
-    private static func fetchLinkMetadata(for url: URL) async throws -> LPLinkMetadata {
-        let provider = LPMetadataProvider()
-        provider.timeout = 5.0
-        return try await provider.startFetchingMetadata(for: url)
+    /// Parse HTML to extract title, og:image URL, and favicon URL.
+    ///
+    /// Uses simple string operations for lightweight extraction. Handles common
+    /// HTML patterns for meta tags and link tags.
+    private static func parseHTML(_ html: String, baseURL: URL) -> (title: String?, ogImageURL: URL?, faviconURL: URL?) {
+        let title = extractTitle(from: html)
+        let ogImageURL = extractOGImage(from: html, baseURL: baseURL)
+        let faviconURL = extractFavicon(from: html, baseURL: baseURL)
+        return (title, ogImageURL, faviconURL)
     }
 
-    /// Load image data from an NSItemProvider using a continuation wrapper.
-    @MainActor
-    private static func loadImageData(from provider: NSItemProvider) async -> Data? {
-        await withCheckedContinuation { continuation in
-            // Use loadDataRepresentation for the most general image type
-            _ = provider.loadDataRepresentation(for: .image) { data, error in
-                if let error {
-                    logger.debug("Failed to load image from NSItemProvider: \(error.localizedDescription)")
-                    continuation.resume(returning: nil)
-                    return
-                }
-                continuation.resume(returning: data)
-            }
+    // MARK: - HTML Parsing Helpers
+
+    /// Extract the page title from <title>...</title> tags.
+    private static func extractTitle(from html: String) -> String? {
+        guard let openRange = html.range(of: "<title", options: .caseInsensitive) else {
+            return nil
         }
+
+        // Find the closing > of the opening tag (handles <title> and <title attr="...">)
+        guard let tagCloseRange = html.range(of: ">", range: openRange.upperBound..<html.endIndex) else {
+            return nil
+        }
+
+        guard let closeRange = html.range(of: "</title>", options: .caseInsensitive, range: tagCloseRange.upperBound..<html.endIndex) else {
+            return nil
+        }
+
+        let rawTitle = String(html[tagCloseRange.upperBound..<closeRange.lowerBound])
+        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : decodeHTMLEntities(trimmed)
+    }
+
+    /// Extract og:image URL from <meta property="og:image" content="..."> tag.
+    private static func extractOGImage(from html: String, baseURL: URL) -> URL? {
+        // Search for meta tags with og:image property
+        // Handles both attribute orders:
+        //   <meta property="og:image" content="...">
+        //   <meta content="..." property="og:image">
+        let lowercased = html.lowercased()
+
+        var searchStart = lowercased.startIndex
+        while let metaRange = lowercased.range(of: "<meta ", options: .caseInsensitive, range: searchStart..<lowercased.endIndex) {
+            guard let tagEnd = lowercased.range(of: ">", range: metaRange.upperBound..<lowercased.endIndex) else {
+                break
+            }
+
+            let tagContent = String(html[metaRange.lowerBound..<tagEnd.upperBound])
+            let tagContentLower = tagContent.lowercased()
+
+            // Check if this meta tag has property="og:image"
+            if tagContentLower.range(of: "property", options: .caseInsensitive) != nil &&
+               tagContentLower.range(of: "og:image", options: .caseInsensitive) != nil {
+                // Extract content attribute value
+                if let contentValue = extractAttributeValue(from: tagContent, attribute: "content") {
+                    if let resolved = resolveURL(contentValue, baseURL: baseURL) {
+                        return resolved
+                    }
+                }
+            }
+
+            searchStart = tagEnd.upperBound
+        }
+
+        return nil
+    }
+
+    /// Extract favicon URL from <link rel="icon" href="..."> tags.
+    private static func extractFavicon(from html: String, baseURL: URL) -> URL? {
+        let lowercased = html.lowercased()
+
+        var searchStart = lowercased.startIndex
+        while let linkRange = lowercased.range(of: "<link ", options: .caseInsensitive, range: searchStart..<lowercased.endIndex) {
+            guard let tagEnd = lowercased.range(of: ">", range: linkRange.upperBound..<lowercased.endIndex) else {
+                break
+            }
+
+            let tagContent = String(html[linkRange.lowerBound..<tagEnd.upperBound])
+            let tagContentLower = tagContent.lowercased()
+
+            // Check if rel attribute contains "icon" (covers "icon", "shortcut icon", "apple-touch-icon")
+            if let relValue = extractAttributeValue(from: tagContent, attribute: "rel") {
+                if relValue.lowercased().contains("icon") {
+                    if let hrefValue = extractAttributeValue(from: tagContent, attribute: "href") {
+                        if let resolved = resolveURL(hrefValue, baseURL: baseURL) {
+                            return resolved
+                        }
+                    }
+                }
+            }
+
+            searchStart = tagEnd.upperBound
+        }
+
+        // Fallback: /favicon.ico
+        if let scheme = baseURL.scheme, let host = baseURL.host {
+            return URL(string: "\(scheme)://\(host)/favicon.ico")
+        }
+
+        return nil
+    }
+
+    /// Extract the value of an HTML attribute from a tag string.
+    ///
+    /// Handles both single and double quotes around attribute values.
+    private static func extractAttributeValue(from tag: String, attribute: String) -> String? {
+        // Look for attribute="value" or attribute='value'
+        let patterns = ["\(attribute)=\"", "\(attribute)='"]
+        let tagLower = tag.lowercased()
+
+        for pattern in patterns {
+            guard let attrRange = tagLower.range(of: pattern, options: .caseInsensitive) else {
+                continue
+            }
+
+            let valueStart = tag.index(attrRange.upperBound, offsetBy: 0)
+            let quote = pattern.last!
+            guard let quoteEnd = tag.range(of: String(quote), range: valueStart..<tag.endIndex) else {
+                continue
+            }
+
+            let value = String(tag[valueStart..<quoteEnd.lowerBound])
+            return value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return nil
+    }
+
+    /// Resolve a URL string against a base URL.
+    private static func resolveURL(_ urlString: String, baseURL: URL) -> URL? {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return nil }
+
+        // Absolute URL
+        if let url = URL(string: trimmed), url.scheme != nil {
+            return url
+        }
+
+        // Relative URL -- resolve against base
+        return URL(string: trimmed, relativeTo: baseURL)?.absoluteURL
+    }
+
+    /// Decode basic HTML entities in a string.
+    private static func decodeHTMLEntities(_ string: String) -> String {
+        var result = string
+        result = result.replacingOccurrences(of: "&amp;", with: "&")
+        result = result.replacingOccurrences(of: "&lt;", with: "<")
+        result = result.replacingOccurrences(of: "&gt;", with: ">")
+        result = result.replacingOccurrences(of: "&quot;", with: "\"")
+        result = result.replacingOccurrences(of: "&#39;", with: "'")
+        return result
     }
 }
