@@ -12,6 +12,7 @@ final class PanelActions {
     var pasteItem: ((ClipboardItem) -> Void)?
     var pastePlainTextItem: ((ClipboardItem) -> Void)?
     var copyOnlyItem: ((ClipboardItem) -> Void)?
+    var onDragStarted: (() -> Void)?
     /// Incremented each time the panel is shown; observed by PanelContentView to reset focus.
     var showCount = 0
 }
@@ -30,6 +31,7 @@ final class PanelController {
     private var panel: SlidingPanel?
     private var globalClickMonitor: Any?
     private var localKeyMonitor: Any?
+    private var dragEndMonitor: Any?
     private var modelContainer: ModelContainer?
     private var appState: AppState?
 
@@ -51,6 +53,14 @@ final class PanelController {
     }
 
     // MARK: - Public API
+
+    /// Whether a drag session is in progress from a clipboard card.
+    /// When true, the global click monitor will NOT dismiss the panel.
+    var isDragging: Bool = false
+
+    /// Callback invoked when a drag session starts from a clipboard card.
+    /// Set by AppState to wire into ClipboardMonitor.skipNextChange.
+    var onDragStarted: (() -> Void)?
 
     /// Callback invoked when a SwiftUI view triggers a paste action.
     /// Set by AppState during setupPanel() to wire into PasteService.
@@ -88,6 +98,27 @@ final class PanelController {
         self.appState = state
     }
 
+    /// Called when a card drag session begins.
+    /// Installs a global mouse-up monitor to detect when the drag ends.
+    func dragSessionStarted() {
+        isDragging = true
+        onDragStarted?() // Notify AppState to set clipboardMonitor.skipNextChange
+
+        // Install one-shot mouse-up monitor to detect drag end
+        dragEndMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
+            // Clean up this one-shot monitor immediately
+            if let monitor = self?.dragEndMonitor {
+                NSEvent.removeMonitor(monitor)
+                self?.dragEndMonitor = nil
+            }
+            // Delay isDragging reset to allow receiving app to process the drop
+            // and avoid the drop triggering a new clipboard history entry
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self?.isDragging = false
+            }
+        }
+    }
+
     // MARK: - Show / Hide
 
     /// Slide the panel in from the configured screen edge.
@@ -118,6 +149,9 @@ final class PanelController {
         panelActions.pasteItem = onPasteItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
+        panelActions.onDragStarted = { [weak self] in
+            self?.dragSessionStarted()
+        }
         panelActions.showCount += 1
 
         guard let panel else { return }
@@ -197,9 +231,11 @@ final class PanelController {
     /// Install monitors to dismiss the panel on click-outside or Escape key.
     private func installEventMonitors() {
         // Dismiss on any mouse click outside the panel
+        // (suppressed while a drag session is in progress)
         globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] _ in
+            guard self?.isDragging != true else { return }
             self?.hide()
         }
 
@@ -225,6 +261,11 @@ final class PanelController {
             NSEvent.removeMonitor(monitor)
             localKeyMonitor = nil
         }
+        if let monitor = dragEndMonitor {
+            NSEvent.removeMonitor(monitor)
+            dragEndMonitor = nil
+        }
+        isDragging = false
     }
 
     // MARK: - Panel Creation
@@ -246,6 +287,9 @@ final class PanelController {
         panelActions.pasteItem = onPasteItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
+        panelActions.onDragStarted = { [weak self] in
+            self?.dragSessionStarted()
+        }
 
         // Host SwiftUI content inside the visual effect view
         let contentView = PanelContentView()
