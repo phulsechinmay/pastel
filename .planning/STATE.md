@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 16 of 16 (Drag-and-Drop from Panel)
 Plan: 02 of 02 complete
 Status: Phase complete -- v1.3 milestone complete
-Last activity: 2026-02-09 -- Completed quick task 015 (panel UI polish)
+Last activity: 2026-02-09 -- Completed quick task 016 (sandbox + URLSession metadata)
 
 Progress: [████████████████████] 100% (v1.3 -- 4/4 phases complete)
 
@@ -82,5 +82,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed quick task 015 (panel UI polish -- glass, corners, spacing, dock overlay)
+Stopped at: Completed quick task 016 (sandbox + URLSession metadata)
 Resume file: None
