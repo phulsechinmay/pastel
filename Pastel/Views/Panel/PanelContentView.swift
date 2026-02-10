@@ -67,7 +67,7 @@ struct PanelContentView: View {
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.vertical, 6)
             } else {
                 // Vertical mode: header on top, search and chips stacked below
                 HStack {

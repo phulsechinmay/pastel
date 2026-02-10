@@ -156,7 +156,7 @@ struct FilteredCardListView: View {
                             }
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 2)
                     }
                     .onChange(of: selectedIndex) { _, newValue in
                         if let newValue {

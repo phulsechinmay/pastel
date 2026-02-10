@@ -24,7 +24,7 @@ final class PanelController {
 
     // MARK: - Constants
 
-    private let animationDuration: TimeInterval = 0.2
+    private let animationDuration: TimeInterval = 0.1
 
     // MARK: - Private State
 
@@ -274,14 +274,30 @@ final class PanelController {
     private func createPanel() {
         let slidingPanel = SlidingPanel()
 
-        // Dark vibrancy material background
+        // Frosted glass material background
         let visualEffectView = NSVisualEffectView()
-        visualEffectView.material = .sidebar
+        visualEffectView.material = .hudWindow
         visualEffectView.blendingMode = .behindWindow
         visualEffectView.state = .active
         visualEffectView.appearance = NSAppearance(named: .darkAqua)
 
         slidingPanel.contentView = visualEffectView
+
+        // Round corners on the inward-facing edges (away from screen edge)
+        let edge = currentEdge
+        visualEffectView.wantsLayer = true
+        visualEffectView.layer?.cornerRadius = 12
+        switch edge {
+        case .right:
+            visualEffectView.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        case .left:
+            visualEffectView.layer?.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        case .top:
+            visualEffectView.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        case .bottom:
+            visualEffectView.layer?.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        }
+        visualEffectView.layer?.masksToBounds = true
 
         // Sync paste callbacks into panelActions before creating SwiftUI view
         panelActions.pasteItem = onPasteItem
