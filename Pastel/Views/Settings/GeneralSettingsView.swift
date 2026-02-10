@@ -1,6 +1,7 @@
 import SwiftUI
 import LaunchAtLogin
 import KeyboardShortcuts
+import UniformTypeIdentifiers
 
 /// General settings tab with all 5 user-configurable settings.
 ///
@@ -16,6 +17,13 @@ struct GeneralSettingsView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var showingClearConfirmation = false
+    @State private var importExportService = ImportExportService()
+    @State private var showingExportSuccess = false
+    @State private var showingImportResult = false
+    @State private var showingImportError = false
+    @State private var exportedItemCount = 0
+    @State private var lastImportResult: ImportResult?
+    @State private var importErrorMessage = ""
 
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("historyRetention") private var retentionDays: Int = 90
@@ -109,16 +117,25 @@ struct GeneralSettingsView: View {
 
                 Divider()
 
-                // 7. Clear History
+                // 7. Data (Export / Import / Clear)
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Data")
                             .font(.headline)
                         Spacer()
+                        Button("Export...") {
+                            performExport()
+                        }
+                        .disabled(importExportService.isProcessing)
+                        Button("Import...") {
+                            performImport()
+                        }
+                        .disabled(importExportService.isProcessing)
                         Button("Clear All History...") {
                             showingClearConfirmation = true
                         }
                         .foregroundStyle(.red)
+                        .disabled(importExportService.isProcessing)
                         .alert("Clear All History", isPresented: $showingClearConfirmation) {
                             Button("Clear All", role: .destructive) {
                                 appState.clearAllHistory(modelContext: modelContext)
@@ -128,9 +145,36 @@ struct GeneralSettingsView: View {
                             Text("This will permanently delete all clipboard items. This action cannot be undone.")
                         }
                     }
-                    Text("Labels are preserved. Only clipboard items and their images are deleted.")
+
+                    if importExportService.isProcessing {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ProgressView(value: importExportService.progress)
+                            Text(importExportService.progressMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text("Export saves text-based clipboard history to a .pastel file. Images are not included.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                .alert("Export Complete", isPresented: $showingExportSuccess) {
+                    Button("OK") {}
+                } message: {
+                    Text("Exported \(exportedItemCount) items to .pastel file.")
+                }
+                .alert("Import Complete", isPresented: $showingImportResult) {
+                    Button("OK") {}
+                } message: {
+                    if let result = lastImportResult {
+                        Text("Imported \(result.importedCount) items, skipped \(result.skippedCount) duplicates. \(result.labelsCreated) new labels created.")
+                    }
+                }
+                .alert("Import Failed", isPresented: $showingImportError) {
+                    Button("OK") {}
+                } message: {
+                    Text(importErrorMessage)
                 }
             }
             .padding(24)
@@ -138,6 +182,59 @@ struct GeneralSettingsView: View {
         }
         .onChange(of: panelEdgeRaw) {
             appState.panelController.handleEdgeChange()
+        }
+    }
+
+    // MARK: - Export
+
+    private func performExport() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pastelExport]
+        panel.nameFieldStringValue = "Clipboard History.pastel"
+        panel.title = "Export Clipboard History"
+        panel.message = "Choose where to save your clipboard history."
+        panel.canCreateDirectories = true
+
+        let response = panel.runModal()
+        guard response == .OK, let url = panel.url else { return }
+
+        Task {
+            do {
+                let data = try importExportService.exportHistory(modelContext: modelContext)
+                try data.write(to: url, options: .atomic)
+                exportedItemCount = importExportService.lastExportCount
+                showingExportSuccess = true
+            } catch {
+                importErrorMessage = "Export failed: \(error.localizedDescription)"
+                showingImportError = true
+            }
+        }
+    }
+
+    // MARK: - Import
+
+    private func performImport() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pastelExport]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.title = "Import Clipboard History"
+        panel.message = "Select a .pastel file to import."
+
+        let response = panel.runModal()
+        guard response == .OK, let url = panel.url else { return }
+
+        Task {
+            do {
+                let data = try Data(contentsOf: url)
+                let result = try importExportService.importHistory(from: data, modelContext: modelContext)
+                lastImportResult = result
+                showingImportResult = true
+            } catch {
+                importErrorMessage = "Import failed: \(error.localizedDescription)"
+                showingImportError = true
+            }
         }
     }
 }

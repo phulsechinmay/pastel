@@ -72,6 +72,7 @@ final class ImportExportService {
     var isProcessing = false
     var progress: Double = 0.0
     var progressMessage = ""
+    var lastExportCount = 0
 
     func exportHistory(modelContext: ModelContext) throws -> Data {
         isProcessing = true
@@ -90,6 +91,7 @@ final class ImportExportService {
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         let items = try modelContext.fetch(itemDescriptor)
+        lastExportCount = items.count
 
         // Fetch all labels
         let labelDescriptor = FetchDescriptor<Label>(
