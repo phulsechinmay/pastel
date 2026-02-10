@@ -289,34 +289,21 @@ final class PanelController {
 
     // MARK: - Panel Creation
 
-    /// Create the SlidingPanel with transparent background and hosted SwiftUI content
-    /// using `.glassEffect` for the Liquid Glass appearance.
+    /// Create the SlidingPanel with transparent background and hosted SwiftUI content.
+    ///
+    /// On macOS 26+, wraps the SwiftUI content in `NSGlassEffectView` for native Liquid Glass.
+    /// On pre-26, uses `NSVisualEffectView(state: .active)` for consistent behind-window blur.
     private func createPanel() {
         let slidingPanel = SlidingPanel()
 
-        // Transparent background — glass effect is handled by SwiftUI's .glassEffect
+        // Transparent background — glass/blur is provided by AppKit views below
         slidingPanel.backgroundColor = .clear
         slidingPanel.isOpaque = false
 
         let containerView = NSView()
+        containerView.wantsLayer = true
+        containerView.layer?.backgroundColor = NSColor.clear.cgColor
         slidingPanel.contentView = containerView
-
-        // Add always-active blur background for pre-macOS 26
-        // (On macOS 26+, SwiftUI .glassEffect handles the panel's visual treatment)
-        if #unavailable(macOS 26) {
-            let visualEffect = NSVisualEffectView()
-            visualEffect.blendingMode = .behindWindow
-            visualEffect.state = .active          // Forces active appearance even when app is not frontmost
-            visualEffect.material = .hudWindow    // Dark translucent material matching panel aesthetic
-            visualEffect.translatesAutoresizingMaskIntoConstraints = false
-            containerView.addSubview(visualEffect)
-            NSLayoutConstraint.activate([
-                visualEffect.topAnchor.constraint(equalTo: containerView.topAnchor),
-                visualEffect.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-                visualEffect.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-                visualEffect.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            ])
-        }
 
         // Sync paste callbacks into panelActions before creating SwiftUI view
         panelActions.pasteItem = onPasteItem
@@ -326,7 +313,7 @@ final class PanelController {
             self?.dragSessionStarted()
         }
 
-        // Host SwiftUI content with .glassEffect applied in PanelContentView
+        // Build SwiftUI content
         let contentView = PanelContentView()
             .environment(\.colorScheme, .dark)
             .environment(panelActions)
@@ -350,14 +337,48 @@ final class PanelController {
             logger.warning("Panel created without ModelContainer -- @Query will not work")
         }
 
-        containerView.addSubview(hostingView)
+        // Transparent hosting view so glass/blur shows through
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
 
-        NSLayoutConstraint.activate([
-            hostingView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            hostingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-        ])
+        // Glass/blur treatment
+        if #available(macOS 26, *) {
+            // NSGlassEffectView renders Liquid Glass at the AppKit/compositor level,
+            // which works correctly with non-activating panels (unlike SwiftUI .glassEffect
+            // which degrades to basic blur when the app is not frontmost).
+            let glassView = NSGlassEffectView()
+            glassView.cornerRadius = 12
+            glassView.translatesAutoresizingMaskIntoConstraints = false
+            glassView.contentView = hostingView
+            containerView.addSubview(glassView)
+            NSLayoutConstraint.activate([
+                glassView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                glassView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+                glassView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                glassView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            ])
+        } else {
+            // Pre-macOS 26: NSVisualEffectView with forced active state for consistent blur
+            let visualEffect = NSVisualEffectView()
+            visualEffect.blendingMode = .behindWindow
+            visualEffect.state = .active
+            visualEffect.material = .hudWindow
+            visualEffect.translatesAutoresizingMaskIntoConstraints = false
+            containerView.addSubview(visualEffect)
+            NSLayoutConstraint.activate([
+                visualEffect.topAnchor.constraint(equalTo: containerView.topAnchor),
+                visualEffect.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+                visualEffect.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                visualEffect.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            ])
+            containerView.addSubview(hostingView)
+            NSLayoutConstraint.activate([
+                hostingView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                hostingView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+                hostingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                hostingView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            ])
+        }
 
         self.panel = slidingPanel
     }

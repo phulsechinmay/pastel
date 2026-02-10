@@ -181,26 +181,28 @@ struct PanelContentView: View {
     }
 }
 
-/// Availability-gated button style: `.glass` on macOS 26+, `.plain` on older versions.
+/// Availability-gated button style: `.borderless` on macOS 26+ (outer NSGlassEffectView
+/// provides the glass backdrop; using `.glass` here would be glass-on-glass), `.plain` on older.
 private struct AdaptiveGlassButtonStyle: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 26, *) {
-            content.buttonStyle(.glass)
+            content.buttonStyle(.borderless)
         } else {
             content.buttonStyle(.plain)
         }
     }
 }
 
-/// Availability-gated glass effect modifier.
-/// Uses SwiftUI `.glassEffect` on macOS 26+; on older versions, clips to the edge-aware
-/// shape and relies on the NSVisualEffectView in PanelController for the behind-window blur.
+/// Availability-gated panel shape modifier.
+/// On macOS 26+, glass is provided by NSGlassEffectView in PanelController — no SwiftUI glass needed.
+/// On pre-26, clips to the edge-aware shape (NSVisualEffectView provides the blur).
 private struct GlassEffectModifier: ViewModifier {
     let shape: UnevenRoundedRectangle
 
     func body(content: Content) -> some View {
         if #available(macOS 26, *) {
-            content.glassEffect(.regular, in: shape)
+            // Glass is rendered by NSGlassEffectView at the AppKit layer (PanelController)
+            content
         } else {
             // NSVisualEffectView in PanelController provides the behind-window blur;
             // just clip to the edge-aware shape here.

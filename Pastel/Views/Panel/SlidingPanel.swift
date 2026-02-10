@@ -31,6 +31,7 @@ final class SlidingPanel: NSPanel {
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         isMovableByWindowBackground = false
+        appearance = NSAppearance(named: .darkAqua)
     }
 
     // MARK: - Key / Main Behavior

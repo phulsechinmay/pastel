@@ -48,6 +48,7 @@ final class SettingsWindowController {
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 500, height: 480)
         window.appearance = NSAppearance(named: .darkAqua)
+        window.titlebarSeparatorStyle = .none
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.window = window
