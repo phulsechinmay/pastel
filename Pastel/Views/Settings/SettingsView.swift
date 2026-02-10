@@ -31,41 +31,65 @@ private enum SettingsTab: String, CaseIterable {
 /// Four tabs: General (all settings), Labels (CRUD label management),
 /// Privacy (app ignore list), and History (full history browser with search and grid).
 /// The tab bar uses a compact icon-above-text layout with accent highlighting.
+/// On macOS 26+, uses GlassEffectContainer with glass button styles.
 struct SettingsView: View {
 
     @State private var selectedTab: SettingsTab = .general
 
+    /// Shared tab label layout used by both glass and legacy tab bar paths.
+    private func tabLabel(_ tab: SettingsTab) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: tab.iconName)
+                .font(.system(size: 16))
+            Text(tab.displayName)
+                .font(.system(size: 12))
+        }
+        .frame(width: 80, height: 52)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Custom tab bar
-            HStack(spacing: 16) {
-                ForEach(SettingsTab.allCases, id: \.self) { tab in
-                    Button {
-                        selectedTab = tab
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: tab.iconName)
-                                .font(.system(size: 16))
-                            Text(tab.displayName)
-                                .font(.system(size: 12))
+            // Custom tab bar — glass buttons on macOS 26+, legacy plain buttons on older
+            if #available(macOS 26, *) {
+                GlassEffectContainer {
+                    HStack(spacing: 16) {
+                        ForEach(SettingsTab.allCases, id: \.self) { tab in
+                            if selectedTab == tab {
+                                Button { selectedTab = tab } label: { tabLabel(tab) }
+                                    .buttonStyle(.glassProminent)
+                            } else {
+                                Button { selectedTab = tab } label: { tabLabel(tab) }
+                                    .buttonStyle(.glass)
+                            }
                         }
-                        .frame(width: 80, height: 52)
-                        .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.white.opacity(0.6))
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(selectedTab == tab ? Color.accentColor.opacity(0.2) : Color.clear)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(selectedTab == tab ? Color.accentColor : Color.clear, lineWidth: 1)
-                        )
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+            } else {
+                HStack(spacing: 16) {
+                    ForEach(SettingsTab.allCases, id: \.self) { tab in
+                        Button {
+                            selectedTab = tab
+                        } label: {
+                            tabLabel(tab)
+                                .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.white.opacity(0.6))
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(selectedTab == tab ? Color.accentColor.opacity(0.2) : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(selectedTab == tab ? Color.accentColor : Color.clear, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThinMaterial)
             }
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity)
-            .background(.ultraThinMaterial)
 
             Divider()
 

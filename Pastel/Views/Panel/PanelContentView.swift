@@ -35,6 +35,22 @@ struct PanelContentView: View {
         return !edge.isVertical
     }
 
+    /// Edge-aware rounded rectangle for glass effect — only inward-facing corners are rounded.
+    private var glassShape: UnevenRoundedRectangle {
+        let r: CGFloat = 12
+        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
+        switch edge {
+        case .right:
+            return UnevenRoundedRectangle(topLeadingRadius: r, bottomLeadingRadius: r, bottomTrailingRadius: 0, topTrailingRadius: 0)
+        case .left:
+            return UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: r, topTrailingRadius: r)
+        case .top:
+            return UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: r, bottomTrailingRadius: r, topTrailingRadius: 0)
+        case .bottom:
+            return UnevenRoundedRectangle(topLeadingRadius: r, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: r)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if isHorizontal {
@@ -64,7 +80,7 @@ struct PanelContentView: View {
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .modifier(AdaptiveGlassButtonStyle())
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
@@ -88,7 +104,7 @@ struct PanelContentView: View {
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .modifier(AdaptiveGlassButtonStyle())
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -120,6 +136,7 @@ struct PanelContentView: View {
             .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())\(appState.itemCount)")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(GlassEffectModifier(shape: glassShape))
         .defaultFocus($panelFocus, .cardList)
         .onAppear {
             DispatchQueue.main.async {
@@ -161,5 +178,33 @@ struct PanelContentView: View {
 
     private func pastePlainTextItem(_ item: ClipboardItem) {
         panelActions.pastePlainTextItem?(item)
+    }
+}
+
+/// Availability-gated button style: `.glass` on macOS 26+, `.plain` on older versions.
+private struct AdaptiveGlassButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.buttonStyle(.glass)
+        } else {
+            content.buttonStyle(.plain)
+        }
+    }
+}
+
+/// Availability-gated glass effect modifier.
+/// Uses SwiftUI `.glassEffect` on macOS 26+, falls back to a translucent dark background on older versions.
+private struct GlassEffectModifier: ViewModifier {
+    let shape: UnevenRoundedRectangle
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.glassEffect(.regular, in: shape)
+        } else {
+            content.background(
+                shape.fill(.ultraThinMaterial)
+            )
+            .clipShape(shape)
+        }
     }
 }
