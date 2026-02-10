@@ -32,6 +32,7 @@ final class PanelController {
     private var globalClickMonitor: Any?
     private var localKeyMonitor: Any?
     private var dragEndMonitor: Any?
+    private var deactivationObserver: Any?
     private var modelContainer: ModelContainer?
     private var appState: AppState?
 
@@ -79,6 +80,11 @@ final class PanelController {
         panel?.isVisible ?? false
     }
 
+    /// The CGWindowID of the panel, used for `screencapture -l` during visual verification.
+    var panelWindowNumber: Int {
+        panel?.windowNumber ?? 0
+    }
+
     /// Toggle the panel: show if hidden, hide if visible.
     func toggle() {
         if isVisible {
@@ -124,8 +130,8 @@ final class PanelController {
     /// Slide the panel in from the configured screen edge.
     func show() {
         // Capture the frontmost app BEFORE showing the panel.
-        // Because the panel uses .nonactivatingPanel, Pastel never becomes frontmost,
-        // but we store this reference for edge cases and future use.
+        // After showing, we activate Pastel so the compositor renders full Liquid Glass.
+        // On hide, we re-activate this app to return focus seamlessly.
         previousApp = NSWorkspace.shared.frontmostApplication
 
         let edge = currentEdge
@@ -174,6 +180,12 @@ final class PanelController {
         panel.orderFrontRegardless()
         panel.makeKey()
 
+        // Activate the app so the compositor renders full Liquid Glass.
+        // LSUIElement = true means no Dock icon or Cmd+Tab entry appears.
+        logger.info("Before activate: isActive=\(NSApp.isActive), isKey=\(panel.isKeyWindow)")
+        NSApp.activate()
+        logger.info("After activate: isActive=\(NSApp.isActive), isKey=\(panel.isKeyWindow)")
+
         NSAnimationContext.runAnimationGroup { context in
             context.duration = animationDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -182,6 +194,15 @@ final class PanelController {
 
         installEventMonitors()
         logger.info("Panel shown on \(edge.rawValue) edge of screen: \(screen.localizedName)")
+        logger.info("Panel windowNumber (for screencapture -l): \(panel.windowNumber)")
+
+        // Debug: check activation state after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            self?.logger.info("200ms later: isActive=\(NSApp.isActive), panel.isKey=\(panel.isKeyWindow)")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.logger.info("500ms later: isActive=\(NSApp.isActive), panel.isKey=\(panel.isKeyWindow)")
+        }
     }
 
     /// Slide the panel off-screen in the direction of the configured edge and order it out.
@@ -210,6 +231,8 @@ final class PanelController {
         } completionHandler: { [weak self] in
             panel.orderOut(nil)
             self?.removeEventMonitors()
+            // Return focus to the app that was frontmost before the panel was shown.
+            self?.previousApp?.activate()
             self?.previousApp = nil
         }
 
@@ -268,6 +291,16 @@ final class PanelController {
             }
             return event
         }
+
+        // Dismiss when the app loses active status (e.g. Cmd+Tab, Mission Control).
+        // Since we activate the app on show(), deactivation means the user switched away.
+        deactivationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            guard self?.isDragging != true else { return }
+            self?.hide()
+        }
     }
 
     /// Remove all event monitors.
@@ -283,6 +316,10 @@ final class PanelController {
         if let monitor = dragEndMonitor {
             NSEvent.removeMonitor(monitor)
             dragEndMonitor = nil
+        }
+        if let observer = deactivationObserver {
+            NotificationCenter.default.removeObserver(observer)
+            deactivationObserver = nil
         }
         isDragging = false
     }
@@ -343,9 +380,9 @@ final class PanelController {
 
         // Glass/blur treatment
         if #available(macOS 26, *) {
-            // NSGlassEffectView renders Liquid Glass at the AppKit/compositor level,
-            // which works correctly with non-activating panels (unlike SwiftUI .glassEffect
-            // which degrades to basic blur when the app is not frontmost).
+            // NSGlassEffectView renders Liquid Glass at the AppKit/compositor level.
+            // Full glass quality (lensing, refraction, specular highlights) requires
+            // the app to be active, which PanelController.show() ensures via NSApp.activate().
             let glassView = NSGlassEffectView()
             glassView.cornerRadius = 12
             glassView.translatesAutoresizingMaskIntoConstraints = false

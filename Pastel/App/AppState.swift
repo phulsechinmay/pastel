@@ -80,8 +80,21 @@ final class AppState {
             self?.clipboardMonitor?.skipNextChange = true
         }
 
-        // Register global hotkey for panel toggle
+        // Register global hotkey for panel toggle.
+        // Defer to next run loop iteration so NSApp.activate() works correctly —
+        // Carbon event handler context blocks activation if called synchronously.
         KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in
+            DispatchQueue.main.async {
+                self?.togglePanel()
+            }
+        }
+
+        // TEMPORARY: Allow toggling panel via DistributedNotification (for automated testing loop)
+        // Remove after liquid glass fix is verified
+        DistributedNotificationCenter.default().addObserver(
+            forName: .init("app.pastel.togglePanel"),
+            object: nil, queue: .main
+        ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.togglePanel()
             }

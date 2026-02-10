@@ -23,6 +23,14 @@ struct PastelApp: App {
         state.modelContainer = container
         MigrationService.migrateLabelsIfNeeded(modelContext: container.mainContext)
         state.handleFirstLaunch()
+
+        // // Auto-open panel on startup for development (commented out for glass testing)
+        // if UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
+        //     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        //         state.togglePanel()
+        //     }
+        // }
+
         self._appState = State(initialValue: state)
     }
 

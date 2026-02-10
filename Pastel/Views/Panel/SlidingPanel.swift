@@ -1,16 +1,18 @@
 import AppKit
 
-/// A non-activating NSPanel subclass that slides in from the screen edge.
+/// Borderless NSPanel subclass that slides in from the screen edge.
 ///
-/// Uses `.nonactivatingPanel` style mask so it never steals focus from the
-/// frontmost application. Configured as a floating, borderless, transparent
-/// panel with shadow for the sliding clipboard history browser.
+/// Does NOT use `.nonactivatingPanel` — the panel activates Pastel when shown
+/// so the macOS compositor renders full Liquid Glass (lensing, refraction,
+/// specular highlights). PanelController re-activates the previous app on dismiss.
+/// Since the app uses `LSUIElement = true`, activation is invisible (no Dock icon
+/// or Cmd+Tab entry).
 final class SlidingPanel: NSPanel {
 
     init() {
         super.init(
             contentRect: .zero,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView, .borderless],
+            styleMask: [.fullSizeContentView, .borderless],
             backing: .buffered,
             defer: true
         )

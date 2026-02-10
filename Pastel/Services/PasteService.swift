@@ -78,7 +78,7 @@ final class PasteService {
         // 5. Hide panel
         panelController.hide()
 
-        // 6. Simulate Cmd+V after 250ms delay (must exceed 200ms panel hide animation for focus to restore)
+        // 6. Simulate Cmd+V after 250ms delay (must exceed panel hide animation + previous app re-activation)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             Self.simulatePaste()
         }
