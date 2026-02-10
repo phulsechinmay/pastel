@@ -19,7 +19,12 @@ final class ClipboardMonitor {
     var isMonitoring: Bool = true
 
     /// Total count of captured clipboard items (reactive for UI binding)
-    var itemCount: Int = 0
+    var itemCount: Int = 0 {
+        didSet { onItemCountChanged?(itemCount) }
+    }
+
+    /// Callback fired when itemCount changes, wired to AppState for @Observable reactivity.
+    var onItemCountChanged: ((Int) -> Void)?
 
     /// When true, the next clipboard change will be skipped (self-paste loop prevention, Phase 3)
     var skipNextChange: Bool = false

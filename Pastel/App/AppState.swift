@@ -28,10 +28,10 @@ final class AppState {
     /// The model container, stored so settings views can access SwiftData
     var modelContainer: ModelContainer?
 
-    /// Total number of captured clipboard items (delegates to monitor)
-    var itemCount: Int {
-        clipboardMonitor?.itemCount ?? 0
-    }
+    /// Total number of captured clipboard items (stored for @Observable reactivity).
+    /// ClipboardMonitor is not @Observable, so a computed property delegating to it
+    /// would not trigger SwiftUI updates. This stored property is synced via callback.
+    var itemCount: Int = 0
 
     /// Whether clipboard monitoring is active (delegates to monitor)
     var isMonitoring: Bool {
@@ -43,6 +43,10 @@ final class AppState {
     /// Called from PastelApp.init after the ModelContainer is created.
     func setup(modelContext: ModelContext) {
         let monitor = ClipboardMonitor(modelContext: modelContext)
+        monitor.onItemCountChanged = { [weak self] count in
+            self?.itemCount = count
+        }
+        self.itemCount = monitor.itemCount
         monitor.start()
         self.clipboardMonitor = monitor
 

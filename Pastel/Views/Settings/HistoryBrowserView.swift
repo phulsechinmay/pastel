@@ -176,6 +176,7 @@ struct HistoryBrowserView: View {
             modelContext.delete(item)
         }
         try? modelContext.save()
+        appState.itemCount -= itemsToDelete.count
         selectedIDs.removeAll()
     }
 }

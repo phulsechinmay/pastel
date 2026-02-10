@@ -22,6 +22,7 @@ struct ClipboardCardView: View {
     @Query(sort: \Label.sortOrder) private var labels: [Label]
     @Environment(\.modelContext) private var modelContext
     @Environment(PanelActions.self) private var panelActions
+    @Environment(AppState.self) private var appState
 
     @State private var isHovered = false
     @State private var imageDimensions: String?
@@ -247,6 +248,7 @@ struct ClipboardCardView: View {
         )
         modelContext.delete(item)
         try? modelContext.save()
+        appState.itemCount -= 1
     }
 
     /// Pre-rendered menu icon for context menu labels.
