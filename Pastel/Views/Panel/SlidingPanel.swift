@@ -3,10 +3,9 @@ import AppKit
 /// Borderless NSPanel subclass that slides in from the screen edge.
 ///
 /// Does NOT use `.nonactivatingPanel` — the panel activates Pastel when shown
-/// so the macOS compositor renders full Liquid Glass (lensing, refraction,
-/// specular highlights). PanelController re-activates the previous app on dismiss.
-/// Since the app uses `LSUIElement = true`, activation is invisible (no Dock icon
-/// or Cmd+Tab entry).
+/// so it can receive keyboard events. PanelController re-activates the previous
+/// app on dismiss. Since the app uses `LSUIElement = true`, activation is invisible
+/// (no Dock icon or Cmd+Tab entry).
 final class SlidingPanel: NSPanel {
 
     init() {
@@ -23,7 +22,7 @@ final class SlidingPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
 
-        // Transparent background -- SwiftUI .glassEffect (macOS 26+) or NSVisualEffectView (pre-26) provides the material
+        // Transparent background -- NSVisualEffectView in PanelController provides the material
         isOpaque = false
         backgroundColor = .clear
 
