@@ -8,15 +8,14 @@ Pastel is a native macOS clipboard manager that saves everything you copy and ma
 
 Clipboard history is always one hotkey away, with instant paste-back into any app.
 
-## Current Milestone: v1.3 Power User Features
+## Current Milestone: v1.4 Panel Liquid Glass
 
-**Goal:** Complete core feature set with paste-as-plain-text support, privacy controls via app filtering, data portability through import/export, and drag-and-drop interaction from panel to other apps.
+**Goal:** Fix the panel's Liquid Glass rendering so it displays proper lensing, refraction, and specular highlights regardless of app focus state — no hacks, no degradation on non-activating panels.
 
 **Target features:**
-- Paste as plain text via context menu, Shift+Enter, Shift+double-click
-- Allow/ignore app lists for selective clipboard monitoring
-- Import/export with custom Pastel format (extensible for other clipboard apps)
-- Drag-and-drop clipboard items from panel into other applications
+- Proper Liquid Glass material on the sliding panel that matches system-native glass appearance
+- Consistent visual rendering whether or not Pastel's settings window is open
+- Long-term architectural fix (not show/hide hacks) for non-activating NSPanel glass compositing
 
 ## Requirements
 
@@ -80,7 +79,7 @@ See REQUIREMENTS.md for v1.3 milestone requirements.
 - **Tech Stack**: Swift + SwiftUI — native APIs, no Electron or web views
 - **Theme**: Always dark — no light mode variant needed
 - **Storage**: Images on disk as files, metadata in SwiftData
-- **Distribution**: Direct distribution (no App Sandbox — incompatible with paste-back)
+- **Distribution**: App Store (App Sandbox enabled, PostEvent TCC for paste-back)
 - **Network**: URL metadata fetching must be non-blocking with graceful fallback
 
 ## Key Decisions
@@ -93,7 +92,7 @@ See REQUIREMENTS.md for v1.3 milestone requirements.
 | Always dark theme | Simpler to build, matches the tool's aesthetic | ✓ Good |
 | Configurable paste behavior | Some users prefer clipboard copy, others want direct paste | ✓ Good |
 | Screen-edge sliding panel | Matches PastePal UX, globally accessible from any app | ✓ Good |
-| NSPanel non-activating | Required for paste-back — panel must not steal focus | ✓ Good |
+| NSPanel activate-on-show | Panel activates app for full Liquid Glass, re-activates previous app on dismiss | ✓ Good |
 | SwiftData persistence | Modern API with @Query integration, macOS 14+ target | ✓ Good |
 | CGEvent Cmd+V paste-back | Reliable paste simulation, requires Accessibility permission | ✓ Good |
 | XcodeGen project management | project.yml is source of truth, reproducible builds | ✓ Good |
@@ -105,4 +104,4 @@ See REQUIREMENTS.md for v1.3 milestone requirements.
 | Image compression for storage | Reduce disk footprint without losing paste quality | — Pending |
 
 ---
-*Last updated: 2026-02-09 after v1.3 milestone start*
+*Last updated: 2026-02-10 after panel Liquid Glass fix*

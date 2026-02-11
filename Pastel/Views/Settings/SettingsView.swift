@@ -49,6 +49,14 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Header logo
+            Image("PastelLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 38)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+
             // Custom tab bar — glass buttons on macOS 26+, legacy plain buttons on older
             if #available(macOS 26, *) {
                 GlassEffectContainer {

@@ -5,16 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.3 -- Phase 16: Drag-and-Drop from Panel (COMPLETE)
+**Current focus:** Milestone v1.4 -- Phase 17: Liquid Glass Panel Fix
 
 ## Current Position
 
-Phase: 16 of 16 (Drag-and-Drop from Panel)
-Plan: 02 of 02 complete
-Status: Phase complete -- v1.3 milestone complete
-Last activity: 2026-02-09 -- Completed quick task 018 (NSGlassEffectView for panel + settings cleanup)
+Phase: 17 (Liquid Glass Panel Fix)
+Plan: Not yet planned
+Status: Phase added, awaiting planning
+Last activity: 2026-02-10 -- Added Phase 17 for Liquid Glass iterative fix
 
-Progress: [████████████████████] 100% (v1.3 -- 4/4 phases complete)
+Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.4 -- 0/1 phases complete)
+
+### Roadmap Evolution
+- Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
 
 ## Previous Milestones
 
