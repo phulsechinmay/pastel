@@ -19,10 +19,12 @@ struct LabelChipView: View {
 
     var body: some View {
         HStack(spacing: size == .compact ? 2 : 4) {
-            // Color dot -- always shown as first element
-            Circle()
-                .fill(dotColor)
-                .frame(width: size == .compact ? 5 : 6, height: size == .compact ? 5 : 6)
+            // Color dot -- only shown if label has no emoji
+            if label.emoji?.isEmpty ?? true {
+                Circle()
+                    .fill(dotColor)
+                    .frame(width: size == .compact ? 5 : 6, height: size == .compact ? 5 : 6)
+            }
 
             if let emoji = label.emoji, !emoji.isEmpty {
                 Text(emoji)
