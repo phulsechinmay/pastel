@@ -30,6 +30,7 @@ struct GeneralSettingsView: View {
     @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.paste.rawValue
     @AppStorage("fetchURLMetadata") private var fetchURLMetadata: Bool = true
     @AppStorage("quickPasteEnabled") private var quickPasteEnabled: Bool = true
+    @AppStorage("dismissAfterDragPaste") private var dismissAfterDragPaste: Bool = true
 
     var body: some View {
         ScrollView {
@@ -98,6 +99,12 @@ struct GeneralSettingsView: View {
                     .frame(maxWidth: 320)
 
                     Text("\"Paste\" writes to clipboard and pastes into the active app.\n\"Copy to Clipboard\" only writes to clipboard.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Toggle("Dismiss panel after drag-to-paste", isOn: $dismissAfterDragPaste)
+                        .toggleStyle(.switch)
+                    Text("Automatically closes the panel after dropping an item into another app.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

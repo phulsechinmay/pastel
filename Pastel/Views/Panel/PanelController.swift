@@ -124,6 +124,14 @@ final class PanelController {
             // and avoid the drop triggering a new clipboard history entry
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self?.isDragging = false
+                // Auto-dismiss panel after drag-to-paste if setting is enabled (default: true)
+                // UserDefaults.bool(forKey:) returns false for unset keys, so check for nil explicitly
+                let defaults = UserDefaults.standard
+                let dismissAfterDrag = defaults.object(forKey: "dismissAfterDragPaste") == nil
+                    || defaults.bool(forKey: "dismissAfterDragPaste")
+                if dismissAfterDrag {
+                    self?.hide()
+                }
             }
         }
     }
