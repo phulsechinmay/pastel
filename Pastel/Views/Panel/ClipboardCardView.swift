@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import AppKit
-import ImageIO
 
 /// Dispatcher card view that wraps each clipboard item in shared chrome
 /// (source app icon, content preview, relative timestamp) and routes to
@@ -25,7 +24,6 @@ struct ClipboardCardView: View {
     @Environment(AppState.self) private var appState
 
     @State private var isHovered = false
-    @State private var imageDimensions: String?
     @State private var dominantColor: Color?
 
     /// Whether this card is a color item (entire card uses the detected color).
@@ -60,16 +58,24 @@ struct ClipboardCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header row: source app icon + title + timestamp
-            HStack {
+            // Header row: source app icon + label chips (max 3) + overflow + timestamp
+            HStack(spacing: 4) {
                 sourceAppIcon
 
-                // Title (when set) -- bold caption2, visually distinct
-                if let title = item.title, !title.isEmpty {
-                    Text(title)
-                        .font(.caption2.bold())
-                        .lineLimit(1)
-                        .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
+                let visibleLabels = Array(item.labels.prefix(3))
+                ForEach(visibleLabels) { label in
+                    LabelChipView(label: label, size: .compact, tintOverride: isColorCard ? colorCardTextColor : nil)
+                }
+                if item.labels.count > 3 {
+                    Text("+\(item.labels.count - 3)")
+                        .font(.caption2)
+                        .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(
+                            isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1),
+                            in: Capsule()
+                        )
                 }
 
                 Spacer()
@@ -83,30 +89,14 @@ struct ClipboardCardView: View {
             // Content preview (full-width)
             contentPreview
 
-            // Footer row: metadata + label chips (max 3) + overflow badge + keycap badge
-            if footerMetadataText != nil || !item.labels.isEmpty || badgePosition != nil {
+            // Footer row: title (bold) + keycap badge
+            if (item.title != nil && !(item.title?.isEmpty ?? true)) || badgePosition != nil {
                 HStack(spacing: 4) {
-                    if let metadata = footerMetadataText {
-                        Text(metadata)
-                            .font(.caption2)
-                            .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.5) : .secondary.opacity(0.7))
+                    if let title = item.title, !title.isEmpty {
+                        Text(title)
+                            .font(.caption.bold())
                             .lineLimit(1)
-                    }
-
-                    let visibleLabels = Array(item.labels.prefix(3))
-                    ForEach(visibleLabels) { label in
-                        LabelChipView(label: label, size: .compact, tintOverride: isColorCard ? colorCardTextColor : nil)
-                    }
-                    if item.labels.count > 3 {
-                        Text("+\(item.labels.count - 3)")
-                            .font(.caption2)
-                            .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(
-                                isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1),
-                                in: Capsule()
-                            )
+                            .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
                     }
 
                     Spacer()
@@ -146,14 +136,6 @@ struct ClipboardCardView: View {
             if !isColorCard {
                 dominantColor = AppIconColorService.shared.dominantColor(forBundleID: item.sourceAppBundleID)
             }
-
-            guard item.type == .image, let path = item.imagePath else { return }
-            let fileURL = ImageStorageService.shared.resolveImageURL(path)
-            guard let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil),
-                  let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-                  let width = properties[kCGImagePropertyPixelWidth] as? Int,
-                  let height = properties[kCGImagePropertyPixelHeight] as? Int else { return }
-            imageDimensions = "\(width) \u{00D7} \(height)"
         }
         .onHover { hovering in
             isHovered = hovering
@@ -374,34 +356,6 @@ struct ClipboardCardView: View {
         }
     }
 
-    /// Type-appropriate metadata text for the card footer.
-    private var footerMetadataText: String? {
-        switch item.type {
-        case .text, .richText:
-            let count = item.characterCount > 0 ? item.characterCount : (item.textContent?.count ?? 0)
-            return count > 0 ? "\(count) chars" : nil
-        case .url:
-            guard let text = item.textContent,
-                  let url = URL(string: text),
-                  var host = url.host else { return nil }
-            if host.hasPrefix("www.") {
-                host = String(host.dropFirst(4))
-            }
-            return host
-        case .image:
-            return imageDimensions
-        case .code:
-            let count = item.characterCount > 0 ? item.characterCount : (item.textContent?.count ?? 0)
-            guard count > 0 else { return nil }
-            var result = "\(count) chars"
-            if let lang = item.detectedLanguage, !lang.isEmpty {
-                result += " \u{00B7} \(lang.capitalized)"
-            }
-            return result
-        case .color, .file:
-            return nil
-        }
-    }
 }
 
 // MARK: - KeycapBadge
