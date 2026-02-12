@@ -159,8 +159,6 @@ struct FilteredCardListView: View {
                                 .id(index)
                             }
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 0)
                     }
                     .onChange(of: selectedIndex) { _, newValue in
                         if let newValue {
@@ -219,8 +217,6 @@ struct FilteredCardListView: View {
                                 .id(index)
                             }
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
                     }
                     .onChange(of: selectedIndex) { _, newValue in
                         if let newValue {

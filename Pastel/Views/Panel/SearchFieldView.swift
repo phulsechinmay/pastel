@@ -33,12 +33,10 @@ struct SearchFieldView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .background(
             Color.white.opacity(0.06),
             in: RoundedRectangle(cornerRadius: 8)
         )
-        .padding(.horizontal, 8)
-        .padding(.vertical, 2)
     }
 }

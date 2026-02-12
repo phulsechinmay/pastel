@@ -23,19 +23,19 @@ struct LabelChipView: View {
             if label.emoji?.isEmpty ?? true {
                 Circle()
                     .fill(dotColor)
-                    .frame(width: size == .compact ? 5 : 6, height: size == .compact ? 5 : 6)
+                    .frame(width: size == .compact ? 5 : 7, height: size == .compact ? 5 : 7)
             }
 
             if let emoji = label.emoji, !emoji.isEmpty {
                 Text(emoji)
-                    .font(.system(size: size == .compact ? 8 : 10))
+                    .font(.system(size: size == .compact ? 8 : 11))
             }
             Text(label.name)
-                .font(size == .compact ? .system(size: 9) : .caption)
+                .font(size == .compact ? .system(size: 9) : .system(size: 11))
                 .lineLimit(1)
         }
-        .padding(.horizontal, size == .compact ? 5 : 8)
-        .padding(.vertical, size == .compact ? 2 : 4)
+        .padding(.horizontal, size == .compact ? 5 : 10)
+        .padding(.vertical, size == .compact ? 2 : 5)
         .background(background, in: Capsule())
         .overlay(
             Capsule().strokeBorder(

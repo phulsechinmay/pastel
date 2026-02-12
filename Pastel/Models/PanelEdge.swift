@@ -14,7 +14,7 @@ enum PanelEdge: String, CaseIterable {
     /// Panel dimensions for the given screen frame.
     ///
     /// Vertical edges: 320pt wide, full height.
-    /// Horizontal edges: full width, 300pt tall.
+    /// Horizontal edges: full width, 300 tall.
     func panelSize(screenFrame: NSRect) -> NSSize {
         if isVertical {
             return NSSize(width: 320, height: screenFrame.height)

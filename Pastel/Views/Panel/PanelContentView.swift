@@ -10,6 +10,9 @@ import SwiftData
 /// Layout: Header -> Divider -> SearchField -> ChipBar -> FilteredCardList
 struct PanelContentView: View {
 
+    /// Uniform distance from panel glass edge to content — reusable constant for all edges.
+    static let panelOuterPadding: CGFloat = 10
+
     @Environment(PanelActions.self) private var panelActions
     @Environment(AppState.self) private var appState
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
@@ -35,20 +38,9 @@ struct PanelContentView: View {
         return !edge.isVertical
     }
 
-    /// Edge-aware rounded rectangle for glass effect — only inward-facing corners are rounded.
-    private var glassShape: UnevenRoundedRectangle {
-        let r: CGFloat = 12
-        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
-        switch edge {
-        case .right:
-            return UnevenRoundedRectangle(topLeadingRadius: r, bottomLeadingRadius: r, bottomTrailingRadius: 0, topTrailingRadius: 0)
-        case .left:
-            return UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 0, bottomTrailingRadius: r, topTrailingRadius: r)
-        case .top:
-            return UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: r, bottomTrailingRadius: r, topTrailingRadius: 0)
-        case .bottom:
-            return UnevenRoundedRectangle(topLeadingRadius: r, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: r)
-        }
+    /// Uniform rounded rectangle for glass effect — all 4 corners rounded.
+    private var glassShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 12)
     }
 
     var body: some View {
@@ -82,8 +74,7 @@ struct PanelContentView: View {
                     }
                     .modifier(AdaptiveGlassButtonStyle())
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 2)
+                .padding(.bottom, 4)
             } else {
                 // Vertical mode: header on top, search and chips stacked below
                 HStack {
@@ -106,8 +97,6 @@ struct PanelContentView: View {
                     }
                     .modifier(AdaptiveGlassButtonStyle())
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
 
                 Divider()
 
@@ -139,6 +128,7 @@ struct PanelContentView: View {
             .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())\(appState.itemCount)")
         }
         .fontDesign(.rounded)
+        .padding(Self.panelOuterPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .modifier(GlassEffectModifier(shape: glassShape))
         .defaultFocus($panelFocus, .cardList)
@@ -216,9 +206,9 @@ private struct AdaptiveGlassButtonStyle: ViewModifier {
 
 /// Availability-gated panel shape modifier.
 /// On macOS 26+, glass is provided by NSGlassEffectView in PanelController — no SwiftUI glass needed.
-/// On pre-26, clips to the edge-aware shape (NSVisualEffectView provides the blur).
+/// On pre-26, clips to the rounded shape (NSVisualEffectView provides the blur).
 private struct GlassEffectModifier: ViewModifier {
-    let shape: UnevenRoundedRectangle
+    let shape: RoundedRectangle
 
     func body(content: Content) -> some View {
         if #available(macOS 26, *) {
@@ -226,7 +216,7 @@ private struct GlassEffectModifier: ViewModifier {
             content
         } else {
             // NSVisualEffectView in PanelController provides the behind-window blur;
-            // just clip to the edge-aware shape here.
+            // just clip to the rounded shape here.
             content.clipShape(shape)
         }
     }

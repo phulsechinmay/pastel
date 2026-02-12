@@ -35,7 +35,6 @@ struct ChipBarView: View {
             }
             createChip
         }
-        .padding(.horizontal, 12)
         .padding(.vertical, 4)
     }
 

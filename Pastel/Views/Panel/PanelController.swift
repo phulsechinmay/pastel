@@ -378,25 +378,10 @@ final class PanelController {
         containerView.wantsLayer = true
         containerView.layer?.backgroundColor = NSColor.clear.cgColor
 
-        // Edge-aware rounded corners: only round inward-facing corners (away from screen edge).
-        // Core Animation Y-axis: MinY = bottom visually, MaxY = top visually.
+        // Round all 4 corners uniformly. NSGlassEffectView also uses the same radius,
+        // so both layers agree and no black corner gaps appear.
         containerView.layer?.cornerRadius = 12
         containerView.layer?.masksToBounds = true
-        let edge = currentEdge
-        switch edge {
-        case .right:
-            // Inward = left side: top-left + bottom-left
-            containerView.layer?.maskedCorners = [.layerMinXMaxYCorner, .layerMinXMinYCorner]
-        case .left:
-            // Inward = right side: top-right + bottom-right
-            containerView.layer?.maskedCorners = [.layerMaxXMaxYCorner, .layerMaxXMinYCorner]
-        case .top:
-            // Inward = bottom: bottom-left + bottom-right
-            containerView.layer?.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        case .bottom:
-            // Inward = top: top-left + top-right
-            containerView.layer?.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-        }
 
         slidingPanel.contentView = containerView
 
