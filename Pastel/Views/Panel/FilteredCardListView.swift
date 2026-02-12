@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppKit
 
 /// Dynamic query child view that constructs its @Query predicate at init time.
 ///
@@ -25,6 +26,7 @@ struct FilteredCardListView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var dropTargetIndex: Int? = nil
+    @State private var keyMonitor: Any? = nil
 
     @Binding var selectedIndex: Int?
     var isShiftHeld: Bool
@@ -231,30 +233,6 @@ struct FilteredCardListView: View {
         }
         .focusable()
         .focusEffectDisabled()
-        .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
-            if !isHorizontal { moveSelection(by: -1) }
-            return isHorizontal ? .ignored : .handled
-        }
-        .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
-            if !isHorizontal { moveSelection(by: 1) }
-            return isHorizontal ? .ignored : .handled
-        }
-        .onKeyPress(keys: [.leftArrow], phases: [.down, .repeat]) { keyPress in
-            if keyPress.modifiers.contains(.command) {
-                onCycleLabelFilter?(-1)
-                return .handled
-            }
-            if isHorizontal { moveSelection(by: -1) }
-            return isHorizontal ? .handled : .ignored
-        }
-        .onKeyPress(keys: [.rightArrow], phases: [.down, .repeat]) { keyPress in
-            if keyPress.modifiers.contains(.command) {
-                onCycleLabelFilter?(1)
-                return .handled
-            }
-            if isHorizontal { moveSelection(by: 1) }
-            return isHorizontal ? .handled : .ignored
-        }
         .onKeyPress(keys: [.return]) { keyPress in
             if let index = selectedIndex, index < filteredItems.count {
                 if keyPress.modifiers.contains(.shift) {
@@ -314,10 +292,59 @@ struct FilteredCardListView: View {
         }
         .onAppear {
             selectedIndex = nil
+            installArrowKeyMonitor()
+        }
+        .onDisappear {
+            if let monitor = keyMonitor {
+                NSEvent.removeMonitor(monitor)
+                keyMonitor = nil
+            }
         }
     }
 
     // MARK: - Private Helpers
+
+    /// Install NSEvent local monitor for arrow key handling.
+    /// NSEvent monitors operate at the AppKit level and are immune to SwiftUI re-render
+    /// interruptions, enabling reliable key repeat for card navigation.
+    private func installArrowKeyMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            switch event.keyCode {
+            case 123: // Left arrow
+                if event.modifierFlags.contains(.command) {
+                    onCycleLabelFilter?(-1)
+                } else if isHorizontal {
+                    moveSelection(by: -1)
+                } else {
+                    return event // pass through in vertical mode
+                }
+                return nil // consumed
+            case 124: // Right arrow
+                if event.modifierFlags.contains(.command) {
+                    onCycleLabelFilter?(1)
+                } else if isHorizontal {
+                    moveSelection(by: 1)
+                } else {
+                    return event
+                }
+                return nil
+            case 125: // Down arrow
+                if !isHorizontal {
+                    moveSelection(by: 1)
+                    return nil
+                }
+                return event
+            case 126: // Up arrow
+                if !isHorizontal {
+                    moveSelection(by: -1)
+                    return nil
+                }
+                return event
+            default:
+                return event // pass through all other keys
+            }
+        }
+    }
 
     private func moveSelection(by offset: Int) {
         guard !filteredItems.isEmpty else { return }

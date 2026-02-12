@@ -10,6 +10,8 @@ struct ChipBarView: View {
 
     let labels: [Label]
     @Binding var selectedLabelIDs: Set<PersistentIdentifier>
+    var isAllHistoryActive: Bool = true
+    var onSelectAllHistory: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
 
@@ -30,12 +32,42 @@ struct ChipBarView: View {
 
     var body: some View {
         CenteredFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+            allHistoryChip
             ForEach(labels) { label in
                 labelChip(for: label)
             }
             createChip
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: - All History Chip
+
+    private var allHistoryChip: some View {
+        Button {
+            onSelectAllHistory?()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.counterclockwise.circle.fill")
+                    .font(.system(size: 11))
+                Text("All History")
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                isAllHistoryActive ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.1),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    isAllHistoryActive ? Color.accentColor.opacity(0.6) : Color.clear,
+                    lineWidth: 1
+                )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Label Chip

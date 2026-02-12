@@ -56,7 +56,12 @@ struct PanelContentView: View {
                     SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
                         .frame(maxWidth: 200)
 
-                    ChipBarView(labels: labels, selectedLabelIDs: $selectedLabelIDs)
+                    ChipBarView(
+                        labels: labels,
+                        selectedLabelIDs: $selectedLabelIDs,
+                        isAllHistoryActive: selectedLabelIDs.isEmpty,
+                        onSelectAllHistory: { selectedLabelIDs.removeAll() }
+                    )
 
                     Spacer()
 
@@ -101,7 +106,12 @@ struct PanelContentView: View {
                 Divider()
 
                 SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
-                ChipBarView(labels: labels, selectedLabelIDs: $selectedLabelIDs)
+                ChipBarView(
+                    labels: labels,
+                    selectedLabelIDs: $selectedLabelIDs,
+                    isAllHistoryActive: selectedLabelIDs.isEmpty,
+                    onSelectAllHistory: { selectedLabelIDs.removeAll() }
+                )
             }
 
             // Filtered content area with keyboard navigation
@@ -175,19 +185,31 @@ struct PanelContentView: View {
     }
 
     /// Cycle through label filters by direction (-1 = previous, +1 = next).
-    /// Wraps around at both ends. Empty selection starts at first/last label.
+    /// Includes "All History" (empty selection) as a position between first and last labels.
+    /// Cycle order: All History -> first label -> ... -> last label -> All History.
     private func cycleLabelFilter(direction: Int) {
         guard !labels.isEmpty else { return }
 
         let labelIDs = labels.map(\.persistentModelID)
 
         if selectedLabelIDs.isEmpty {
-            // No label selected: pick first (direction +1) or last (direction -1)
-            selectedLabelIDs = [direction > 0 ? labelIDs.first! : labelIDs.last!]
+            // Currently on "All History"
+            if direction > 0 {
+                // Forward: go to first label
+                selectedLabelIDs = [labelIDs.first!]
+            } else {
+                // Backward: go to last label
+                selectedLabelIDs = [labelIDs.last!]
+            }
         } else if let currentID = selectedLabelIDs.first,
                   let currentIndex = labelIDs.firstIndex(of: currentID) {
-            let newIndex = (currentIndex + direction + labelIDs.count) % labelIDs.count
-            selectedLabelIDs = [labelIDs[newIndex]]
+            let newIndex = currentIndex + direction
+            if newIndex < 0 || newIndex >= labelIDs.count {
+                // Wrap to "All History"
+                selectedLabelIDs.removeAll()
+            } else {
+                selectedLabelIDs = [labelIDs[newIndex]]
+            }
         }
     }
 }
