@@ -117,11 +117,13 @@ struct ClipboardCardView: View {
                     .fill(cardBackground)
                 if !isColorCard, let dominantColor {
                     LinearGradient(
-                        colors: [dominantColor.opacity(0.5), .clear],
+                        stops: [
+                            .init(color: dominantColor.opacity(0.5), location: 0.0),
+                            .init(color: .clear, location: 0.5)
+                        ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .frame(height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
