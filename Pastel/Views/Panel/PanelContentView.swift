@@ -83,7 +83,7 @@ struct PanelContentView: View {
                     .modifier(AdaptiveGlassButtonStyle())
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 4)
+                .padding(.vertical, 2)
             } else {
                 // Vertical mode: header on top, search and chips stacked below
                 HStack {
@@ -138,6 +138,7 @@ struct PanelContentView: View {
             .focused($panelFocus, equals: .cardList)
             .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())\(appState.itemCount)")
         }
+        .fontDesign(.rounded)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .modifier(GlassEffectModifier(shape: glassShape))
         .defaultFocus($panelFocus, .cardList)

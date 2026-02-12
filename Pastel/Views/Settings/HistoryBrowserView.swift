@@ -89,6 +89,7 @@ struct HistoryBrowserView: View {
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
         }
+        .fontDesign(.rounded)
         .onChange(of: debouncedSearchText) { _, _ in selectedIDs.removeAll() }
         .onChange(of: selectedLabelIDs) { _, _ in selectedIDs.removeAll() }
         .alert("Delete \(selectedIDs.count) Items", isPresented: $showDeleteConfirmation) {

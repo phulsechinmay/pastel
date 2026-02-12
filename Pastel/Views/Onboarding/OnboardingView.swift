@@ -150,6 +150,7 @@ struct OnboardingView: View {
             }
             .padding(32)
         }
+        .fontDesign(.rounded)
         .onReceive(pollTimer) { _ in
             accessibilityGranted = AccessibilityService.isGranted
         }

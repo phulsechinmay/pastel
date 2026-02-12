@@ -36,7 +36,7 @@ struct ChipBarView: View {
             createChip
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
     }
 
     // MARK: - Label Chip

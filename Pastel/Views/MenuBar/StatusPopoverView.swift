@@ -94,6 +94,7 @@ struct StatusPopoverView: View {
             .keyboardShortcut("q", modifiers: .command)
         }
         .padding()
+        .fontDesign(.rounded)
         .onAppear {
             panelShortcutDescription = KeyboardShortcuts.getShortcut(for: .togglePanel)?.description
         }

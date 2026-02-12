@@ -51,6 +51,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // Header logo
             Image("PastelLogo")
+
                 .resizable()
                 .scaledToFit()
                 .frame(height: 38)
@@ -123,5 +124,6 @@ struct SettingsView: View {
                 maxHeight: selectedTab == .history ? .infinity : 600
             )
         }
+        .fontDesign(.rounded)
     }
 }
