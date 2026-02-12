@@ -90,9 +90,10 @@ None currently.
 | 019 | Fix panel click dismissal + rounded corners | 2026-02-11 | 0d2385f | [19-fix-panel-click-dismissal-and-add-rounde](./quick/19-fix-panel-click-dismissal-and-add-rounde/) |
 | 020 | Single-select label filter, card rearrange, color dot chips | 2026-02-12 | 760abf9 | [20-single-select-label-filter-rearrange-car](./quick/20-single-select-label-filter-rearrange-car/) |
 | 021 | Key repeat navigation, rounded font, header padding | 2026-02-12 | 08a9412 | [21-enable-key-repeat-navigation-rounded-fon](./quick/21-enable-key-repeat-navigation-rounded-fon/) |
+| 022 | Fix key repeat, All History chip, drag-paste dismiss | 2026-02-12 | 62903e4 | [22-fix-key-repeat-for-card-nav-add-all-hist](./quick/22-fix-key-repeat-for-card-nav-add-all-hist/) |
 
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Completed quick task 021 (Key repeat navigation, rounded font, header padding)
+Stopped at: Completed quick task 022 (Fix key repeat, All History chip, drag-paste dismiss)
 Resume file: None
