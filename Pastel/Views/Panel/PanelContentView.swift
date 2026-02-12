@@ -129,7 +129,7 @@ struct PanelContentView: View {
         }
         .fontDesign(.rounded)
         .padding(Self.panelOuterPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, alignment: .top)
         .modifier(GlassEffectModifier(shape: glassShape))
         .defaultFocus($panelFocus, .cardList)
         .onAppear {

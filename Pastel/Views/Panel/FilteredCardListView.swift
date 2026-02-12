@@ -160,6 +160,7 @@ struct FilteredCardListView: View {
                             }
                         }
                     }
+                    .fixedSize(horizontal: false, vertical: true)
                     .onChange(of: selectedIndex) { _, newValue in
                         if let newValue {
                             withAnimation(.easeInOut(duration: 0.15)) {

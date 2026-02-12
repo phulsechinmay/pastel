@@ -24,6 +24,8 @@ final class PanelController {
 
     // MARK: - Constants
 
+    /// Set to `false` to keep the panel open for testing (disables all auto-dismiss triggers).
+    private let autoDismissEnabled = true
     private let animationDuration: TimeInterval = 0.1
 
     // MARK: - Private State
@@ -273,6 +275,7 @@ final class PanelController {
 
     /// Install monitors to dismiss the panel on click-outside or Escape key.
     private func installEventMonitors() {
+        guard autoDismissEnabled else { return }
         // Dismiss on any mouse click outside the panel.
         // Global monitors fire for events in OTHER apps, but with borderless
         // NSPanel + LSUIElement, macOS can occasionally route panel clicks as global.

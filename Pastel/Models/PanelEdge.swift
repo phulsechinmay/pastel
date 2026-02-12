@@ -11,21 +11,25 @@ enum PanelEdge: String, CaseIterable {
     /// Whether the panel slides horizontally (left/right) and occupies the full screen height.
     var isVertical: Bool { self == .left || self == .right }
 
+    /// Inset from the sliding edge so the panel's rounded corners are visible.
+    private static let edgeInset: CGFloat = 10
+
     /// Panel dimensions for the given screen frame.
     ///
     /// Vertical edges: 320pt wide, full height.
-    /// Horizontal edges: full width, 300 tall.
+    /// Horizontal edges: full width, 265 tall.
     func panelSize(screenFrame: NSRect) -> NSSize {
         if isVertical {
             return NSSize(width: 320, height: screenFrame.height)
         } else {
-            return NSSize(width: screenFrame.width, height: 300)
+            return NSSize(width: screenFrame.width, height: 265)
         }
     }
 
     /// The visible (on-screen) frame for the panel on the given screen.
     func onScreenFrame(screenFrame: NSRect) -> NSRect {
         let size = panelSize(screenFrame: screenFrame)
+        let inset = Self.edgeInset
         switch self {
         case .right:
             return NSRect(
@@ -44,14 +48,14 @@ enum PanelEdge: String, CaseIterable {
         case .top:
             return NSRect(
                 x: screenFrame.origin.x,
-                y: screenFrame.maxY - size.height,
+                y: screenFrame.maxY - size.height - inset,
                 width: size.width,
                 height: size.height
             )
         case .bottom:
             return NSRect(
                 x: screenFrame.origin.x,
-                y: screenFrame.origin.y,
+                y: screenFrame.origin.y + inset,
                 width: size.width,
                 height: size.height
             )
