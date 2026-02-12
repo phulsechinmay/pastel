@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 17 (Liquid Glass Panel Fix)
 Plan: Not yet planned
 Status: Phase added, awaiting planning
-Last activity: 2026-02-10 -- Added Phase 17 for Liquid Glass iterative fix
+Last activity: 2026-02-12 -- Completed quick task 022: Fix key repeat for card nav, add All History label chip, auto-close after drag-paste
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.4 -- 0/1 phases complete)
 
