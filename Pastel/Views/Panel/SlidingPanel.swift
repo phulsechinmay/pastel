@@ -43,4 +43,14 @@ final class SlidingPanel: NSPanel {
 
     /// Never become main window -- the active app retains main status.
     override var canBecomeMain: Bool { false }
+
+}
+
+// MARK: - First-Mouse Content View
+
+/// Custom NSView that accepts the first mouse click immediately.
+/// Used as the container view for SlidingPanel so clicks on the panel
+/// register without requiring a separate activation click first.
+final class FirstMouseView: NSView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

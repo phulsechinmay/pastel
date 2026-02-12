@@ -30,6 +30,7 @@ final class PanelController {
 
     private var panel: SlidingPanel?
     private var globalClickMonitor: Any?
+    private var localClickMonitor: Any?
     private var localKeyMonitor: Any?
     private var dragEndMonitor: Any?
     private var deactivationObserver: Any?
@@ -272,13 +273,37 @@ final class PanelController {
 
     /// Install monitors to dismiss the panel on click-outside or Escape key.
     private func installEventMonitors() {
-        // Dismiss on any mouse click outside the panel
-        // (suppressed while a drag session is in progress)
+        // Dismiss on any mouse click outside the panel.
+        // Global monitors fire for events in OTHER apps, but with borderless
+        // NSPanel + LSUIElement, macOS can occasionally route panel clicks as global.
+        // Guard by checking the click location against the panel frame.
         globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
-        ) { [weak self] _ in
+        ) { [weak self] event in
             guard self?.isDragging != true else { return }
-            self?.hide()
+            // Only dismiss if click is genuinely outside the panel
+            guard let panelFrame = self?.panel?.frame else {
+                self?.hide()
+                return
+            }
+            let clickLocation = NSEvent.mouseLocation
+            if !panelFrame.contains(clickLocation) {
+                self?.hide()
+            }
+        }
+
+        // Local click monitor: ensure the app stays active when clicking inside the panel.
+        // Belt-and-suspenders for borderless NSPanel where SwiftUI focus changes can
+        // cause momentary deactivation.
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] event in
+            if let panel = self?.panel, event.window == panel {
+                if !NSApp.isActive {
+                    NSApp.activate()
+                }
+            }
+            return event // pass through -- don't consume
         }
 
         // Dismiss on Escape key (local monitor so we can consume the event)
@@ -294,12 +319,20 @@ final class PanelController {
 
         // Dismiss when the app loses active status (e.g. Cmd+Tab, Mission Control).
         // Since we activate the app on show(), deactivation means the user switched away.
+        // Use a short delay to avoid false-positive dismissals from momentary deactivation
+        // during internal focus changes (e.g., clicking search field, label chips).
         deactivationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
             guard self?.isDragging != true else { return }
-            self?.hide()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                guard let self, self.isVisible else { return }
+                // If the app re-activated (focus returned to panel), don't dismiss
+                if !NSApp.isActive {
+                    self.hide()
+                }
+            }
         }
     }
 
@@ -308,6 +341,10 @@ final class PanelController {
         if let monitor = globalClickMonitor {
             NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil
+        }
+        if let monitor = localClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            localClickMonitor = nil
         }
         if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
@@ -337,7 +374,7 @@ final class PanelController {
         slidingPanel.backgroundColor = .clear
         slidingPanel.isOpaque = false
 
-        let containerView = NSView()
+        let containerView = FirstMouseView()
         containerView.wantsLayer = true
         containerView.layer?.backgroundColor = NSColor.clear.cgColor
         slidingPanel.contentView = containerView
