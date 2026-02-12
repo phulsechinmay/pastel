@@ -49,9 +49,9 @@ struct ChipBarView: View {
             .contentShape(Capsule())
             .onTapGesture {
                 if isActive {
-                    selectedLabelIDs.remove(label.persistentModelID)
+                    selectedLabelIDs.removeAll()
                 } else {
-                    selectedLabelIDs.insert(label.persistentModelID)
+                    selectedLabelIDs = [label.persistentModelID]
                 }
             }
             .draggable(label.persistentModelID.asTransferString) {

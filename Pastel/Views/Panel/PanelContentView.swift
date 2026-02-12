@@ -130,6 +130,9 @@ struct PanelContentView: View {
                 },
                 onDragStarted: {
                     panelActions.onDragStarted?()
+                },
+                onCycleLabelFilter: { direction in
+                    cycleLabelFilter(direction: direction)
                 }
             )
             .focused($panelFocus, equals: .cardList)
@@ -178,6 +181,23 @@ struct PanelContentView: View {
 
     private func pastePlainTextItem(_ item: ClipboardItem) {
         panelActions.pastePlainTextItem?(item)
+    }
+
+    /// Cycle through label filters by direction (-1 = previous, +1 = next).
+    /// Wraps around at both ends. Empty selection starts at first/last label.
+    private func cycleLabelFilter(direction: Int) {
+        guard !labels.isEmpty else { return }
+
+        let labelIDs = labels.map(\.persistentModelID)
+
+        if selectedLabelIDs.isEmpty {
+            // No label selected: pick first (direction +1) or last (direction -1)
+            selectedLabelIDs = [direction > 0 ? labelIDs.first! : labelIDs.last!]
+        } else if let currentID = selectedLabelIDs.first,
+                  let currentIndex = labelIDs.firstIndex(of: currentID) {
+            let newIndex = (currentIndex + direction + labelIDs.count) % labelIDs.count
+            selectedLabelIDs = [labelIDs[newIndex]]
+        }
     }
 }
 

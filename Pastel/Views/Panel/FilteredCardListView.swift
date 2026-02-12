@@ -32,6 +32,8 @@ struct FilteredCardListView: View {
     var onPastePlainText: (ClipboardItem) -> Void
     var onTypeToSearch: ((Character) -> Void)?
     var onDragStarted: (() -> Void)?
+    /// Callback for Cmd+Left/Right label cycling. Direction: -1 = previous, +1 = next.
+    var onCycleLabelFilter: ((Int) -> Void)?
 
     /// Selected label IDs for in-memory post-filtering (OR logic).
     private let selectedLabelIDs: Set<PersistentIdentifier>
@@ -61,7 +63,8 @@ struct FilteredCardListView: View {
         onPaste: @escaping (ClipboardItem) -> Void,
         onPastePlainText: @escaping (ClipboardItem) -> Void,
         onTypeToSearch: ((Character) -> Void)? = nil,
-        onDragStarted: (() -> Void)? = nil
+        onDragStarted: (() -> Void)? = nil,
+        onCycleLabelFilter: ((Int) -> Void)? = nil
     ) {
         self.selectedLabelIDs = selectedLabelIDs
 
@@ -90,6 +93,7 @@ struct FilteredCardListView: View {
         self.onPastePlainText = onPastePlainText
         self.onTypeToSearch = onTypeToSearch
         self.onDragStarted = onDragStarted
+        self.onCycleLabelFilter = onCycleLabelFilter
     }
 
     var body: some View {
@@ -238,11 +242,19 @@ struct FilteredCardListView: View {
             if !isHorizontal { moveSelection(by: 1) }
             return isHorizontal ? .ignored : .handled
         }
-        .onKeyPress(.leftArrow) {
+        .onKeyPress(keys: [.leftArrow]) { keyPress in
+            if keyPress.modifiers.contains(.command) {
+                onCycleLabelFilter?(-1)
+                return .handled
+            }
             if isHorizontal { moveSelection(by: -1) }
             return isHorizontal ? .handled : .ignored
         }
-        .onKeyPress(.rightArrow) {
+        .onKeyPress(keys: [.rightArrow]) { keyPress in
+            if keyPress.modifiers.contains(.command) {
+                onCycleLabelFilter?(1)
+                return .handled
+            }
             if isHorizontal { moveSelection(by: 1) }
             return isHorizontal ? .handled : .ignored
         }
