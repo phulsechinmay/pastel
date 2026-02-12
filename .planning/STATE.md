@@ -87,9 +87,10 @@ None currently.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 018 | NSGlassEffectView for panel + settings cleanup | 2026-02-09 | 1af4890 | [018-liquid-glass-panel-settings-swiftui-26](./quick/018-liquid-glass-panel-settings-swiftui-26/) |
+| 019 | Fix panel click dismissal + rounded corners | 2026-02-11 | 0d2385f | [19-fix-panel-click-dismissal-and-add-rounde](./quick/19-fix-panel-click-dismissal-and-add-rounde/) |
 
 ## Session Continuity
 
-Last session: 2026-02-09
-Stopped at: Completed quick task 018 (NSGlassEffectView for panel + settings cleanup)
+Last session: 2026-02-11
+Stopped at: Completed quick task 019 (Fix panel click dismissal + rounded corners)
 Resume file: None
