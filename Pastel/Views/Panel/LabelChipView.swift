@@ -3,8 +3,8 @@ import SwiftUI
 /// Shared label chip used across chip bar, card footer, and edit modal.
 ///
 /// Two sizes: `.regular` for chip bar and edit modal, `.compact` for card footers.
-/// Background uses the label's assigned color (no color dot). Emoji labels use
-/// a neutral background. Active state adds an accent stroke border.
+/// Background is always neutral (no colored background). A small color dot circle
+/// precedes the emoji/name text. Active state adds an accent stroke border.
 struct LabelChipView: View {
     let label: Label
     var size: ChipSize = .regular
@@ -19,6 +19,11 @@ struct LabelChipView: View {
 
     var body: some View {
         HStack(spacing: size == .compact ? 2 : 4) {
+            // Color dot -- always shown as first element
+            Circle()
+                .fill(dotColor)
+                .frame(width: size == .compact ? 5 : 6, height: size == .compact ? 5 : 6)
+
             if let emoji = label.emoji, !emoji.isEmpty {
                 Text(emoji)
                     .font(.system(size: size == .compact ? 8 : 10))
@@ -38,18 +43,24 @@ struct LabelChipView: View {
         )
     }
 
+    /// Color for the leading dot circle.
+    private var dotColor: Color {
+        if let tint = tintOverride {
+            return tint
+        }
+        return LabelColor(rawValue: label.colorName)?.color ?? .gray
+    }
+
+    /// Always-neutral background regardless of label color or emoji.
     private var background: Color {
         if let tint = tintOverride {
             return tint.opacity(0.15)
         }
 
-        let hasEmoji = label.emoji?.isEmpty == false
-        let labelColor = LabelColor(rawValue: label.colorName)?.color ?? .gray
-
-        if hasEmoji {
-            return isActive ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.1)
+        if isActive {
+            return Color.accentColor.opacity(0.3)
         } else {
-            return isActive ? labelColor.opacity(0.7) : labelColor.opacity(0.45)
+            return Color.white.opacity(0.1)
         }
     }
 }
