@@ -234,15 +234,15 @@ struct FilteredCardListView: View {
         }
         .focusable()
         .focusEffectDisabled()
-        .onKeyPress(.upArrow) {
+        .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in
             if !isHorizontal { moveSelection(by: -1) }
             return isHorizontal ? .ignored : .handled
         }
-        .onKeyPress(.downArrow) {
+        .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in
             if !isHorizontal { moveSelection(by: 1) }
             return isHorizontal ? .ignored : .handled
         }
-        .onKeyPress(keys: [.leftArrow]) { keyPress in
+        .onKeyPress(keys: [.leftArrow], phases: [.down, .repeat]) { keyPress in
             if keyPress.modifiers.contains(.command) {
                 onCycleLabelFilter?(-1)
                 return .handled
@@ -250,7 +250,7 @@ struct FilteredCardListView: View {
             if isHorizontal { moveSelection(by: -1) }
             return isHorizontal ? .handled : .ignored
         }
-        .onKeyPress(keys: [.rightArrow]) { keyPress in
+        .onKeyPress(keys: [.rightArrow], phases: [.down, .repeat]) { keyPress in
             if keyPress.modifiers.contains(.command) {
                 onCycleLabelFilter?(1)
                 return .handled
