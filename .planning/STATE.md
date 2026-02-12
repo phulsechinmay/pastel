@@ -88,9 +88,10 @@ None currently.
 |---|-------------|------|--------|-----------|
 | 018 | NSGlassEffectView for panel + settings cleanup | 2026-02-09 | 1af4890 | [018-liquid-glass-panel-settings-swiftui-26](./quick/018-liquid-glass-panel-settings-swiftui-26/) |
 | 019 | Fix panel click dismissal + rounded corners | 2026-02-11 | 0d2385f | [19-fix-panel-click-dismissal-and-add-rounde](./quick/19-fix-panel-click-dismissal-and-add-rounde/) |
+| 020 | Single-select label filter, card rearrange, color dot chips | 2026-02-12 | 760abf9 | [20-single-select-label-filter-rearrange-car](./quick/20-single-select-label-filter-rearrange-car/) |
 
 ## Session Continuity
 
-Last session: 2026-02-11
-Stopped at: Completed quick task 019 (Fix panel click dismissal + rounded corners)
+Last session: 2026-02-12
+Stopped at: Completed quick task 020 (Single-select label filter, card rearrange, color dot chips)
 Resume file: None
