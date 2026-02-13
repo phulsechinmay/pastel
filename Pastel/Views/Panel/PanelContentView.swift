@@ -136,7 +136,9 @@ struct PanelContentView: View {
                 }
             )
             .focused($panelFocus, equals: .cardList)
-            .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())\(appState.itemCount)")
+            // .id() triggers full view recreation when filters change (required for @Query predicate update).
+            // Intentionally excludes appState.itemCount: @Query auto-observes item additions/deletions.
+            .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
         }
         .fontDesign(.rounded)
         .padding(Self.panelOuterPadding)

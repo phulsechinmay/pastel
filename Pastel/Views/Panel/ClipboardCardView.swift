@@ -240,24 +240,24 @@ struct ClipboardCardView: View {
     /// Both emoji and color labels render as NSImage so NSMenu aligns them in the same image column.
     private func menuIcon(for label: Label) -> NSImage {
         let size: CGFloat = 16
-        let image = NSImage(size: NSSize(width: size, height: size))
-        image.lockFocus()
-        if let emoji = label.emoji, !emoji.isEmpty {
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 12)
-            ]
-            let str = NSAttributedString(string: emoji, attributes: attributes)
-            let strSize = str.size()
-            str.draw(at: NSPoint(
-                x: (size - strSize.width) / 2,
-                y: (size - strSize.height) / 2
-            ))
-        } else {
-            let nsColor = NSColor(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-            nsColor.setFill()
-            NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: 12, height: 12)).fill()
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+            if let emoji = label.emoji, !emoji.isEmpty {
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: 12)
+                ]
+                let str = NSAttributedString(string: emoji, attributes: attributes)
+                let strSize = str.size()
+                str.draw(at: NSPoint(
+                    x: (size - strSize.width) / 2,
+                    y: (size - strSize.height) / 2
+                ))
+            } else {
+                let nsColor = NSColor(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                nsColor.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 2, y: 2, width: 12, height: 12)).fill()
+            }
+            return true
         }
-        image.unlockFocus()
         image.isTemplate = false
         return image
     }
