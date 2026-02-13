@@ -5,19 +5,20 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Milestone v1.4 -- Phase 17: Liquid Glass Panel Fix
+**Current focus:** Phase 18: Codebase Audit -- Anti-patterns, Performance, and Security
 
 ## Current Position
 
-Phase: 17 (Liquid Glass Panel Fix)
-Plan: Not yet planned
-Status: Phase added, awaiting planning
-Last activity: 2026-02-12 -- Completed quick task 022: Fix key repeat for card nav, add All History label chip, auto-close after drag-paste
+Phase: 18 (Codebase Audit)
+Plan: 02 of 3 complete
+Status: Executing Phase 18
+Last activity: 2026-02-13 -- Completed 18-02: Force unwrap fixes and import optimization
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.4 -- 0/1 phases complete)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
+- Phase 18 added: Codebase Audit — Anti-patterns, Performance, and Security (Encryption)
 
 ## Previous Milestones
 
@@ -68,6 +69,12 @@ Key decisions from v1.3:
 - [16-02]: 500ms delay before isDragging reset matches existing paste-back timing
 - [16-02]: skipNextChange (not full monitor pause) for self-capture prevention during drag
 
+Key decisions from Phase 18 (Codebase Audit):
+
+- [18-02]: guard-let + fatalError for applicationSupportDirectory (same pattern as PastelApp.swift ModelContainer)
+- [18-02]: asTransferString returns String? -- callers nil-coalesce to empty string for graceful drag failure
+- [18-02]: Pre-load all content hashes into Set<String> for O(1) import dedup instead of O(n) fetchCount queries
+
 ### Research Flags (v1.3)
 
 - ~~Phase 13: PAST-23 (fix HTML bug) must be first task before adding UI~~ DONE
@@ -94,6 +101,6 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-12
-Stopped at: Completed quick task 022 (Fix key repeat, All History chip, drag-paste dismiss)
+Last session: 2026-02-13
+Stopped at: Completed 18-02-PLAN.md (Force unwrap fixes and import optimization)
 Resume file: None
