@@ -21,7 +21,7 @@ final class MigrationService {
             }
         }
 
-        try? modelContext.save()
+        saveWithLogging(modelContext, operation: "label migration")
         UserDefaults.standard.set(true, forKey: key)
     }
 }

@@ -90,14 +90,14 @@ struct URLMetadataService {
                   (200..<300).contains(httpResponse.statusCode)
             else {
                 item.urlMetadataFetched = false
-                try? modelContext.save()
+                saveWithLogging(modelContext, operation: "URL metadata fetch")
                 logger.warning("URL metadata fetch got non-success status for \(urlString)")
                 return
             }
 
             guard let html = String(data: data, encoding: .utf8) else {
                 item.urlMetadataFetched = false
-                try? modelContext.save()
+                saveWithLogging(modelContext, operation: "URL metadata failure")
                 logger.warning("URL metadata fetch could not decode HTML as UTF-8 for \(urlString)")
                 return
             }
@@ -134,7 +134,7 @@ struct URLMetadataService {
         } catch {
             // Mark as failed so we don't retry endlessly
             item.urlMetadataFetched = false
-            try? modelContext.save()
+            saveWithLogging(modelContext, operation: "URL metadata failure")
             logger.warning("URL metadata fetch failed for \(urlString): \(error.localizedDescription)")
         }
     }
@@ -199,7 +199,7 @@ struct URLMetadataService {
         currentItem.urlFaviconPath = existing.urlFaviconPath
         currentItem.urlPreviewImagePath = existing.urlPreviewImagePath
         currentItem.urlMetadataFetched = true
-        try? modelContext.save()
+        saveWithLogging(modelContext, operation: "URL favicon save")
 
         logger.info("Reused cached URL metadata for \(urlString)")
         return true

@@ -181,7 +181,7 @@ struct ClipboardCardView: View {
                         } else {
                             item.labels.append(label)
                         }
-                        try? modelContext.save()
+                        saveWithLogging(modelContext, operation: "label toggle")
                     } label: {
                         HStack {
                             Image(nsImage: menuIcon(for: label))
@@ -197,7 +197,7 @@ struct ClipboardCardView: View {
                     Divider()
                     Button("Remove All Labels") {
                         item.labels.removeAll()
-                        try? modelContext.save()
+                        saveWithLogging(modelContext, operation: "remove all labels")
                     }
                 }
             }
@@ -231,7 +231,7 @@ struct ClipboardCardView: View {
             thumbnailPath: item.urlPreviewImagePath
         )
         modelContext.delete(item)
-        try? modelContext.save()
+        saveWithLogging(modelContext, operation: "delete item")
         appState.itemCount -= 1
     }
 

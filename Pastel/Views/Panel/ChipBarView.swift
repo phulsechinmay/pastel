@@ -201,7 +201,7 @@ struct ChipBarView: View {
         )
 
         modelContext.insert(newLabel)
-        try? modelContext.save()
+        saveWithLogging(modelContext, operation: "label reorder")
         showingCreateLabel = false
     }
 }

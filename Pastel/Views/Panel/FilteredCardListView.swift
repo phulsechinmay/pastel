@@ -147,7 +147,7 @@ struct FilteredCardListView: View {
                                         $0.persistentModelID == label.persistentModelID
                                     }) else { return true }
                                     item.labels.append(label)
-                                    try? modelContext.save()
+                                    saveWithLogging(modelContext, operation: "label drop assignment")
                                     return true
                                 } isTargeted: { targeted in
                                     withAnimation(.easeInOut(duration: 0.15)) {
@@ -206,7 +206,7 @@ struct FilteredCardListView: View {
                                         $0.persistentModelID == label.persistentModelID
                                     }) else { return true }
                                     item.labels.append(label)
-                                    try? modelContext.save()
+                                    saveWithLogging(modelContext, operation: "label drop assignment")
                                     return true
                                 } isTargeted: { targeted in
                                     withAnimation(.easeInOut(duration: 0.15)) {

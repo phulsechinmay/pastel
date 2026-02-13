@@ -63,12 +63,12 @@ struct LabelSettingsView: View {
         let maxOrder = labels.map(\.sortOrder).max() ?? -1
         let newLabel = Label(name: "New Label", colorName: "blue", sortOrder: maxOrder + 1)
         modelContext.insert(newLabel)
-        try? modelContext.save()
+        saveWithLogging(modelContext, operation: "create label")
     }
 
     private func deleteLabel(_ label: Label) {
         modelContext.delete(label)
-        try? modelContext.save()
+        saveWithLogging(modelContext, operation: "delete label")
     }
 }
 
@@ -120,7 +120,7 @@ private struct LabelRow: View {
                     .textFieldStyle(.plain)
                     .onSubmit {
                         isEditing = false
-                        try? modelContext.save()
+                        saveWithLogging(modelContext, operation: "update label name")
                     }
             } else {
                 Text(label.name)
@@ -167,7 +167,7 @@ private struct LabelRow: View {
                         .onTapGesture {
                             label.colorName = labelColor.rawValue
                             label.emoji = nil
-                            try? modelContext.save()
+                            saveWithLogging(modelContext, operation: "update label color")
                             showingPalette = false
                         }
                 }
@@ -192,7 +192,7 @@ private struct LabelRow: View {
                         )
                         .onTapGesture {
                             label.emoji = emoji
-                            try? modelContext.save()
+                            saveWithLogging(modelContext, operation: "update label emoji")
                             showingPalette = false
                         }
                 }
