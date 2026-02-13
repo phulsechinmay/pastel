@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 ## Current Position
 
 Phase: 18 (Codebase Audit)
-Plan: 02 of 3 complete
+Plan: 02 of 3 complete (01 and 02 done, 03 remaining)
 Status: Executing Phase 18
-Last activity: 2026-02-13 -- Completed 18-02: Force unwrap fixes and import optimization
+Last activity: 2026-02-13 -- Completed 18-01: Anti-patterns cleanup (saveWithLogging, debug removal, paste dedup)
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.4 -- 0/1 phases complete)
 
@@ -71,6 +71,8 @@ Key decisions from v1.3:
 
 Key decisions from Phase 18 (Codebase Audit):
 
+- [18-01]: Free function saveWithLogging() instead of ModelContext extension -- avoids polluting SDK type namespace
+- [18-01]: Operation string parameter per call site for OSLog diagnostics
 - [18-02]: guard-let + fatalError for applicationSupportDirectory (same pattern as PastelApp.swift ModelContainer)
 - [18-02]: asTransferString returns String? -- callers nil-coalesce to empty string for graceful drag failure
 - [18-02]: Pre-load all content hashes into Set<String> for O(1) import dedup instead of O(n) fetchCount queries
@@ -102,5 +104,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-13
-Stopped at: Completed 18-02-PLAN.md (Force unwrap fixes and import optimization)
+Stopped at: Completed 18-01-PLAN.md (Anti-patterns cleanup)
 Resume file: None
