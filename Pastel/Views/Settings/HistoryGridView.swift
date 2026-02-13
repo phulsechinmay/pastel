@@ -24,6 +24,8 @@ struct HistoryGridView: View {
     @Binding var resolvedItems: [ClipboardItem]
     @State private var lastClickedID: PersistentIdentifier? = nil
 
+    // Labels passed from parent for ClipboardCardView context menus
+    let allLabels: [Label]
     // Label filtering (in-memory, same reason as FilteredCardListView)
     private let selectedLabelIDs: Set<PersistentIdentifier>
 
@@ -37,7 +39,8 @@ struct HistoryGridView: View {
         GridItem(.adaptive(minimum: 280, maximum: 400), spacing: 12)
     ]
 
-    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}, onPastePlainText: @escaping (ClipboardItem) -> Void = { _ in }) {
+    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, allLabels: [Label] = [], selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}, onPastePlainText: @escaping (ClipboardItem) -> Void = { _ in }) {
+        self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
         _selectedIDs = selectedIDs
         _resolvedItems = resolvedItems
@@ -55,6 +58,8 @@ struct HistoryGridView: View {
                 item.title?.localizedStandardContains(search) == true
             }
         } else {
+            // Fetch all items (no fetchLimit): required for in-memory label post-filtering.
+            // SwiftData #Predicate cannot use .contains() on to-many relationships.
             predicate = #Predicate<ClipboardItem> { _ in true }
         }
 
@@ -92,6 +97,7 @@ struct HistoryGridView: View {
                             ClipboardCardView(
                                 item: item,
                                 isSelected: isInSelection,
+                                allLabels: allLabels,
                                 hideContextMenu: true
                             )
                             .onTapGesture {

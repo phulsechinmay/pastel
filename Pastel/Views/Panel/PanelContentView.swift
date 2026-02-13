@@ -118,6 +118,7 @@ struct PanelContentView: View {
             FilteredCardListView(
                 searchText: debouncedSearchText,
                 selectedLabelIDs: selectedLabelIDs,
+                allLabels: labels,
                 selectedIndex: $selectedIndex,
                 isShiftHeld: isShiftHeld,
                 onPaste: { item in pasteItem(item) },

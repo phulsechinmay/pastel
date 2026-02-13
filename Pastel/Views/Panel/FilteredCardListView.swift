@@ -28,6 +28,7 @@ struct FilteredCardListView: View {
     @State private var dropTargetIndex: Int? = nil
     @State private var keyMonitor: Any? = nil
 
+    let allLabels: [Label]
     @Binding var selectedIndex: Int?
     var isShiftHeld: Bool
     var onPaste: (ClipboardItem) -> Void
@@ -60,6 +61,7 @@ struct FilteredCardListView: View {
     init(
         searchText: String,
         selectedLabelIDs: Set<PersistentIdentifier>,
+        allLabels: [Label] = [],
         selectedIndex: Binding<Int?>,
         isShiftHeld: Bool = false,
         onPaste: @escaping (ClipboardItem) -> Void,
@@ -68,6 +70,7 @@ struct FilteredCardListView: View {
         onDragStarted: (() -> Void)? = nil,
         onCycleLabelFilter: ((Int) -> Void)? = nil
     ) {
+        self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
 
         // Text-only predicate. Label filtering is done in-memory via filteredItems
@@ -81,6 +84,8 @@ struct FilteredCardListView: View {
                 item.title?.localizedStandardContains(search) == true
             }
         } else {
+            // Fetch all items (no fetchLimit): required for in-memory label post-filtering.
+            // SwiftData #Predicate cannot use .contains() on to-many relationships.
             predicate = #Predicate<ClipboardItem> { _ in true }
         }
 
@@ -116,6 +121,7 @@ struct FilteredCardListView: View {
                                 ClipboardCardView(
                                     item: item,
                                     isSelected: selectedIndex == index,
+                                    allLabels: allLabels,
                                     badgePosition: badge,
                                     isDropTarget: dropTargetIndex == index,
                                     isShiftHeld: isShiftHeld
@@ -177,6 +183,7 @@ struct FilteredCardListView: View {
                                 ClipboardCardView(
                                     item: item,
                                     isSelected: selectedIndex == index,
+                                    allLabels: allLabels,
                                     badgePosition: badge,
                                     isDropTarget: dropTargetIndex == index,
                                     isShiftHeld: isShiftHeld

@@ -18,7 +18,7 @@ struct ClipboardCardView: View {
     var isSelected: Bool
     var onPaste: (() -> Void)?
 
-    @Query(sort: \Label.sortOrder) private var labels: [Label]
+    let allLabels: [Label]
     @Environment(\.modelContext) private var modelContext
     @Environment(PanelActions.self) private var panelActions
     @Environment(AppState.self) private var appState
@@ -46,9 +46,10 @@ struct ClipboardCardView: View {
     /// When true, the built-in context menu is suppressed (caller provides its own).
     var hideContextMenu: Bool
 
-    init(item: ClipboardItem, isSelected: Bool = false, badgePosition: Int? = nil, isDropTarget: Bool = false, isShiftHeld: Bool = false, hideContextMenu: Bool = false, onPaste: (() -> Void)? = nil) {
+    init(item: ClipboardItem, isSelected: Bool = false, allLabels: [Label] = [], badgePosition: Int? = nil, isDropTarget: Bool = false, isShiftHeld: Bool = false, hideContextMenu: Bool = false, onPaste: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
+        self.allLabels = allLabels
         self.badgePosition = badgePosition
         self.isDropTarget = isDropTarget
         self.isShiftHeld = isShiftHeld
@@ -169,7 +170,7 @@ struct ClipboardCardView: View {
 
             // Label assignment submenu with toggle checkmarks
             Menu("Label") {
-                ForEach(labels) { label in
+                ForEach(allLabels) { label in
                     let isAssigned = item.labels.contains {
                         $0.persistentModelID == label.persistentModelID
                     }

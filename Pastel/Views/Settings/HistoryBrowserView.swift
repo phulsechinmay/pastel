@@ -44,6 +44,7 @@ struct HistoryBrowserView: View {
             HistoryGridView(
                 searchText: debouncedSearchText,
                 selectedLabelIDs: selectedLabelIDs,
+                allLabels: labels,
                 selectedIDs: $selectedIDs,
                 resolvedItems: $resolvedItems,
                 onBulkCopy: { bulkCopy() },
