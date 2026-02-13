@@ -415,15 +415,18 @@ final class PanelController {
                 .environment(appState)
                 .modelContainer(container))
             hv.translatesAutoresizingMaskIntoConstraints = false
+            hv.sizingOptions = []
             hostingView = hv
         } else if let container = modelContainer {
             let hv = NSHostingView(rootView: contentView.modelContainer(container))
             hv.translatesAutoresizingMaskIntoConstraints = false
+            hv.sizingOptions = []
             hostingView = hv
             logger.warning("Panel created without AppState -- live refresh will not work")
         } else {
             let hv = NSHostingView(rootView: contentView)
             hv.translatesAutoresizingMaskIntoConstraints = false
+            hv.sizingOptions = []
             hostingView = hv
             logger.warning("Panel created without ModelContainer -- @Query will not work")
         }

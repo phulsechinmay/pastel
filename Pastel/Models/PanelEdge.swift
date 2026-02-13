@@ -11,18 +11,19 @@ enum PanelEdge: String, CaseIterable {
     /// Whether the panel slides horizontally (left/right) and occupies the full screen height.
     var isVertical: Bool { self == .left || self == .right }
 
-    /// Inset from the sliding edge so the panel's rounded corners are visible.
+    /// Inset from all touching screen edges so the panel floats with visible rounded corners.
     private static let edgeInset: CGFloat = 10
 
-    /// Panel dimensions for the given screen frame.
+    /// Panel dimensions for the given screen frame, accounting for insets.
     ///
-    /// Vertical edges: 320pt wide, full height.
-    /// Horizontal edges: full width, 265 tall.
+    /// Vertical edges: 320pt wide, full height minus top/bottom insets.
+    /// Horizontal edges: full width minus left/right insets, 265 tall.
     func panelSize(screenFrame: NSRect) -> NSSize {
+        let inset = Self.edgeInset
         if isVertical {
-            return NSSize(width: 320, height: screenFrame.height)
+            return NSSize(width: 320, height: screenFrame.height - 2 * inset)
         } else {
-            return NSSize(width: screenFrame.width, height: 265)
+            return NSSize(width: screenFrame.width - 2 * inset, height: 265)
         }
     }
 
@@ -33,28 +34,28 @@ enum PanelEdge: String, CaseIterable {
         switch self {
         case .right:
             return NSRect(
-                x: screenFrame.maxX - size.width,
-                y: screenFrame.origin.y,
+                x: screenFrame.maxX - size.width - inset,
+                y: screenFrame.origin.y + inset,
                 width: size.width,
                 height: size.height
             )
         case .left:
             return NSRect(
-                x: screenFrame.origin.x,
-                y: screenFrame.origin.y,
+                x: screenFrame.origin.x + inset,
+                y: screenFrame.origin.y + inset,
                 width: size.width,
                 height: size.height
             )
         case .top:
             return NSRect(
-                x: screenFrame.origin.x,
+                x: screenFrame.origin.x + inset,
                 y: screenFrame.maxY - size.height - inset,
                 width: size.width,
                 height: size.height
             )
         case .bottom:
             return NSRect(
-                x: screenFrame.origin.x,
+                x: screenFrame.origin.x + inset,
                 y: screenFrame.origin.y + inset,
                 width: size.width,
                 height: size.height
@@ -65,31 +66,32 @@ enum PanelEdge: String, CaseIterable {
     /// The off-screen frame used as the start/end position for slide animations.
     func offScreenFrame(screenFrame: NSRect) -> NSRect {
         let size = panelSize(screenFrame: screenFrame)
+        let inset = Self.edgeInset
         switch self {
         case .right:
             return NSRect(
                 x: screenFrame.maxX,
-                y: screenFrame.origin.y,
+                y: screenFrame.origin.y + inset,
                 width: size.width,
                 height: size.height
             )
         case .left:
             return NSRect(
                 x: screenFrame.origin.x - size.width,
-                y: screenFrame.origin.y,
+                y: screenFrame.origin.y + inset,
                 width: size.width,
                 height: size.height
             )
         case .top:
             return NSRect(
-                x: screenFrame.origin.x,
+                x: screenFrame.origin.x + inset,
                 y: screenFrame.maxY,
                 width: size.width,
                 height: size.height
             )
         case .bottom:
             return NSRect(
-                x: screenFrame.origin.x,
+                x: screenFrame.origin.x + inset,
                 y: screenFrame.origin.y - size.height,
                 width: size.width,
                 height: size.height

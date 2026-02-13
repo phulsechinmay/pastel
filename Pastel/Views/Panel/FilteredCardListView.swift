@@ -101,15 +101,11 @@ struct FilteredCardListView: View {
     var body: some View {
         Group {
             if filteredItems.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.tertiary)
-                    Text("No matching items")
+                    SwiftUI.Label("No matching items", systemImage: "magnifyingglass")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 20)
             } else if isHorizontal {
                 // Horizontal layout for top/bottom edges
                 ScrollViewReader { proxy in
