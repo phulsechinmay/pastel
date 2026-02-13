@@ -196,10 +196,14 @@ struct PanelContentView: View {
             // Currently on "All History"
             if direction > 0 {
                 // Forward: go to first label
-                selectedLabelIDs = [labelIDs.first!]
+                if let firstID = labelIDs.first {
+                    selectedLabelIDs = [firstID]
+                }
             } else {
                 // Backward: go to last label
-                selectedLabelIDs = [labelIDs.last!]
+                if let lastID = labelIDs.last {
+                    selectedLabelIDs = [lastID]
+                }
             }
         } else if let currentID = selectedLabelIDs.first,
                   let currentIndex = labelIDs.firstIndex(of: currentID) {

@@ -85,7 +85,7 @@ struct ChipBarView: View {
                     selectedLabelIDs = [label.persistentModelID]
                 }
             }
-            .draggable(label.persistentModelID.asTransferString) {
+            .draggable(label.persistentModelID.asTransferString ?? "") {
                 LabelChipView(label: label)
             }
     }

@@ -3,9 +3,12 @@ import Foundation
 
 extension PersistentIdentifier {
     /// Encode this identifier as a JSON string for drag-and-drop transfer.
-    var asTransferString: String {
-        let data = try! JSONEncoder().encode(self)
-        return String(data: data, encoding: .utf8)!
+    var asTransferString: String? {
+        guard let data = try? JSONEncoder().encode(self),
+              let string = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return string
     }
 
     /// Decode a PersistentIdentifier from a JSON string produced by `asTransferString`.

@@ -40,10 +40,12 @@ final class ImageStorageService: Sendable {
     // MARK: - Initialization
 
     private init() {
-        let appSupport = FileManager.default.urls(
+        guard let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first!
+        ).first else {
+            fatalError("Application Support directory unavailable")
+        }
 
         self.imagesDirectory = appSupport
             .appendingPathComponent("Pastel", isDirectory: true)
