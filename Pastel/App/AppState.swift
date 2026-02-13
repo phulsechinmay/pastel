@@ -89,16 +89,6 @@ final class AppState {
             }
         }
 
-        // TEMPORARY: Allow toggling panel via DistributedNotification (for automated testing loop)
-        // Remove after liquid glass fix is verified
-        DistributedNotificationCenter.default().addObserver(
-            forName: .init("app.pastel.togglePanel"),
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.togglePanel()
-            }
-        }
     }
 
     /// Toggle the sliding panel open/closed.

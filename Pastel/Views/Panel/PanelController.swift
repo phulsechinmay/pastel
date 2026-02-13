@@ -206,14 +206,6 @@ final class PanelController {
         installEventMonitors()
         logger.info("Panel shown on \(edge.rawValue) edge of screen: \(screen.localizedName)")
         logger.info("Panel windowNumber (for screencapture -l): \(panel.windowNumber)")
-
-        // Debug: check activation state after a short delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            self?.logger.info("200ms later: isActive=\(NSApp.isActive), panel.isKey=\(panel.isKeyWindow)")
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.logger.info("500ms later: isActive=\(NSApp.isActive), panel.isKey=\(panel.isKeyWindow)")
-        }
     }
 
     /// Slide the panel off-screen in the direction of the configured edge and order it out.

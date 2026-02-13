@@ -242,7 +242,7 @@ final class PasteService {
     ///
     /// Uses virtual key code 0x09 (kVK_ANSI_V) which is layout-independent.
     /// Posts to `.cgSessionEventTap` to reach the frontmost app.
-    private static func simulatePaste() {
+    static func simulatePaste() {
         let source = CGEventSource(stateID: .combinedSessionState)
 
         // Suppress local keyboard events during paste to avoid interference

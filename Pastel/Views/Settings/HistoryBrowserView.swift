@@ -142,14 +142,7 @@ struct HistoryBrowserView: View {
 
         // Simulate Cmd+V after delay (350ms > panel hide; settings window uses orderOut for instant hide)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            let source = CGEventSource(stateID: .combinedSessionState)
-            let vKeyCode: CGKeyCode = 0x09
-            let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true)
-            let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false)
-            keyDown?.flags = .maskCommand
-            keyUp?.flags = .maskCommand
-            keyDown?.post(tap: .cgSessionEventTap)
-            keyUp?.post(tap: .cgSessionEventTap)
+            PasteService.simulatePaste()
         }
     }
 
