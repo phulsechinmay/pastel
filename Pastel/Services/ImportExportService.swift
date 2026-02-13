@@ -212,20 +212,20 @@ final class ImportExportService {
         progressMessage = "Importing items..."
         progress = 0.2
 
+        // Pre-load all existing content hashes for O(1) dedup lookups
+        let allItemsDescriptor = FetchDescriptor<ClipboardItem>()
+        let existingItems = try modelContext.fetch(allItemsDescriptor)
+        var existingHashes = Set<String>(existingItems.map(\.contentHash))
+
         var importedCount = 0
         var skippedCount = 0
         let totalItems = export.items.count
 
         for (index, exportedItem) in export.items.enumerated() {
-            // Pre-check: skip if contentHash already exists
+            // O(1) in-memory dedup check
             let hash = exportedItem.contentHash
-            let checkDescriptor = FetchDescriptor<ClipboardItem>(
-                predicate: #Predicate<ClipboardItem> { item in
-                    item.contentHash == hash
-                }
-            )
 
-            if (try? modelContext.fetchCount(checkDescriptor)) ?? 0 > 0 {
+            if existingHashes.contains(hash) {
                 skippedCount += 1
             } else {
                 let item = ClipboardItem(
@@ -254,6 +254,7 @@ final class ImportExportService {
                 }
 
                 modelContext.insert(item)
+                existingHashes.insert(hash)
                 importedCount += 1
             }
 
