@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 18: Codebase Audit -- Anti-patterns, Performance, and Security
+**Current focus:** Phase 18 complete -- Codebase Audit finished
 
 ## Current Position
 
-Phase: 18 (Codebase Audit)
-Plan: 02 of 3 complete (01 and 02 done, 03 remaining)
-Status: Executing Phase 18
-Last activity: 2026-02-13 -- Completed 18-01: Anti-patterns cleanup (saveWithLogging, debug removal, paste dedup)
+Phase: 18 (Codebase Audit) -- COMPLETE
+Plan: 03 of 3 complete (all plans done)
+Status: Phase 18 complete
+Last activity: 2026-02-14 -- Completed 18-03: View layer refactoring (query optimization, @ViewBuilder, deprecated API)
 
-Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v1.4 -- 0/1 phases complete)
+Progress: [████████████████████] 100% (v1.4 -- 1/1 phases complete)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -76,6 +76,11 @@ Key decisions from Phase 18 (Codebase Audit):
 - [18-02]: guard-let + fatalError for applicationSupportDirectory (same pattern as PastelApp.swift ModelContainer)
 - [18-02]: asTransferString returns String? -- callers nil-coalesce to empty string for graceful drag failure
 - [18-02]: Pre-load all content hashes into Set<String> for O(1) import dedup instead of O(n) fetchCount queries
+- [18-03]: allLabels parameter on ClipboardCardView -- pass from parent @Query, not per-card @Query
+- [18-03]: EditItemView keeps its own @Query (standalone modal, single subscription)
+- [18-03]: A5 #Predicate { _ in true } accepted -- fetchLimit breaks in-memory label post-filtering
+- [18-03]: Exclude itemCount from .id() -- @Query auto-observes item additions/deletions
+- [18-03]: NSImage(size:flipped:drawingHandler:) replaces deprecated lockFocus/unlockFocus
 
 ### Research Flags (v1.3)
 
@@ -103,6 +108,6 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-13
-Stopped at: Completed 18-01-PLAN.md (Anti-patterns cleanup)
+Last session: 2026-02-14
+Stopped at: Completed 18-03-PLAN.md (View layer refactoring -- Phase 18 complete)
 Resume file: None
