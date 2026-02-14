@@ -8,14 +8,17 @@ Pastel is a native macOS clipboard manager that saves everything you copy and ma
 
 Clipboard history is always one hotkey away, with instant paste-back into any app.
 
-## Current Milestone: v1.4 Panel Liquid Glass
+## Current Milestone: v1.5 iCloud Sync
 
-**Goal:** Fix the panel's Liquid Glass rendering so it displays proper lensing, refraction, and specular highlights regardless of app focus state — no hacks, no degradation on non-activating panels.
+**Goal:** Sync clipboard history across multiple Macs via iCloud so users logged into the same Apple ID see the same history on all devices.
 
 **Target features:**
-- Proper Liquid Glass material on the sliding panel that matches system-native glass appearance
-- Consistent visual rendering whether or not Pastel's settings window is open
-- Long-term architectural fix (not show/hide hacks) for non-activating NSPanel glass compositing
+- iCloud sync of clipboard history (text, URLs, code, colors, file references — images deferred)
+- Opt-in sync toggle in Settings (off by default)
+- Conflict resolution for concurrent edits across devices
+- Sync-aware retention limits to manage iCloud storage
+- Sync status indicator so users know when data is up to date
+- Uses user's own iCloud storage (no server infrastructure needed)
 
 ## Requirements
 
@@ -43,22 +46,21 @@ Clipboard history is always one hotkey away, with instant paste-back into any ap
 
 ### Active
 
-See REQUIREMENTS.md for v1.3 milestone requirements.
+See REQUIREMENTS.md for v1.5 milestone requirements.
 
-- [ ] Paste as plain text — context menu, Shift+Enter, Shift+double-click
-- [ ] Allow/ignore app lists — selective clipboard monitoring
-- [ ] Import/export — custom Pastel format with extensibility
-- [ ] Drag-and-drop from panel — native macOS interaction
+- [ ] iCloud sync — clipboard history synced across Macs via CloudKit
+- [ ] Sync settings — opt-in toggle, retention limits for synced data
+- [ ] Conflict resolution — handle concurrent copies across devices
+- [ ] Sync status — visual indicator of sync state
 
 ### Out of Scope
 
-- iCloud sync — adds complexity, not needed for v1.x
 - iOS companion app — macOS only
 - Snippet templates / text expansion — separate tool category
-- Import/export — defer to v2
-- Allow/ignore app lists — defer to v2
 - Light mode / system-adaptive theme — always dark
-- Pinned/favorite items — defer to v2
+- Pinned/favorite items — defer to future
+- Image sync — text-only for v1.5, architecture supports future image sync
+- Real-time collaboration / shared clipboard between different Apple IDs
 
 ## Context
 
@@ -72,6 +74,8 @@ See REQUIREMENTS.md for v1.3 milestone requirements.
 - v1.0 complete with 29 requirements delivered across 5 phases
 - v1.1 complete with 15 requirements delivered across 5 phases (6-10)
 - v1.2 complete with item management features across 2 phases (11-12)
+- v1.3 complete with power user features across 4 phases (13-16)
+- v1.4 complete with codebase audit (Phase 18; Phase 17 deferred)
 
 ## Constraints
 
@@ -104,4 +108,4 @@ See REQUIREMENTS.md for v1.3 milestone requirements.
 | Image compression for storage | Reduce disk footprint without losing paste quality | — Pending |
 
 ---
-*Last updated: 2026-02-10 after panel Liquid Glass fix*
+*Last updated: 2026-02-14 after milestone v1.5 start*

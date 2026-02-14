@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 18 complete -- Codebase Audit finished
+**Current focus:** v1.5 iCloud Sync — defining requirements
 
 ## Current Position
 
-Phase: 18 (Codebase Audit) -- COMPLETE
-Plan: 03 of 3 complete (all plans done)
-Status: Phase 18 complete
-Last activity: 2026-02-14 -- Completed 18-03: View layer refactoring (query optimization, @ViewBuilder, deprecated API)
-
-Progress: [████████████████████] 100% (v1.4 -- 1/1 phases complete)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-14 — Milestone v1.5 started
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -35,6 +33,14 @@ Progress: [████████████████████] 100% (v
 ### v1.2 Item Management
 - Phases 11-12 complete (6 plans)
 - Features: item titles, multi-label support, edit modal, history browser with grid view, multi-select, bulk operations
+
+### v1.3 Power User Features
+- Phases 13-16 complete (7 plans)
+- Features: paste-as-plain-text, app ignore list, import/export, drag-and-drop from panel
+
+### v1.4 Codebase Audit
+- Phase 18 complete (3 plans), Phase 17 deferred
+- Features: error handling, force unwrap fixes, import optimization, @Query cleanup, deprecated API replacement
 
 ## Accumulated Context
 
@@ -109,5 +115,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed 18-03-PLAN.md (View layer refactoring -- Phase 18 complete)
+Stopped at: Starting milestone v1.5 iCloud Sync
 Resume file: None
