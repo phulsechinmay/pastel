@@ -167,7 +167,7 @@ struct HistoryBrowserView: View {
                 thumbnailPath: item.urlPreviewImagePath
             )
             // Clear many-to-many label relationships before delete (SwiftData MTM requirement)
-            item.labels.removeAll()
+            item.safeLabels.removeAll()
             modelContext.delete(item)
         }
         saveWithLogging(modelContext, operation: "bulk delete")

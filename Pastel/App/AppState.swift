@@ -179,7 +179,7 @@ final class AppState {
                     imagePath: item.urlFaviconPath,
                     thumbnailPath: item.urlPreviewImagePath
                 )
-                item.labels.removeAll()
+                item.safeLabels.removeAll()
                 modelContext.delete(item)
             }
             try modelContext.save()

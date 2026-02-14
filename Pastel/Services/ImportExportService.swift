@@ -119,7 +119,7 @@ final class ImportExportService {
                 title: item.title,
                 detectedLanguage: item.detectedLanguage,
                 detectedColorHex: item.detectedColorHex,
-                labelNames: item.labels.map(\.name)
+                labelNames: item.safeLabels.map(\.name)
             )
         }
 
@@ -249,7 +249,7 @@ final class ImportExportService {
                 // Wire label relationships
                 for labelName in exportedItem.labelNames {
                     if let label = labelMap[labelName] {
-                        item.labels.append(label)
+                        item.safeLabels.append(label)
                     }
                 }
 

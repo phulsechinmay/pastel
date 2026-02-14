@@ -63,12 +63,12 @@ struct ClipboardCardView: View {
             HStack(spacing: 4) {
                 sourceAppIcon
 
-                let visibleLabels = Array(item.labels.prefix(3))
+                let visibleLabels = Array(item.safeLabels.prefix(3))
                 ForEach(visibleLabels) { label in
                     LabelChipView(label: label, size: .compact, tintOverride: isColorCard ? colorCardTextColor : nil)
                 }
-                if item.labels.count > 3 {
-                    Text("+\(item.labels.count - 3)")
+                if item.safeLabels.count > 3 {
+                    Text("+\(item.safeLabels.count - 3)")
                         .font(.caption2)
                         .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
                         .padding(.horizontal, 4)
@@ -171,16 +171,16 @@ struct ClipboardCardView: View {
             // Label assignment submenu with toggle checkmarks
             Menu("Label") {
                 ForEach(allLabels) { label in
-                    let isAssigned = item.labels.contains {
+                    let isAssigned = item.safeLabels.contains {
                         $0.persistentModelID == label.persistentModelID
                     }
                     Button {
                         if isAssigned {
-                            item.labels.removeAll {
+                            item.safeLabels.removeAll {
                                 $0.persistentModelID == label.persistentModelID
                             }
                         } else {
-                            item.labels.append(label)
+                            item.safeLabels.append(label)
                         }
                         saveWithLogging(modelContext, operation: "label toggle")
                     } label: {
@@ -194,10 +194,10 @@ struct ClipboardCardView: View {
                     }
                 }
 
-                if !item.labels.isEmpty {
+                if !item.safeLabels.isEmpty {
                     Divider()
                     Button("Remove All Labels") {
-                        item.labels.removeAll()
+                        item.safeLabels.removeAll()
                         saveWithLogging(modelContext, operation: "remove all labels")
                     }
                 }

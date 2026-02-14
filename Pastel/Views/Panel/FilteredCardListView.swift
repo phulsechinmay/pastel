@@ -46,7 +46,7 @@ struct FilteredCardListView: View {
     private var filteredItems: [ClipboardItem] {
         guard !selectedLabelIDs.isEmpty else { return items }
         return items.filter { item in
-            item.labels.contains { label in
+            item.safeLabels.contains { label in
                 selectedLabelIDs.contains(label.persistentModelID)
             }
         }
@@ -259,10 +259,10 @@ struct FilteredCardListView: View {
                 return false
             }
             // Append label if not already assigned
-            guard !item.labels.contains(where: {
+            guard !item.safeLabels.contains(where: {
                 $0.persistentModelID == label.persistentModelID
             }) else { return true }
-            item.labels.append(label)
+            item.safeLabels.append(label)
             saveWithLogging(modelContext, operation: "label drop assignment")
             return true
         } isTargeted: { targeted in

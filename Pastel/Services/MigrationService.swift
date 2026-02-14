@@ -12,10 +12,10 @@ final class MigrationService {
 
         for item in items {
             if let singleLabel = item.label {
-                if !item.labels.contains(where: {
+                if !item.safeLabels.contains(where: {
                     $0.persistentModelID == singleLabel.persistentModelID
                 }) {
-                    item.labels.append(singleLabel)
+                    item.safeLabels.append(singleLabel)
                 }
                 item.label = nil
             }

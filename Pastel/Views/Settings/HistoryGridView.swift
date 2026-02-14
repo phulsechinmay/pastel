@@ -71,7 +71,7 @@ struct HistoryGridView: View {
     private var filteredItems: [ClipboardItem] {
         guard !selectedLabelIDs.isEmpty else { return items }
         return items.filter { item in
-            item.labels.contains { label in
+            item.safeLabels.contains { label in
                 selectedLabelIDs.contains(label.persistentModelID)
             }
         }

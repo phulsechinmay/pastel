@@ -29,18 +29,18 @@ struct EditItemView: View {
                 // Reuse CenteredFlowLayout from ChipBarView
                 CenteredFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
                     ForEach(allLabels) { label in
-                        let isAssigned = item.labels.contains {
+                        let isAssigned = item.safeLabels.contains {
                             $0.persistentModelID == label.persistentModelID
                         }
                         LabelChipView(label: label, isActive: isAssigned)
                             .contentShape(Capsule())
                             .onTapGesture {
                                 if isAssigned {
-                                    item.labels.removeAll {
+                                    item.safeLabels.removeAll {
                                         $0.persistentModelID == label.persistentModelID
                                     }
                                 } else {
-                                    item.labels.append(label)
+                                    item.safeLabels.append(label)
                                 }
                             }
                     }
