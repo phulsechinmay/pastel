@@ -329,7 +329,11 @@ Plans:
   3. User copies a password from 1Password (concealed item) and it never appears on Mac B (concealed exclusion enforced)
   4. User copies an image or file and it does not appear on Mac B (image/file items excluded from sync)
   5. App builds and syncs correctly in both Debug and Release configurations (CloudKit.framework explicitly linked)
-**Plans**: 2 plans (estimate)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 20-01-PLAN.md -- Entitlements (iCloud + CloudKit + APS), CloudKit.framework linking, conditional ModelContainer, schema initialization
+- [ ] 20-02-PLAN.md -- Display-level filtering (concealed exclusion, remote image/file exclusion), sync verification checkpoint
 
 ### Phase 21: Sync Controls, Deduplication, and Status
 **Goal**: Users can control sync via Settings, duplicate items from multiple devices are automatically merged, and sync status is visible so users know whether sync is working
