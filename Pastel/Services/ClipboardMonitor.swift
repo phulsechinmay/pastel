@@ -246,6 +246,9 @@ final class ClipboardMonitor {
         // Consecutive duplicate check: fetch most recent item
         if isDuplicateOfMostRecent(contentHash: contentHash) { return }
 
+        // Non-consecutive duplicate check: any existing item with same hash
+        if isDuplicateByHash(contentHash) { return }
+
         // Create and persist the clipboard item
         let item = ClipboardItem(
             textContent: textContent,
@@ -268,6 +271,7 @@ final class ClipboardMonitor {
         item.detectedLanguage = detectedLanguage
 
         modelContext.insert(item)
+        item.originDeviceID = DeviceIdentifier.current
 
         do {
             try modelContext.save()
@@ -306,9 +310,8 @@ final class ClipboardMonitor {
                 }
             }
         } catch {
-            // Handle @Attribute(.unique) conflict gracefully -- non-consecutive duplicate
+            // General save error -- rollback the insert to keep context consistent
             Self.logger.warning("Failed to save clipboard item: \(error.localizedDescription)")
-            // Rollback the insert to keep context consistent
             modelContext.rollback()
         }
     }
@@ -332,6 +335,9 @@ final class ClipboardMonitor {
 
         // Consecutive duplicate check
         if isDuplicateOfMostRecent(contentHash: contentHash) { return }
+
+        // Non-consecutive duplicate check: any existing item with same hash
+        if isDuplicateByHash(contentHash) { return }
 
         // Capture source app (must be on main thread)
         let sourceApp = NSWorkspace.shared.frontmostApplication
@@ -363,6 +369,7 @@ final class ClipboardMonitor {
             )
 
             self.modelContext.insert(item)
+            item.originDeviceID = DeviceIdentifier.current
 
             do {
                 try self.modelContext.save()
@@ -374,6 +381,7 @@ final class ClipboardMonitor {
                     self.expirationService.scheduleExpiration(for: item)
                 }
             } catch {
+                // General save error -- rollback the insert to keep context consistent
                 Self.logger.warning("Failed to save image clipboard item: \(error.localizedDescription)")
                 self.modelContext.rollback()
             }
@@ -381,6 +389,26 @@ final class ClipboardMonitor {
     }
 
     // MARK: - Deduplication
+
+    /// Check if ANY item in history has the same content hash (non-consecutive dedup).
+    /// Replaces @Attribute(.unique) constraint behavior removed for CloudKit compatibility.
+    private func isDuplicateByHash(_ contentHash: String) -> Bool {
+        let hashToCheck = contentHash
+        let descriptor = FetchDescriptor<ClipboardItem>(
+            predicate: #Predicate<ClipboardItem> { $0.contentHash == hashToCheck }
+        )
+        do {
+            let count = try modelContext.fetchCount(descriptor)
+            if count > 0 {
+                Self.logger.debug("Non-consecutive duplicate detected by hash, skipping")
+                return true
+            }
+        } catch {
+            Self.logger.error("Hash dedup check failed: \(error.localizedDescription)")
+            // Continue with insertion on error -- better to have a dup than lose data
+        }
+        return false
+    }
 
     /// Check if the given content hash matches the most recent clipboard item.
     ///
