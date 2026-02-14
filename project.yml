@@ -39,3 +39,4 @@ targets:
       - package: KeyboardShortcuts
       - package: LaunchAtLogin
       - package: HighlightSwift
+      - sdk: CloudKit.framework
