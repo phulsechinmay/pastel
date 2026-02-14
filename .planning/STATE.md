@@ -5,18 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** v1.5 iCloud Sync — defining requirements
+**Current focus:** v1.5 iCloud Sync -- Phase 19 ready to plan
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-14 — Milestone v1.5 started
+Phase: 19 of 21 (CloudKit-Compatible Data Model)
+Plan: --
+Status: Ready to plan
+Last activity: 2026-02-14 -- v1.5 roadmap created (3 phases, 14 requirements)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
-- Phase 18 added: Codebase Audit — Anti-patterns, Performance, and Security (Encryption)
+- Phase 18 added: Codebase Audit -- Anti-patterns, Performance, and Security (Encryption)
+- Phases 19-21 added: v1.5 iCloud Sync (CloudKit-compatible model, sync infrastructure, sync controls)
 
 ## Previous Milestones
 
@@ -47,52 +48,27 @@ Last activity: 2026-02-14 — Milestone v1.5 started
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Key decisions from v1.2 carrying forward:
-
-- [11-01]: Two-property migration strategy -- keep deprecated label: Label? alongside new labels: [Label]
-- [11-03]: In-memory label filtering (not #Predicate) because SwiftData .contains() crashes on to-many relationships
-- [12-02]: PanelActions() injected as dummy environment for ClipboardCardView reuse outside panel
-- [12-03]: resolvedItems @Binding passes filteredItems from HistoryGridView to parent for bulk operations
-
-Key decisions from v1.3:
-
-- [13-01]: Use onKeyPress(keys:) instead of onKeyPress(KeyEquivalent) when modifier detection is needed (latter has no KeyPress parameter)
-- [13-01]: No bulk paste-as-plain-text in History browser multi-selection (out of scope for Phase 13)
-- [14-01]: Ignore check in checkForChanges() not processPasteboardContent() -- filters ALL content types uniformly including images
-- [14-01]: Fresh UserDefaults read each poll cycle for ignore list -- no caching, matches RetentionService pattern
-- [14-01]: ignoredAppBundleIDs UserDefaults key stores [String] array of bundle IDs
-- [14-02]: Three separate UserDefaults keys (IDs, dates, names) for ignore list persistence -- simpler than Codable, and ignoredAppBundleIDs already consumed by ClipboardMonitor
-- [15-01]: Separate Codable transfer structs (ExportedItem, ExportedLabel) decoupled from SwiftData @Model -- avoids fragile persistence state serialization
-- [15-01]: Pre-check fetchCount deduplication instead of relying on SwiftData @Attribute(.unique) upsert
-- [15-01]: Exclude concealed and image items from export (security-first, images not portable)
-- [15-02]: lastExportCount property on ImportExportService for post-export alert count display
-- [15-02]: User-selected file read/write entitlement needed for NSSavePanel/NSOpenPanel file access
-- [16-01]: Use .onDrag() instead of .draggable() to avoid type collision with existing .dropDestination(for: String.self) for label assignment
-- [16-01]: DragItemProviderService as pure Foundation/UTI enum -- no SwiftUI/SwiftData imports
-- [16-01]: RTF registered before plain text fallback for richText items
-- [16-02]: Callback chain pattern (not NotificationCenter) for drag state propagation through PanelActions bridge
-- [16-02]: One-shot global leftMouseUp monitor for drag end detection, self-removes after firing
-- [16-02]: 500ms delay before isDragging reset matches existing paste-back timing
-- [16-02]: skipNextChange (not full monitor pause) for self-capture prevention during drag
-
 Key decisions from Phase 18 (Codebase Audit):
 
 - [18-01]: Free function saveWithLogging() instead of ModelContext extension -- avoids polluting SDK type namespace
-- [18-01]: Operation string parameter per call site for OSLog diagnostics
-- [18-02]: guard-let + fatalError for applicationSupportDirectory (same pattern as PastelApp.swift ModelContainer)
-- [18-02]: asTransferString returns String? -- callers nil-coalesce to empty string for graceful drag failure
 - [18-02]: Pre-load all content hashes into Set<String> for O(1) import dedup instead of O(n) fetchCount queries
 - [18-03]: allLabels parameter on ClipboardCardView -- pass from parent @Query, not per-card @Query
-- [18-03]: EditItemView keeps its own @Query (standalone modal, single subscription)
-- [18-03]: A5 #Predicate { _ in true } accepted -- fetchLimit breaks in-memory label post-filtering
-- [18-03]: Exclude itemCount from .id() -- @Query auto-observes item additions/deletions
-- [18-03]: NSImage(size:flipped:drawingHandler:) replaces deprecated lockFocus/unlockFocus
 
-### Research Flags (v1.3)
+Key architecture decisions for v1.5 (from research):
 
-- ~~Phase 13: PAST-23 (fix HTML bug) must be first task before adding UI~~ DONE
-- ~~Phase 16: MANDATORY feasibility test of .draggable() on NSPanel before building feature~~ DONE -- Research confirmed feasibility: existing .draggable() on label chips proves SwiftUI drag works from NSPanel. Using .onDrag() instead to avoid type collision.
-- ~~Phase 15: One-at-a-time insert for import (SwiftData @Attribute(.unique) constraint)~~ DONE (pre-check fetchCount before each insert)
+- SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
+- Build own sync monitor (~60 lines), no CloudKitSyncMonitor dependency
+- Restart required for sync toggle (UserDefaults + restart prompt)
+- Text-only sync (images/files excluded), concealed items never sync
+- Last-writer-wins conflict resolution (built into SwiftData CloudKit)
+
+### Research Flags (v1.5)
+
+- Phase 19: @Attribute(.unique) MUST be removed BEFORE enabling CloudKit (app crash otherwise)
+- Phase 19: Schema is permanent once deployed to CloudKit production -- finalize model FIRST
+- Phase 20: CloudKit.framework must be explicitly linked for macOS release builds (silent failure otherwise)
+- Phase 20: cloudKitDatabase: .none reliability needs validation (conflicting reports)
+- Phase 20: managedObjectContext?.transactionAuthor access from SwiftData needs testing
 
 ### Pending Todos
 
@@ -115,5 +91,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Starting milestone v1.5 iCloud Sync
+Stopped at: v1.5 roadmap created, Phase 19 ready to plan
 Resume file: None

@@ -6,6 +6,7 @@
 - v1.1 Rich Content & Enhanced Paste - Phases 6-10 (in progress)
 - v1.2 Storage & Security - Phases 11-12 (shipped 2026-02-09)
 - v1.3 Power User Features - Phases 13-16 (planned)
+- v1.5 iCloud Sync - Phases 19-21 (planned)
 
 ## Phases
 
@@ -257,18 +258,18 @@ Plans:
 
 ### v1.4 Panel Liquid Glass
 
-**Milestone Goal:** Fix the panel's Liquid Glass rendering so it displays proper lensing, refraction, and specular highlights consistently — regardless of whether the panel was triggered via hotkey, notification, or any other mechanism.
+**Milestone Goal:** Fix the panel's Liquid Glass rendering so it displays proper lensing, refraction, and specular highlights consistently -- regardless of whether the panel was triggered via hotkey, notification, or any other mechanism.
 
-- [ ] **Phase 17: Liquid Glass Panel Fix** - Iterative visual feedback loop to fix glass rendering on hotkey-triggered panel
+- [ ] **Phase 17: Liquid Glass Panel Fix** - DEFERRED - Iterative visual feedback loop to fix glass rendering on hotkey-triggered panel
 
 ## Phase Details (v1.4)
 
 ### Phase 17: Liquid Glass Panel Fix
-**Goal**: The sliding panel renders identical Liquid Glass material whether opened via the global hotkey (Carbon RegisterEventHotKey), a DistributedNotification, or any other trigger — no dark/degraded glass, consistent with macOS 26 system-native glass appearance
+**Goal**: The sliding panel renders identical Liquid Glass material whether opened via the global hotkey (Carbon RegisterEventHotKey), a DistributedNotification, or any other trigger -- no dark/degraded glass, consistent with macOS 26 system-native glass appearance
 **Depends on**: Phase 16 (v1.3 complete)
 **Requirements**: GLASS-01
 **Success Criteria** (what must be TRUE):
-  1. User presses Option+V hotkey and the panel shows full Liquid Glass (lensing, refraction, specular highlights) — NOT a dark muted blur
+  1. User presses Option+V hotkey and the panel shows full Liquid Glass (lensing, refraction, specular highlights) -- NOT a dark muted blur
   2. Panel glass appearance is identical whether triggered via hotkey or DistributedNotification
   3. Automated screenshot comparison between hotkey-triggered and notification-triggered panels shows matching glass quality
   4. Paste-back still works correctly after the fix (previous app regains focus, Cmd+V fires)
@@ -281,10 +282,68 @@ Plans:
 - [ ] 17-01-PLAN.md -- Expose panel window ID, build/verify Liquid Glass rendering via hotkey and notification triggers
 - [ ] 17-02-PLAN.md -- Functional verification of dismiss/paste-back behaviors, debug logging cleanup
 
+### Phase 18: Codebase Audit -- Anti-patterns, Performance, and Security (Encryption)
+
+**Goal:** Fix concrete anti-patterns (silent error swallowing, force unwraps, duplicated code, deprecated APIs), optimize hot-path performance (redundant @Query subscriptions, unnecessary view rebuilds, per-item import queries), and clean up debug artifacts -- without adding application-level encryption (FileVault + App Sandbox is sufficient)
+**Depends on:** Phase 17
+**Plans:** 3 plans
+
+Plans:
+- [x] 18-01-PLAN.md -- Shared SwiftData error handler, replace 17 silent try? saves, remove debug logs, extract duplicated paste simulation
+- [x] 18-02-PLAN.md -- Fix force unwraps in 3 files, optimize import dedup with pre-loaded hash set
+- [x] 18-03-PLAN.md -- Remove redundant @Query from ClipboardCardView, remove itemCount from .id(), replace deprecated lockFocus, extract duplicated card rendering
+
+### v1.5 iCloud Sync
+
+**Milestone Goal:** Sync clipboard history (text, URL, code, color items) across Macs via iCloud, with opt-in toggle, cross-device deduplication, concealed item exclusion, and sync status visibility -- using SwiftData's built-in CloudKit integration.
+
+- [ ] **Phase 19: CloudKit-Compatible Data Model** - Migrate schema for CloudKit compatibility (remove unique constraints, add defaults, optional relationships) with sync OFF
+- [ ] **Phase 20: CloudKit Infrastructure and Sync Engine** - Enable iCloud sync plumbing, entitlements, framework linking, content filtering, and verify cross-Mac sync
+- [ ] **Phase 21: Sync Controls, Deduplication, and Status** - Settings UI with sync toggle, cross-device dedup service, sync monitor, and status indicator
+
+## Phase Details (v1.5)
+
+### Phase 19: CloudKit-Compatible Data Model
+**Goal**: The SwiftData schema is fully CloudKit-compatible and existing user data migrates cleanly, while the app continues to work identically in local-only mode with no sync enabled
+**Depends on**: Phase 18 (v1.4 complete)
+**Requirements**: SYNC-01, SYNC-02, SYNC-03, SYNC-04
+**Success Criteria** (what must be TRUE):
+  1. User updates from v1.4 to v1.5 and all existing clipboard items and labels load without data loss (migration succeeds)
+  2. User copies the same text twice non-consecutively and only one item appears in history (application-level hash dedup works without @Attribute(.unique))
+  3. User copies any item and it has an originDeviceID stamped (visible in debug or verifiable via export)
+  4. All relationship access throughout the app uses nil-safe patterns (no crashes when labels or items arrays are nil)
+  5. App runs identically to v1.4 from the user's perspective -- no behavioral changes, no sync, purely internal model preparation
+**Plans**: 2 plans (estimate)
+
+### Phase 20: CloudKit Infrastructure and Sync Engine
+**Goal**: Clipboard items (text, URL, code, color) and labels sync automatically between Macs logged into the same Apple ID, with concealed and image items excluded from sync
+**Depends on**: Phase 19
+**Requirements**: SYNC-05, SYNC-06, SYNC-07, SYNC-08, SYNC-10, SYNC-11
+**Success Criteria** (what must be TRUE):
+  1. User copies text on Mac A and within minutes the item appears in the panel on Mac B (both signed into the same Apple ID with sync enabled)
+  2. User creates a label on Mac A and assigns it to an item, and both the label and assignment appear on Mac B
+  3. User copies a password from 1Password (concealed item) and it never appears on Mac B (concealed exclusion enforced)
+  4. User copies an image or file and it does not appear on Mac B (image/file items excluded from sync)
+  5. App builds and syncs correctly in both Debug and Release configurations (CloudKit.framework explicitly linked)
+**Plans**: 2 plans (estimate)
+
+### Phase 21: Sync Controls, Deduplication, and Status
+**Goal**: Users can control sync via Settings, duplicate items from multiple devices are automatically merged, and sync status is visible so users know whether sync is working
+**Depends on**: Phase 20
+**Requirements**: SYNC-09, SYNC-12, SYNC-13, SYNC-14
+**Success Criteria** (what must be TRUE):
+  1. User opens Settings and sees a Sync tab with an on/off toggle that defaults to off
+  2. User enables sync and sees a restart prompt; after restarting, sync begins working
+  3. User copies the same text on two different Macs and only one item remains after sync (cross-device dedup by contentHash, earliest timestamp kept, labels merged)
+  4. User opens the Sync tab in Settings and sees the current sync state (synced/syncing/error/offline/disabled) updating in near-real-time
+  5. User disables sync, restarts, and no further items sync between devices
+
+**Plans**: 2 plans (estimate)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18
+Phases execute in numeric order: 19 -> 20 -> 21
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -304,16 +363,8 @@ Phases execute in numeric order: 13 -> 14 -> 15 -> 16 -> 17 -> 18
 | 14. App Ignore List | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 15. Import/Export | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 16. Drag-and-Drop from Panel | v1.3 | 2/2 | Complete | 2026-02-09 |
-| 17. Liquid Glass Panel Fix | v1.4 | 0/2 | Not started | - |
-| 18. Codebase Audit — Anti-patterns, Performance, and Security | v1.4 | 3/3 | Complete | 2026-02-13 |
-
-### Phase 18: Codebase Audit — Anti-patterns, Performance, and Security (Encryption)
-
-**Goal:** Fix concrete anti-patterns (silent error swallowing, force unwraps, duplicated code, deprecated APIs), optimize hot-path performance (redundant @Query subscriptions, unnecessary view rebuilds, per-item import queries), and clean up debug artifacts -- without adding application-level encryption (FileVault + App Sandbox is sufficient)
-**Depends on:** Phase 17
-**Plans:** 3 plans
-
-Plans:
-- [x] 18-01-PLAN.md -- Shared SwiftData error handler, replace 17 silent try? saves, remove debug logs, extract duplicated paste simulation
-- [x] 18-02-PLAN.md -- Fix force unwraps in 3 files, optimize import dedup with pre-loaded hash set
-- [x] 18-03-PLAN.md -- Remove redundant @Query from ClipboardCardView, remove itemCount from .id(), replace deprecated lockFocus, extract duplicated card rendering
+| 17. Liquid Glass Panel Fix | v1.4 | 0/2 | Deferred | - |
+| 18. Codebase Audit -- Anti-patterns, Performance, and Security | v1.4 | 3/3 | Complete | 2026-02-13 |
+| 19. CloudKit-Compatible Data Model | v1.5 | 0/2 | Not started | - |
+| 20. CloudKit Infrastructure and Sync Engine | v1.5 | 0/2 | Not started | - |
+| 21. Sync Controls, Deduplication, and Status | v1.5 | 0/2 | Not started | - |

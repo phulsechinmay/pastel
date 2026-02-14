@@ -55,30 +55,30 @@ Requirements for initial release. Each maps to roadmap phases.
 
 Requirements for v1.1 milestone: Rich Content & Enhanced Paste.
 
-### Rich Content — Code Detection
+### Rich Content -- Code Detection
 
 - [x] **RICH-01**: App detects code snippets via multi-signal heuristic and classifies them as `.code` ContentType
 - [x] **RICH-02**: Code cards show syntax-highlighted previews with auto-detected language (via HighlightSwift)
 - [x] **RICH-03**: Code cards display a language badge (e.g., "Swift", "Python")
 
-### Rich Content — Color Detection
+### Rich Content -- Color Detection
 
 - [x] **RICH-04**: App detects standalone color values (hex, rgb, hsl) and classifies them as `.color` ContentType
 - [x] **RICH-05**: Color cards show a visual swatch alongside the original color text
 
-### Rich Content — URL Previews
+### Rich Content -- URL Previews
 
 - [x] **RICH-06**: App auto-fetches URL metadata (title, favicon, og:image) after URL item is captured
 - [x] **RICH-07**: URL cards show source app icon + timestamp header, og:image preview, and favicon + title footer
 - [x] **RICH-08**: URL metadata fetch is non-blocking with graceful fallback to plain URL card on failure
 - [x] **RICH-09**: Settings toggle to disable URL metadata fetching
 
-### Enhanced Paste — Quick Paste Hotkeys
+### Enhanced Paste -- Quick Paste Hotkeys
 
 - [x] **PAST-10**: Cmd+1-9 pastes the Nth visible item while the panel is open
 - [x] **PAST-10b**: Cmd+Shift+1-9 pastes the Nth visible item as plain text (RTF stripped)
 - [x] **PAST-11**: Settings toggle to enable/disable quick paste hotkeys (enabled by default)
-- [x] **PAST-12**: First 9 panel cards show keycap-style position badges (⌘ 1-9) when hotkeys are enabled
+- [x] **PAST-12**: First 9 panel cards show keycap-style position badges when hotkeys are enabled
 
 ### Label Enhancements
 
@@ -112,14 +112,14 @@ Requirements for v1.2 milestone: Item Management.
 
 Requirements for v1.3 milestone: Power User Features.
 
-### Enhanced Paste — Plain Text Support
+### Enhanced Paste -- Plain Text Support
 
 - [ ] **PAST-20**: Context menu shows "Paste as Plain Text" option on all clipboard cards
 - [ ] **PAST-21**: Shift+Enter pastes selected item as plain text (RTF and HTML stripped)
 - [ ] **PAST-22**: Shift+double-click pastes item as plain text
 - [ ] **PAST-23**: Plain text paste correctly strips ALL formatting (fix existing HTML bug in PasteService)
 
-### Privacy — App Filtering
+### Privacy -- App Filtering
 
 - [x] **PRIV-01**: User can configure ignore-list of apps to exclude from clipboard monitoring
 - [x] **PRIV-02**: Settings has "Privacy" section with app ignore-list management
@@ -127,7 +127,7 @@ Requirements for v1.3 milestone: Power User Features.
 - [x] **PRIV-04**: User can remove apps from ignore-list
 - [x] **PRIV-05**: ClipboardMonitor respects ignore-list during capture (skips ignored app bundles)
 
-### Data Portability — Import/Export
+### Data Portability -- Import/Export
 
 - [x] **DATA-01**: User can export clipboard history to `.pastel` file (JSON format)
 - [x] **DATA-02**: Export preserves all metadata (titles, labels, timestamps, source apps, content)
@@ -138,7 +138,7 @@ Requirements for v1.3 milestone: Power User Features.
 - [x] **DATA-07**: Settings has "Import/Export" section with export and import buttons
 - [x] **DATA-08**: Export/import shows progress feedback for large histories
 
-### Advanced Interaction — Drag-and-Drop
+### Advanced Interaction -- Drag-and-Drop
 
 - [x] **DRAG-01**: User can drag clipboard items from panel to other applications
 - [x] **DRAG-02**: Drag-and-drop supports text, images, URLs, and files
@@ -315,6 +315,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRAG-03 | Phase 16 | Complete |
 | DRAG-04 | Phase 16 | Complete |
 | DRAG-05 | Phase 16 | Complete |
+| SYNC-01 | Phase 19 | Pending |
+| SYNC-02 | Phase 19 | Pending |
+| SYNC-03 | Phase 19 | Pending |
+| SYNC-04 | Phase 19 | Pending |
+| SYNC-05 | Phase 20 | Pending |
+| SYNC-06 | Phase 20 | Pending |
+| SYNC-07 | Phase 20 | Pending |
+| SYNC-08 | Phase 20 | Pending |
+| SYNC-09 | Phase 21 | Pending |
+| SYNC-10 | Phase 20 | Pending |
+| SYNC-11 | Phase 20 | Pending |
+| SYNC-12 | Phase 21 | Pending |
+| SYNC-13 | Phase 21 | Pending |
+| SYNC-14 | Phase 21 | Pending |
 
 **v1.0 Coverage:**
 - v1 requirements: 29 total
@@ -338,9 +352,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **v1.5 Coverage:**
 - v1.5 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 (pending roadmap creation)
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-14 after v1.5 requirements creation*
+*Last updated: 2026-02-14 after v1.5 roadmap creation*
