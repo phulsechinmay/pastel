@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** v1.5 iCloud Sync -- Phase 19 Plan 01 complete, Plan 02 next
+**Current focus:** v1.5 iCloud Sync -- Phase 19 complete, Phase 20 next
 
 ## Current Position
 
 Phase: 19 of 21 (CloudKit-Compatible Data Model)
-Plan: 01 of 02 complete
-Status: Executing phase
-Last activity: 2026-02-14 -- Plan 01 complete (CloudKit-compatible data model)
+Plan: 02 of 02 complete
+Status: Phase complete
+Last activity: 2026-02-14 -- Phase 19 complete (CloudKit-compatible data model + call site updates)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -59,6 +59,9 @@ Key decisions from Phase 19 (CloudKit-Compatible Data Model):
 - [19-01]: Auto-migration (no VersionedSchema) -- SwiftData handles adding defaults, relaxing constraints, adding properties
 - [19-01]: DeviceIdentifier in local UserDefaults (not iCloud KVS) -- each device keeps distinct identity
 - [19-01]: Optional relationships + nil-safe computed accessors (safeLabels/safeItems) pattern for CloudKit compatibility
+- [19-02]: isDuplicateByHash uses fetchCount for O(count) dedup without loading model objects
+- [19-02]: Keep both dedup methods: isDuplicateOfMostRecent (fast O(1)) + isDuplicateByHash (thorough)
+- [19-02]: Defensive originDeviceID stamping after insert (redundant with init for future-proofing)
 
 Key architecture decisions for v1.5 (from research):
 
@@ -97,5 +100,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed 19-01-PLAN.md (CloudKit-compatible data model)
+Stopped at: Completed 19-02-PLAN.md (call site updates + application-level dedup)
 Resume file: None
