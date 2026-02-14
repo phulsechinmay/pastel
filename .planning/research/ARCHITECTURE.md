@@ -1,1108 +1,1030 @@
-# Architecture Research: v1.3 Power User Features
+# Architecture Research: v1.5 iCloud Sync
 
-**Domain:** macOS clipboard manager -- paste-as-plain-text UI, app filtering, import/export, drag-and-drop
-**Researched:** 2026-02-09
-**Confidence:** HIGH (based on direct source code analysis of all 50+ Swift files in the Pastel codebase, verified macOS/SwiftUI API patterns, and Maccy reference implementation)
+**Domain:** iCloud sync integration into existing macOS clipboard manager
+**Researched:** 2026-02-14
+**Confidence:** HIGH for core approach (SwiftData built-in CloudKit), MEDIUM for implementation details (toggle mechanism, dedup timing)
 
 ## Confidence Note
 
-All integration points are derived from direct analysis of every service, model, and view file in the Pastel codebase. Architecture recommendations build on patterns the codebase already follows (@MainActor services, @AppStorage for preferences, @Observable for reactive UI, PanelActions callback bridge). Drag-and-drop recommendations use SwiftUI's `.onDrag` / `.draggable` modifiers which the codebase already uses for label chips (ChipBarView). App filtering logic is verified against Maccy's open-source implementation. Import/export patterns use standard Codable + NSSavePanel/NSOpenPanel which are well-documented macOS APIs. Paste-as-plain-text infrastructure already exists (PasteService.pastePlainText) -- this research focuses on UI integration points only.
+Core architecture decisions are verified against Apple's official documentation, multiple independent guides (fatbobman, Hacking with Swift, Kodeco), and open-source reference implementations. Data model requirements (no unique constraints, optional relationships, default values) are universally documented and consistent across all sources. macOS-specific pitfalls (CloudKit.framework linking) are confirmed by both fatbobman and Apple Developer Forums. The transactionAuthor filtering approach is verified via fatbobman's persistent history tracking guide. Areas of MEDIUM/LOW confidence are explicitly marked.
 
 ---
 
-## Existing Architecture Summary (Updated for v1.2)
+## Existing Architecture Summary (Current State)
 
 ```
 PastelApp (@main)
     |
+    +-- ModelContainer (SwiftData: ClipboardItem, Label)
+    |       NO CloudKit configuration
+    |       Created with default ModelConfiguration
+    |
     +-- AppState (@Observable, @MainActor)
     |       |-- ClipboardMonitor (Timer polling -> classify -> deduplicate -> SwiftData insert)
-    |       |-- PanelController (NSPanel lifecycle, show/hide, event monitors)
-    |       |-- PasteService (pasteboard write + CGEvent Cmd+V, plain text mode)
-    |       |-- RetentionService (hourly purge based on retention period)
-    |       `-- modelContainer (SwiftData: ClipboardItem, Label)
+    |       |       contentHash uses @Attribute(.unique) for dedup
+    |       |-- PanelController (NSPanel lifecycle, show/hide)
+    |       |-- PasteService (pasteboard write + CGEvent Cmd+V)
+    |       |-- RetentionService (hourly purge based on retention days)
+    |       `-- modelContainer reference
     |
     +-- Models
-    |       |-- ClipboardItem (@Model: textContent, htmlContent, rtfData, contentType,
-    |       |                   imagePath, thumbnailPath, isConcealed, expiresAt,
-    |       |                   contentHash (@Attribute(.unique)), title, labels[],
-    |       |                   detectedLanguage, detectedColorHex, url metadata fields)
-    |       |-- ContentType (enum: text, richText, url, image, file, code, color)
-    |       |-- Label (@Model: name, colorName, emoji, sortOrder, items[])
-    |       |-- LabelColor (enum: 12 preset colors)
-    |       `-- PasteBehavior (enum: paste, copy, copyAndPaste)
+    |       |-- ClipboardItem (@Model: 20+ fields, contentHash @Attribute(.unique),
+    |       |                   labels: [Label] non-optional relationship)
+    |       |-- Label (@Model: name, colorName, emoji, sortOrder,
+    |       |          items: [ClipboardItem] non-optional inverse)
+    |       `-- ContentType (enum: text, richText, url, image, file, code, color)
     |
     +-- Services
-    |       |-- ClipboardMonitor (@MainActor, 0.5s polling, SHA256 hashing, skipNextChange)
-    |       |-- ImageStorageService (singleton, background DispatchQueue, PNG storage,
-    |       |                        4K downscale, 200px thumbnails)
-    |       |-- ExpirationService (60s auto-delete for concealed items)
-    |       |-- RetentionService (hourly purge by retention days)
-    |       |-- PasteService (writeToPasteboard, writeToPasteboardPlainText, simulatePaste)
-    |       |-- CodeDetectionService, ColorDetectionService, URLMetadataService
-    |       |-- AccessibilityService, AppIconColorService, MigrationService
-    |       `-- [Missing: AppFilterService, ImportExportService]
+    |       |-- ClipboardMonitor (0.5s polling, SHA256 hashing, skipNextChange)
+    |       |-- ImageStorageService (PNG on disk, thumbnails)
+    |       |-- RetentionService (hourly purge)
+    |       |-- ImportExportService (.pastel JSON export/import)
+    |       |-- PasteService, ExpirationService, MigrationService
+    |       `-- CodeDetectionService, ColorDetectionService, URLMetadataService
     |
-    +-- Views/Panel
-    |       |-- PanelController -> SlidingPanel (NSPanel, .nonactivatingPanel)
-    |       |-- PanelContentView (header + search + chips + filtered list)
-    |       |-- FilteredCardListView (dynamic @Query, keyboard nav, quick paste hotkeys)
-    |       |-- ClipboardCardView (dispatcher: header + contentPreview + footer + context menu)
-    |       |-- [Type-specific cards: Text, Image, URL, File, Code, Color]
-    |       |-- ChipBarView (label chips with .draggable), SearchFieldView
-    |       |-- PanelActions (@Observable bridge: pasteItem, pastePlainTextItem, copyOnlyItem)
-    |       `-- EditItemView + EditItemWindow (title + multi-label editing)
-    |
-    +-- Views/Settings
-    |       |-- SettingsView (tabs: General, Labels, History)
-    |       |-- GeneralSettingsView (startup, hotkey, position, retention, paste, URL previews)
-    |       |-- LabelSettingsView (CRUD for labels)
-    |       `-- HistoryBrowserView + HistoryGridView (search, filter, multi-select, bulk ops)
-    |
-    +-- Views/MenuBar
-            `-- StatusPopoverView (monitoring toggle, show history, settings, clear all, quit)
+    +-- Entitlements
+            com.apple.security.app-sandbox = true
+            com.apple.security.network.client = true
+            com.apple.security.files.user-selected.read-write = true
 ```
 
-### Key Architecture Patterns Already Established
-
-1. **PanelActions callback bridge:** SwiftUI views call `panelActions.pasteItem?(item)` which routes through PanelController to AppState to PasteService. All paste variants (normal, plain text, copy-only) follow this pattern.
-2. **PasteService already has plain text support:** `pastePlainText(item:)` and `writeToPasteboardPlainText(item:)` strip RTF and write only `.string` + `.html`. This is fully implemented and working via Cmd+Shift+1-9 hotkeys.
-3. **Context menu pattern in ClipboardCardView:** Right-click context menu has Copy, Paste, Copy+Paste, Edit, Label submenu, and Delete. Adding new items is straightforward.
-4. **Source app tracking already exists:** `ClipboardItem.sourceAppBundleID` and `sourceAppName` are captured at copy time via `NSWorkspace.shared.frontmostApplication`. This is the foundation for app filtering.
-5. **SwiftUI drag already works:** ChipBarView uses `.draggable(label.persistentModelID.asTransferString)` with `PersistentIdentifier+Transfer` extension. The codebase has proven drag-and-drop patterns.
-6. **@AppStorage for all preferences:** Every user-configurable setting uses `@AppStorage` with string keys.
-7. **Dynamic @Query via view recreation:** FilteredCardListView takes search/filter params in init, constructs a #Predicate, and uses `.id()` on the parent to force recreation when filters change.
-
 ---
 
-## Feature 1: Paste-as-Plain-Text UI
+## Recommended Architecture: SwiftData Built-in CloudKit Sync
 
-### Current State
+### Why This Approach
 
-PasteService already has **full plain text paste support**:
-- `PasteService.pastePlainText(item:clipboardMonitor:panelController:)` -- strips RTF, writes `.string` + `.html` only
-- `PasteService.writeToPasteboardPlainText(item:)` -- the underlying pasteboard write
-- `AppState.pastePlainText(item:)` -- delegates to PasteService
-- `PanelActions.pastePlainTextItem` -- callback bridge from SwiftUI
-- `PanelContentView.pastePlainTextItem(_:)` -- wired to PanelActions
-- FilteredCardListView handles `Cmd+Shift+1-9` for plain text paste via `onPastePlainText` callback
+Use SwiftData's native CloudKit integration via `ModelConfiguration(cloudKitDatabase:)` rather than building a custom sync engine with `CKSyncEngine`. SwiftData wraps `NSPersistentCloudKitContainer` under the hood, which automatically mirrors the local SwiftData store to the user's private CloudKit database.
 
-**What is missing is only the UI entry points**: context menu items, Shift+Enter, and Shift+double-click.
+**How it works:**
+- Local writes happen instantly (local-first, unchanged from current behavior)
+- NSPersistentCloudKitContainer automatically queues changed records for CloudKit export
+- CloudKit sends silent push notifications to other devices when records change
+- Other devices fetch changed records and merge into local SwiftData store
+- @Query views auto-refresh when merged data appears
+- Conflict resolution is last-writer-wins at the attribute level (built-in)
 
-### Integration Points
+**Why NOT CKSyncEngine:** CKSyncEngine is designed for apps that bring their own persistence layer (not SwiftData/CoreData). Pastel already uses SwiftData, so the built-in integration is the correct and only sensible path. CKSyncEngine would require reimplementing the entire persistence-to-CloudKit bridge -- massive effort for zero benefit.
 
-#### 1. Context Menu in ClipboardCardView (MODIFY)
+**Confidence: HIGH** -- Apple's official documentation and every authoritative source confirms this is the intended approach for SwiftData apps.
 
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/ClipboardCardView.swift`
-**Lines:** 163-222 (contextMenu block)
+### System Diagram (Post-Sync)
 
-The current context menu has:
 ```
-Copy
-Paste
-Copy + Paste
----
-Edit...
----
-Label >
----
-Delete
+Mac A (local capture)                      Mac B (receives sync)
++-------------------+                      +-------------------+
+| ClipboardMonitor  |                      | ClipboardMonitor  |
+| (polls NSPaste-   |                      | (polls NSPaste-   |
+|  board 0.5s)      |                      |  board 0.5s)      |
+| author="app"      |                      | author="app"      |
++--------+----------+                      +--------+----------+
+         |                                          |
+         v                                          v
++--------+----------+                      +--------+----------+
+| SwiftData         |                      | SwiftData         |
+| ModelContext       |                      | ModelContext       |
+| (mainContext)      |                      | (mainContext)      |
++--------+----------+                      +--------+----------+
+         |                                          ^
+         v                                          |
++--------+----------+  iCloud Private DB   +--------+----------+
+| NSPersistent-     |====================> | NSPersistent-     |
+| CloudKitContainer |  (auto export)       | CloudKitContainer |
+| (under SwiftData) |                      | (auto import)     |
++--------+----------+                      +--------+----------+
+         |                                          |
+         v                                          v
++--------+----------+                      +--------+----------+
+| SyncMonitor-      |                      | SyncMonitor-      |
+|  Service (NEW)    |                      |  Service (NEW)    |
+| (event observer)  |                      | (event observer)  |
++-------------------+                      +--------+----------+
+                                                    |
+                                                    v
+                                           +--------+----------+
+                                           | Deduplication-    |
+                                           |  Service (NEW)    |
+                                           | (remote change    |
+                                           |  handler)         |
+                                           +-------------------+
 ```
 
-Add "Paste as Plain Text" after "Copy + Paste":
+### Data Flow: Complete Sync Lifecycle
+
+**1. Local Capture (unchanged path):**
 ```
-Copy
-Paste
-Copy + Paste
-Paste as Plain Text    <-- NEW
----
-Edit...
----
-Label >
----
-Delete
+NSPasteboard.general changed
+    -> ClipboardMonitor.checkForChanges()
+    -> processPasteboardContent()
+    -> item = ClipboardItem(...)
+    -> item.originDeviceID = DeviceIdentifier.current  // NEW
+    -> item.isSynced = false  // NEW
+    -> modelContext.insert(item)
+    -> modelContext.save()
+    -> SwiftData persists locally
+    -> NSPersistentCloudKitContainer auto-queues for CloudKit export
 ```
 
-**Implementation:** Call `panelActions.pastePlainTextItem?(item)` -- the callback already exists on PanelActions.
+**2. Export to Cloud (automatic, zero code):**
+```
+NSPersistentCloudKitContainer detects local save
+    -> Serializes changed CKRecords
+    -> Pushes to CloudKit private database
+    -> Posts eventChangedNotification (.export)
+    -> SyncMonitorService updates exportState
+```
 
-**Conditional visibility:** Only show "Paste as Plain Text" for text-based content types (.text, .richText, .code, .color). For .url, .image, .file it has no effect (PasteService already delegates to normal writeToPasteboard for non-text types).
+**3. Remote Notification & Import (automatic, zero code):**
+```
+CloudKit sends silent push to Mac B
+    -> NSPersistentCloudKitContainer on Mac B wakes
+    -> Fetches changed CKRecords from CloudKit
+    -> Merges into local SwiftData store (last-writer-wins)
+    -> Posts .NSPersistentStoreRemoteChange notification
+    -> Posts eventChangedNotification (.import)
+    -> @Query views auto-refresh (items appear in panel)
+    -> SyncMonitorService updates importState
+```
 
-#### 2. Shift+Double-Click in FilteredCardListView (MODIFY)
+**4. Deduplication (new code):**
+```
+.NSPersistentStoreRemoteChange notification fires
+    -> DeduplicationService.handleRemoteChanges()
+    -> Scan for duplicate contentHash values
+    -> Keep earliest timestamp item
+    -> Merge labels from duplicates onto keeper
+    -> Delete duplicates
+    -> modelContext.save()
+```
 
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/FilteredCardListView.swift`
-**Lines:** 120-125 (vertical layout), 170-175 (horizontal layout)
+---
 
-Current pattern:
+## Critical Data Model Changes
+
+### Change 1: Remove @Attribute(.unique) from contentHash
+
+**This is the single most impactful change in the entire sync integration.**
+
+CloudKit does not support atomic uniqueness checks across devices. The `@Attribute(.unique)` on `contentHash` MUST be removed. Every authoritative source confirms this.
+
 ```swift
-.onTapGesture(count: 2) { onPaste(item) }
-.onTapGesture(count: 1) { selectedIndex = index }
+// BEFORE (current -- line 49 of ClipboardItem.swift)
+@Attribute(.unique) var contentHash: String
+
+// AFTER (CloudKit-compatible)
+var contentHash: String = ""
 ```
 
-**Challenge:** SwiftUI's `.onTapGesture` does not provide modifier key information. The `count: 2` handler receives no `NSEvent` to check for Shift.
+**What this breaks:** Currently, if the same content is copied twice (non-consecutively), the unique constraint causes a save error which ClipboardMonitor handles gracefully by rolling back. Without the constraint, duplicates would be inserted.
 
-**Solution approach:** Use `NSEvent.modifierFlags` (static property) to check current modifier state at the time of the gesture callback:
+**Mitigation:** The existing `isDuplicateOfMostRecent()` check handles consecutive dupes. For non-consecutive dupes, the DeduplicationService handles duplicates that arrive via CloudKit sync. For local non-consecutive dupes, add an application-level check:
 
 ```swift
-.onTapGesture(count: 2) {
-    if NSEvent.modifierFlags.contains(.shift) {
-        onPastePlainText(item)
-    } else {
-        onPaste(item)
+// In ClipboardMonitor.processPasteboardContent(), replace the save/catch:
+// Check for existing item with same hash (replaces @Attribute(.unique) behavior)
+let existingDescriptor = FetchDescriptor<ClipboardItem>(
+    predicate: #Predicate<ClipboardItem> { item in
+        item.contentHash == contentHash
+    }
+)
+if let existingCount = try? modelContext.fetchCount(existingDescriptor),
+   existingCount > 0 {
+    // Non-consecutive duplicate -- update timestamp of existing
+    return
+}
+```
+
+**Confidence: HIGH** -- Universal requirement. The contentHash-based dedup approach matches Apple's recommended pattern from the CoreDataCloudKitShare sample.
+
+### Change 2: Default Values for All Non-Optional Properties
+
+CloudKit requires all properties to be optional or have default values. Analysis of current model:
+
+**ClipboardItem changes needed:**
+
+| Property | Current | Fix |
+|----------|---------|-----|
+| `contentType` | `String` (set in init) | Add `= "text"` default |
+| `timestamp` | `Date` (set in init) | Add `= Date()` default |
+| `characterCount` | `Int` (set in init) | Add `= 0` default |
+| `byteCount` | `Int` (set in init) | Add `= 0` default |
+| `changeCount` | `Int` (set in init) | Add `= 0` default |
+| `isConcealed` | `Bool` (set in init) | Add `= false` default |
+| `contentHash` | `String` (set in init, unique) | Add `= ""`, remove unique |
+
+Properties already CloudKit-compatible (optional or have defaults): `textContent`, `htmlContent`, `rtfData`, `sourceAppBundleID`, `sourceAppName`, `imagePath`, `thumbnailPath`, `expiresAt`, `label`, `title`, `detectedLanguage`, `detectedColorHex`, `urlTitle`, `urlFaviconPath`, `urlPreviewImagePath`, `urlMetadataFetched`.
+
+**Label changes needed:**
+
+| Property | Current | Fix |
+|----------|---------|-----|
+| `name` | `String` (set in init) | Add `= ""` default |
+| `colorName` | `String` (set in init) | Add `= "blue"` default |
+| `sortOrder` | `Int` (set in init) | Add `= 0` default |
+
+**Confidence: HIGH** -- Straightforward requirement, well-documented.
+
+### Change 3: Make Relationships Optional
+
+CloudKit requires ALL relationships to be optional.
+
+```swift
+// ClipboardItem -- BEFORE
+@Relationship(deleteRule: .nullify, inverse: \Label.items)
+var labels: [Label]
+
+// ClipboardItem -- AFTER
+@Relationship(deleteRule: .nullify, inverse: \Label.items)
+var labels: [Label]?
+
+// Label -- BEFORE
+var items: [ClipboardItem]
+
+// Label -- AFTER
+var items: [ClipboardItem]?
+```
+
+**Impact:** Every access to `.labels` and `.items` throughout the codebase needs nil-coalescing. Add convenience computed properties:
+
+```swift
+// On ClipboardItem:
+var safeLabels: [Label] { labels ?? [] }
+
+// On Label:
+var safeItems: [ClipboardItem] { items ?? [] }
+```
+
+Then find-and-replace all `.labels` usage to `.safeLabels` and `.items` to `.safeItems` (except in the relationship declaration itself and the init).
+
+**Scope of impact:** This touches ClipboardCardView, FilteredCardListView, ChipBarView, EditItemView, HistoryGridView, ImportExportService, ClipboardMonitor (for label migration), and any view that reads item labels or label items.
+
+**Confidence: HIGH** -- Required by CloudKit. The `safeLabels` pattern is a clean mitigation.
+
+### Change 4: New Fields for Sync
+
+```swift
+// Add to ClipboardItem:
+
+/// UUID of the device that originally captured this item.
+/// Generated per-device on first launch, stored in UserDefaults.
+/// Used for: dedup (same content on different devices), UI badges ("from MacBook Pro"),
+/// retention awareness (local vs synced items).
+var originDeviceID: String = ""
+
+/// Whether this item was synced from another device.
+/// Stored (not computed) for efficient #Predicate use in @Query.
+var isSynced: Bool = false
+
+/// Whether this item should be excluded from CloudKit sync display on remote devices.
+/// True for images, files, concealed items -- they sync to CloudKit (unavoidable
+/// with single-store approach) but are hidden or shown as placeholders on other devices.
+var syncExcluded: Bool = false
+```
+
+**Device ID implementation:**
+
+```swift
+enum DeviceIdentifier {
+    private static let key = "pastelDeviceUUID"
+
+    static var current: String {
+        if let existing = UserDefaults.standard.string(forKey: key) {
+            return existing
+        }
+        let new = UUID().uuidString
+        UserDefaults.standard.set(new, forKey: key)
+        return new
     }
 }
 ```
 
-This pattern is already proven in the codebase: `HistoryGridView.handleTap()` uses `NSEvent.modifierFlags` to detect Cmd and Shift modifiers for multi-select behavior (line 160).
+Store in UserDefaults (NOT NSUbiquitousKeyValueStore) so each device has its own unique ID that does not sync.
 
-**Confidence:** HIGH -- the pattern works and is already used in HistoryGridView.
-
-#### 3. Shift+Enter in FilteredCardListView (MODIFY)
-
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/FilteredCardListView.swift`
-**Lines:** 230-235 (Return key handler)
-
-Current handler:
-```swift
-.onKeyPress(.return) {
-    if let index = selectedIndex, index < filteredItems.count {
-        onPaste(filteredItems[index])
-    }
-    return .handled
-}
-```
-
-**Solution:** The `.onKeyPress` handler receives a `KeyPress` value that has a `.modifiers` property. Check for `.shift`:
-
-```swift
-.onKeyPress(.return) { keyPress in
-    guard let index = selectedIndex, index < filteredItems.count else { return .handled }
-    if keyPress.modifiers.contains(.shift) {
-        onPastePlainText(filteredItems[index])
-    } else {
-        onPaste(filteredItems[index])
-    }
-    return .handled
-}
-```
-
-This pattern is already used in the Cmd+1-9 handler at lines 236-259, which checks `keyPress.modifiers.contains(.shift)` and `keyPress.modifiers.contains(.command)`.
-
-**Confidence:** HIGH -- exact same modifier check pattern already in use.
-
-### Data Model Changes
-
-None. The plain text paste infrastructure is fully implemented. This is purely a UI wiring task.
-
-### New Components
-
-None. All changes are modifications to existing files.
-
-### Files to Modify
-
-| File | Change | Scope |
-|------|--------|-------|
-| `ClipboardCardView.swift` | Add "Paste as Plain Text" context menu item | ~8 lines added |
-| `FilteredCardListView.swift` | Shift+double-click and Shift+Enter checks | ~10 lines modified |
+**Confidence: HIGH** for the need; MEDIUM for exact field design.
 
 ---
 
-## Feature 2: App Allow/Ignore Lists
+## New Components
 
-### Architecture Decision: Where to Check
+### 1. SyncMonitorService (NEW)
 
-There are two architectural options for app filtering:
+**Purpose:** Observe NSPersistentCloudKitContainer events and expose sync status to UI.
 
-**Option A: Filter in ClipboardMonitor.checkForChanges()** (early filtering)
-- Check `NSWorkspace.shared.frontmostApplication?.bundleIdentifier` before processing
-- Items from ignored apps never enter the capture pipeline
-- Pro: No unnecessary work (no hashing, no SwiftData access)
-- Con: Must check on every poll tick (0.5s), but the check is trivial (Set.contains)
+```swift
+import CloudKit
+import CoreData
+import OSLog
 
-**Option B: Filter in ClipboardMonitor.processPasteboardContent()** (late filtering)
-- Check after content classification but before SwiftData insert
-- Pro: Classification info available (could filter by content type per app)
-- Con: Does unnecessary classification work before discarding
-
-**Recommendation: Option A -- early filtering in checkForChanges().** The check is a single `Set.contains(bundleID)` operation. Filtering before `processPasteboardContent()` avoids all unnecessary work: no content reading, no hashing, no SwiftData queries. This matches Maccy's implementation pattern.
-
-### Integration Points
-
-#### 1. New Service: AppFilterService (NEW)
-
-**File:** `Pastel/Services/AppFilterService.swift`
-
-```
 @MainActor
 @Observable
-final class AppFilterService {
-    /// List of bundle IDs in the user's configured list
-    var appBundleIDs: [String]  // loaded from UserDefaults
+final class SyncMonitorService {
 
-    /// Whether the list acts as an allow-list or ignore-list
-    var mode: FilterMode  // .allowList or .ignoreList
-
-    enum FilterMode: String {
-        case allowList = "allowList"   // ONLY capture from listed apps
-        case ignoreList = "ignoreList" // capture from ALL EXCEPT listed apps
+    enum SyncState: Equatable {
+        case disabled          // User has sync off
+        case notStarted        // Sync enabled but hasn't run yet
+        case syncing           // Import or export in progress
+        case succeeded(Date)   // Last successful sync timestamp
+        case failed(String)    // Error description
+        case accountUnavailable // No iCloud account signed in
+        case networkUnavailable // No network connection
     }
 
-    /// Check whether clipboard content from a given app should be captured
-    func shouldCapture(bundleID: String?) -> Bool {
-        guard let bundleID else { return true }  // Unknown app -> capture
-        switch mode {
-        case .ignoreList:
-            return !appBundleIDs.contains(bundleID)
-        case .allowList:
-            return appBundleIDs.contains(bundleID)
+    var setupState: SyncState = .notStarted
+    var importState: SyncState = .notStarted
+    var exportState: SyncState = .notStarted
+
+    /// Computed summary for UI display
+    var overallState: SyncState {
+        if case .failed = setupState { return setupState }
+        if case .failed = importState { return importState }
+        if case .failed = exportState { return exportState }
+        if case .syncing = importState { return .syncing }
+        if case .syncing = exportState { return .syncing }
+        if case .succeeded(let date) = importState { return .succeeded(date) }
+        if case .succeeded(let date) = exportState { return .succeeded(date) }
+        return .notStarted
+    }
+
+    var isAccountAvailable: Bool = false
+
+    private var eventObserver: Any?
+    private let logger = Logger(subsystem: "app.pastel.Pastel", category: "SyncMonitor")
+
+    func startMonitoring(coordinator: NSPersistentStoreCoordinator?) {
+        guard let coordinator else { return }
+
+        // Observe CloudKit container events (setup, import, export)
+        eventObserver = NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification,
+            object: coordinator,
+            queue: .main
+        ) { [weak self] notification in
+            guard let event = notification.userInfo?[
+                NSPersistentCloudKitContainer.eventNotificationUserInfoKey
+            ] as? NSPersistentCloudKitContainer.Event else { return }
+            self?.handleEvent(event)
+        }
+
+        // Check iCloud account status
+        Task {
+            let status = try? await CKContainer.default().accountStatus()
+            isAccountAvailable = (status == .available)
+        }
+    }
+
+    private func handleEvent(_ event: NSPersistentCloudKitContainer.Event) {
+        let state: SyncState
+        if let error = event.error {
+            state = .failed(error.localizedDescription)
+        } else if event.endDate == nil {
+            state = .syncing
+        } else {
+            state = .succeeded(event.endDate ?? Date())
+        }
+
+        switch event.type {
+        case .setup: setupState = state
+        case .import: importState = state
+        case .export: exportState = state
+        @unknown default: break
+        }
+    }
+
+    func stopMonitoring() {
+        if let observer = eventObserver {
+            NotificationCenter.default.removeObserver(observer)
+            eventObserver = nil
         }
     }
 }
 ```
 
-**Persistence:** Store the app list in UserDefaults as a JSON-encoded `[String]` array, and the mode as a string. Use `@AppStorage` for the mode toggle and manual UserDefaults access for the array (since @AppStorage does not support arrays).
+**How to access the persistent store coordinator from SwiftData:** This requires reaching into the Core Data layer. The ModelContainer has a `mainContext` whose `managedObjectContext?.persistentStoreCoordinator` provides the coordinator needed for notification registration.
 
-**Why a separate service instead of inline logic in ClipboardMonitor:**
-- ClipboardMonitor is already 400 lines with complex responsibility
-- AppFilterService encapsulates the allow/ignore logic and persistence
-- Settings views can bind to AppFilterService.appBundleIDs directly
-- Testable in isolation
+**Confidence: MEDIUM** -- The NSPersistentCloudKitContainer event API is well-documented for Core Data. Accessing it through SwiftData's Core Data bridge is validated by the CloudKitSyncMonitor open-source package.
 
-#### 2. ClipboardMonitor Modification (MODIFY)
+### 2. DeduplicationService (NEW)
 
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Services/ClipboardMonitor.swift`
-**Method:** `checkForChanges()` (lines 128-143)
-
-Add filter check after the changeCount guard, before `processPasteboardContent()`:
+**Purpose:** Handle duplicate ClipboardItems that arrive via CloudKit sync when the same content is copied on multiple devices.
 
 ```swift
-private func checkForChanges() {
-    guard isMonitoring else { return }
-    let currentChangeCount = pasteboard.changeCount
-    guard currentChangeCount != lastChangeCount else { return }
-    lastChangeCount = currentChangeCount
+import SwiftData
+import CoreData
+import OSLog
 
-    if skipNextChange {
-        skipNextChange = false
-        return
+@MainActor
+final class DeduplicationService {
+
+    private let modelContext: ModelContext
+    private var remoteChangeObserver: Any?
+    private let logger = Logger(subsystem: "app.pastel.Pastel", category: "Dedup")
+
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
     }
 
-    // NEW: App filtering
-    let sourceApp = NSWorkspace.shared.frontmostApplication
-    if let filterService = appFilterService,
-       !filterService.shouldCapture(bundleID: sourceApp?.bundleIdentifier) {
-        return
+    func startObserving() {
+        let coordinator = modelContext.managedObjectContext?.persistentStoreCoordinator
+
+        remoteChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange,
+            object: coordinator,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.deduplicateItems()
+            }
+        }
     }
 
-    processPasteboardContent()
+    /// Scan for and remove duplicate items by contentHash.
+    /// Strategy: keep the item with the earliest timestamp, merge labels, delete rest.
+    func deduplicateItems() {
+        do {
+            let allItems = try modelContext.fetch(FetchDescriptor<ClipboardItem>())
+
+            // Group by contentHash
+            var hashGroups: [String: [ClipboardItem]] = [:]
+            for item in allItems {
+                guard !item.contentHash.isEmpty else { continue }
+                hashGroups[item.contentHash, default: []].append(item)
+            }
+
+            var totalRemoved = 0
+            for (_, items) in hashGroups where items.count > 1 {
+                // Sort by timestamp ascending (earliest first)
+                let sorted = items.sorted { $0.timestamp < $1.timestamp }
+                let keeper = sorted[0]
+                let duplicates = sorted.dropFirst()
+
+                // Merge labels from duplicates onto keeper
+                for dup in duplicates {
+                    for label in (dup.labels ?? []) {
+                        if !(keeper.labels ?? []).contains(where: {
+                            $0.persistentModelID == label.persistentModelID
+                        }) {
+                            keeper.labels?.append(label) ?? (keeper.labels = [label])
+                        }
+                    }
+                    // Clean up image files if any
+                    ImageStorageService.shared.deleteImage(
+                        imagePath: dup.imagePath, thumbnailPath: dup.thumbnailPath
+                    )
+                    modelContext.delete(dup)
+                    totalRemoved += 1
+                }
+            }
+
+            if totalRemoved > 0 {
+                try modelContext.save()
+                logger.info("Dedup removed \(totalRemoved) duplicate items")
+            }
+        } catch {
+            logger.error("Dedup failed: \(error.localizedDescription)")
+            modelContext.rollback()
+        }
+    }
+
+    func stopObserving() {
+        if let observer = remoteChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            remoteChangeObserver = nil
+        }
+    }
 }
 ```
 
-**Important consideration:** The `NSWorkspace.shared.frontmostApplication` call is already made later in `processPasteboardContent()` (line 223). Moving it earlier to `checkForChanges()` for filtering means it runs on every poll tick where the changeCount differs. This is safe -- it is a simple property access on the main thread with no performance concern.
+**When dedup runs:**
+1. On `.NSPersistentStoreRemoteChange` notification (CloudKit import completed)
+2. On app launch (catch anything missed while app was closed)
+3. Debounced -- multiple rapid remote changes should coalesce into one dedup scan
 
-However, there is a subtlety: if app filtering skips the content, `processPasteboardContent()` is never called, so the sourceApp info from `checkForChanges()` is discarded. If filtering passes, `processPasteboardContent()` re-reads `frontmostApplication`, which could theoretically return a different app if the user switched apps between the two calls (within the same 0.5s tick). This is an extremely unlikely edge case and not worth optimizing for.
+**Confidence: MEDIUM** -- The approach is sound and matches Apple's CoreDataCloudKitShare sample patterns. The O(N) full-scan is acceptable for typical clipboard history sizes (< 50K items). For very large histories, a targeted scan using persistent history tracking would be more efficient but adds complexity.
 
-#### 3. AppState Wiring (MODIFY)
+### 3. SyncSettingsView (NEW)
 
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/App/AppState.swift`
+**Purpose:** Settings UI for the Sync tab.
 
-Add `appFilterService` property and pass it to ClipboardMonitor:
+**Elements:**
+- Sync on/off toggle (stored in UserDefaults, requires app restart)
+- Restart prompt dialog when toggle is changed
+- Sync status indicator (derived from SyncMonitorService.overallState)
+- Last synced timestamp
+- iCloud account status warning (if not signed in)
+- "What syncs" explanation text (text, URLs, code, colors -- not images or concealed)
+
+**Placement:** New "Sync" tab in SettingsView, between General and Labels.
+
+### 4. DeviceIdentifier (NEW utility)
+
+Small utility enum for per-device UUID generation, as shown above. Single file, ~15 lines.
+
+---
+
+## Integration Points with Existing Components
+
+### ClipboardMonitor: Why Sync Does NOT Cause Ghost Copies
+
+**The concern:** When a synced item arrives from Mac B, will Mac A's ClipboardMonitor detect it as a new clipboard change and create a feedback loop?
+
+**Answer: No.** ClipboardMonitor polls `NSPasteboard.general` -- the system pasteboard. Synced items arriving via CloudKit go directly into the SwiftData/SQLite store. They NEVER touch the system pasteboard. The ClipboardMonitor will never see them.
+
+The only way a synced item reaches the pasteboard is if the user explicitly pastes it (via PasteService), which already sets `skipNextChange = true` to prevent self-capture.
+
+**What IS needed in ClipboardMonitor:**
+
+1. **Set transactionAuthor** so DeduplicationService can distinguish local vs remote changes:
+```swift
+// In ClipboardMonitor.init:
+modelContext.managedObjectContext?.transactionAuthor = "app"
+```
+
+2. **Stamp origin device on new items:**
+```swift
+// In processPasteboardContent():
+item.originDeviceID = DeviceIdentifier.current
+item.isSynced = false
+```
+
+3. **Replace unique constraint dedup with application-level check:**
+```swift
+// Before modelContext.insert(item):
+let hash = contentHash
+let existing = FetchDescriptor<ClipboardItem>(
+    predicate: #Predicate<ClipboardItem> { $0.contentHash == hash }
+)
+if (try? modelContext.fetchCount(existing)) ?? 0 > 0 {
+    Self.logger.debug("Non-consecutive duplicate detected by hash, skipping")
+    return
+}
+```
+
+4. **Mark sync-excluded items:**
+```swift
+item.syncExcluded = (isConcealed || contentType == .image || contentType == .file)
+```
+
+**Confidence: HIGH** for the core insight (sync does not touch NSPasteboard). MEDIUM for the transactionAuthor bridge (requires Core Data layer access).
+
+### RetentionService: Sync-Aware Retention
+
+**Current behavior:** Deletes items older than N days. Simple and correct for local-only.
+
+**With sync enabled:** When RetentionService deletes an item on Mac A, CloudKit propagates that deletion to Mac B. This is the correct default behavior -- retention should be consistent.
+
+**Edge case:** Different retention settings on different devices. If Mac A has 30-day retention and Mac B has 7-day, Mac B deletes synced items at 7 days, and that deletion propagates back to Mac A (removing them despite Mac A's 30-day setting).
+
+**Recommendation for v1.5:** Keep it simple. Each device applies its own retention locally. Deletions propagate via CloudKit (automatic). Document that the shortest retention across devices effectively wins. Consider syncing the retention setting via NSUbiquitousKeyValueStore in a future version.
+
+**Changes to RetentionService:**
+- None required for basic functionality -- it already works correctly with sync
+- Optional improvement: skip deletion of items where `isSynced == true && timestamp > (cutoff - 1day)` to give a small grace period for synced items. This prevents a race where an item is deleted before the user has seen it on this device.
+
+**Confidence: MEDIUM** -- Retention + sync interaction is a real design decision. The simple approach works but has documented edge cases.
+
+### ImportExportService: No Changes Needed
+
+The existing ImportExportService uses in-memory hash comparison (`existingHashes` Set) for dedup during import. This does NOT rely on the `@Attribute(.unique)` constraint. Removing the unique constraint does not break import.
+
+**Confidence: HIGH** -- Verified by reading ImportExportService source code.
+
+### PastelApp: ModelContainer Configuration Change
+
+The most significant infrastructure change is in PastelApp.init, where the ModelContainer is created:
 
 ```swift
-var appFilterService: AppFilterService?
+// BEFORE (current)
+container = try ModelContainer(for: ClipboardItem.self, Label.self)
+
+// AFTER (sync-aware)
+let syncEnabled = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+
+let config: ModelConfiguration
+if syncEnabled {
+    config = ModelConfiguration(
+        cloudKitDatabase: .private("iCloud.app.pastel.Pastel")
+    )
+} else {
+    config = ModelConfiguration(
+        cloudKitDatabase: .none
+    )
+}
+
+container = try ModelContainer(
+    for: ClipboardItem.self, Label.self,
+    configurations: config
+)
+```
+
+**Default: OFF.** Sync is opt-in. First launch creates a local-only container. This preserves existing behavior for users who do not want sync.
+
+**Toggle requires restart:** Changing the sync setting requires recreating the ModelContainer, which effectively means restarting the app. The SyncSettingsView should show a dialog: "Sync changes take effect after restarting Pastel."
+
+**Caveat (LOW confidence):** Some reports indicate `cloudKitDatabase: .none` may not reliably prevent sync when CloudKit entitlements are present in the app. This MUST be validated during implementation. If `.none` is unreliable, the fallback approach is to conditionally set the `cloudKitContainerIdentifier` based on user preference plus iCloud account status check.
+
+**Confidence: MEDIUM** -- The conditional configuration pattern is standard, but the `.none` reliability is a known concern.
+
+### AppState: Wire New Services
+
+```swift
+// Add to AppState:
+var syncMonitorService: SyncMonitorService?
+var deduplicationService: DeduplicationService?
 
 func setup(modelContext: ModelContext) {
-    let filter = AppFilterService()
-    self.appFilterService = filter
+    // ... existing ClipboardMonitor and RetentionService setup ...
 
-    let monitor = ClipboardMonitor(modelContext: modelContext, appFilterService: filter)
-    // ...
-}
-```
+    // Set transaction author for all local writes
+    modelContext.managedObjectContext?.transactionAuthor = "app"
 
-#### 4. Settings UI: App Filter Settings View (NEW)
+    // Sync services (only if sync is enabled)
+    if UserDefaults.standard.bool(forKey: "iCloudSyncEnabled") {
+        let syncMonitor = SyncMonitorService()
+        syncMonitor.startMonitoring(
+            coordinator: modelContext.managedObjectContext?.persistentStoreCoordinator
+        )
+        self.syncMonitorService = syncMonitor
 
-**File:** `Pastel/Views/Settings/AppFilterSettingsView.swift`
-
-This view needs:
-- Toggle between Allow List mode and Ignore List mode
-- List of currently configured apps (showing app name + icon + bundle ID)
-- "Add App" button that shows a file picker for .app bundles (NSOpenPanel with /Applications as starting directory)
-- Remove button per app entry
-- Running apps list for quick selection (via `NSWorkspace.shared.runningApplications`)
-
-**App discovery approach:**
-- **Primary:** NSOpenPanel pointing to /Applications, filter for .app bundles. Read bundle ID from the selected app's Info.plist via `Bundle(url:)?.bundleIdentifier`.
-- **Secondary:** Show a list of currently running applications (`NSWorkspace.shared.runningApplications`) filtered to `.activationPolicy == .regular` (excludes background agents and daemons). User taps to add.
-
-**Integration with SettingsView:** Add a new "Apps" or "Privacy" tab, or add as a section within GeneralSettingsView. Given that the settings already have 3 tabs (General, Labels, History), adding a 4th "Apps" tab is reasonable and avoids overloading General.
-
-#### 5. SettingsView Tab Addition (MODIFY)
-
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Settings/SettingsView.swift`
-
-Add `case apps` to `SettingsTab` enum:
-```swift
-private enum SettingsTab: String, CaseIterable {
-    case general
-    case labels
-    case history
-    case apps  // NEW
-}
-```
-
-### Data Model Changes
-
-None. App filter configuration lives entirely in UserDefaults, not SwiftData. The ClipboardItem model already has `sourceAppBundleID` for display purposes -- this is not used for filtering (filtering happens before item creation).
-
-### New Components
-
-| Component | Type | Purpose |
-|-----------|------|---------|
-| `AppFilterService` | @MainActor @Observable | Allow/ignore list logic and persistence |
-| `AppFilterSettingsView` | SwiftUI View | UI for managing app lists |
-
-### Files to Modify
-
-| File | Change | Scope |
-|------|--------|-------|
-| `ClipboardMonitor.swift` | Add filter check in `checkForChanges()` | ~8 lines added, 1 init param |
-| `AppState.swift` | Create and wire AppFilterService | ~5 lines |
-| `SettingsView.swift` | Add `apps` tab | ~5 lines |
-
----
-
-## Feature 3: Import/Export
-
-### Architecture Decision: File Format
-
-**Custom `.pastel` format (JSON-based):**
-
-The export file should be a self-contained JSON document that includes:
-- Metadata (export date, app version, item count)
-- ClipboardItem data (all fields except SwiftData-specific identifiers)
-- Label definitions (name, color, emoji, sort order)
-- Item-to-label assignments
-- Embedded image data (Base64-encoded) for image items
-
-**Why JSON over alternatives:**
-- **Plist:** More macOS-native but harder to extend. JSON is human-readable and debuggable.
-- **SQLite dump:** Ties the format to SwiftData internals. Schema changes break imports.
-- **Zip with separate files:** More complex to create/parse. Images are rare in clipboard history, so embedding Base64 is acceptable for most exports.
-- **JSON:** Universal, Codable-friendly, extensible with versioning. Standard practice.
-
-**Format structure:**
-
-```json
-{
-    "version": 1,
-    "exportDate": "2026-02-09T12:00:00Z",
-    "appVersion": "1.3.0",
-    "labels": [
-        { "name": "Work", "colorName": "blue", "emoji": null, "sortOrder": 0 }
-    ],
-    "items": [
-        {
-            "textContent": "Hello world",
-            "htmlContent": null,
-            "rtfData": null,
-            "contentType": "text",
-            "timestamp": "2026-02-09T11:30:00Z",
-            "sourceAppBundleID": "com.apple.Safari",
-            "sourceAppName": "Safari",
-            "characterCount": 11,
-            "byteCount": 11,
-            "isConcealed": false,
-            "contentHash": "abc123...",
-            "title": null,
-            "labels": ["Work"],
-            "detectedLanguage": null,
-            "detectedColorHex": null,
-            "imageData": null
-        }
-    ]
-}
-```
-
-**Key decisions:**
-- Labels referenced by name (not PersistentIdentifier) since IDs are not portable
-- `imageData` is Base64-encoded PNG for image items (nullable for text items)
-- RTF data is Base64-encoded when present
-- `contentHash` is exported so import can skip duplicates
-- No export of `imagePath`, `thumbnailPath`, `changeCount`, `expiresAt` (runtime-only fields)
-- Concealed items are excluded by default (they are sensitive/temporary)
-- URL metadata fields (urlTitle, urlFaviconPath, urlPreviewImagePath) are NOT exported -- they will be re-fetched on import if URL metadata fetching is enabled
-
-### Integration Points
-
-#### 1. New Service: ImportExportService (NEW)
-
-**File:** `Pastel/Services/ImportExportService.swift`
-
-```
-@MainActor
-final class ImportExportService {
-
-    // MARK: - Export Types
-
-    struct ExportDocument: Codable {
-        let version: Int
-        let exportDate: Date
-        let appVersion: String
-        let labels: [ExportLabel]
-        let items: [ExportItem]
-    }
-
-    struct ExportLabel: Codable {
-        let name: String
-        let colorName: String
-        let emoji: String?
-        let sortOrder: Int
-    }
-
-    struct ExportItem: Codable {
-        let textContent: String?
-        let htmlContent: String?
-        let rtfData: String?       // Base64
-        let contentType: String
-        let timestamp: Date
-        let sourceAppBundleID: String?
-        let sourceAppName: String?
-        let characterCount: Int
-        let byteCount: Int
-        let isConcealed: Bool
-        let contentHash: String
-        let title: String?
-        let labels: [String]       // Label names
-        let detectedLanguage: String?
-        let detectedColorHex: String?
-        let imageData: String?     // Base64 PNG
-    }
-
-    // MARK: - Export
-
-    func exportAll(modelContext: ModelContext) throws -> Data {
-        // 1. Fetch all Labels
-        // 2. Fetch all ClipboardItems (excluding concealed)
-        // 3. For image items, read image file from disk and Base64-encode
-        // 4. Map to ExportDocument
-        // 5. JSONEncoder with .prettyPrinted + .iso8601 dateStrategy
-        // 6. Return Data
-    }
-
-    // MARK: - Import
-
-    func importFromData(_ data: Data, modelContext: ModelContext) throws -> ImportResult {
-        // 1. JSONDecoder with .iso8601 dateStrategy
-        // 2. Version check (handle migration if needed)
-        // 3. Import labels: match by name (update existing, create new)
-        // 4. Import items: skip if contentHash already exists in DB
-        // 5. For image items: decode Base64, save via ImageStorageService
-        // 6. Assign labels by name lookup
-        // 7. Save in batches (per SwiftData best practices)
-        // 8. Return ImportResult with counts
-    }
-
-    struct ImportResult {
-        let itemsImported: Int
-        let itemsSkipped: Int   // duplicates
-        let labelsCreated: Int
-        let labelsMatched: Int
+        let dedup = DeduplicationService(modelContext: modelContext)
+        dedup.startObserving()
+        dedup.deduplicateItems()  // Run on launch to catch missed items
+        self.deduplicationService = dedup
     }
 }
-```
-
-**SwiftData batch import considerations:**
-- For large imports (1000+ items), split into batches of 500 to avoid memory spikes
-- Call `modelContext.save()` after each batch
-- Image items require async disk I/O via ImageStorageService -- process sequentially to avoid overwhelming the background queue
-- Skip items where `contentHash` already exists (use `@Attribute(.unique)` constraint as guard)
-
-#### 2. Export UI: NSSavePanel Integration (NEW)
-
-**File:** `Pastel/Views/Settings/ImportExportView.swift` (or section in GeneralSettingsView)
-
-```swift
-func showExportPanel() {
-    let panel = NSSavePanel()
-    panel.allowedContentTypes = [.init(filenameExtension: "pastel")!]
-    panel.nameFieldStringValue = "Pastel Export \(dateFormatter.string(from: .now))"
-    panel.canCreateDirectories = true
-
-    panel.begin { response in
-        guard response == .OK, let url = panel.url else { return }
-        Task { @MainActor in
-            do {
-                let data = try importExportService.exportAll(modelContext: modelContext)
-                try data.write(to: url)
-            } catch {
-                // Show error alert
-            }
-        }
-    }
-}
-```
-
-**Why NSSavePanel instead of SwiftUI .fileExporter:**
-- `.fileExporter` requires conformance to `FileDocument` or `ReferenceFileDocument`, which adds unnecessary protocol machinery for a simple one-shot export
-- NSSavePanel integrates cleanly with the existing AppKit hybrid (PanelController, SettingsWindowController)
-- NSSavePanel provides more control over the initial directory and filename
-- The app is not sandboxed, so NSSavePanel works without security-scoped bookmarks
-
-#### 3. Import UI: NSOpenPanel Integration (NEW)
-
-```swift
-func showImportPanel() {
-    let panel = NSOpenPanel()
-    panel.allowedContentTypes = [.init(filenameExtension: "pastel")!]
-    panel.canChooseDirectories = false
-    panel.allowsMultipleSelection = false
-
-    panel.begin { response in
-        guard response == .OK, let url = panel.url else { return }
-        Task { @MainActor in
-            do {
-                let data = try Data(contentsOf: url)
-                let result = try importExportService.importFromData(data, modelContext: modelContext)
-                // Show result summary alert
-            } catch {
-                // Show error alert
-            }
-        }
-    }
-}
-```
-
-#### 4. Settings Integration (MODIFY)
-
-The import/export buttons can be placed in:
-- **Option A:** New section at bottom of GeneralSettingsView ("Data" section, which already has "Clear All History")
-- **Option B:** New "Data" tab in SettingsView
-
-**Recommendation: Option A -- add to GeneralSettingsView's existing "Data" section.** The Data section currently only has "Clear All History". Adding "Export..." and "Import..." buttons below it is natural. This avoids adding a 5th tab (with the "Apps" tab from Feature 2, we are already at 4 tabs).
-
-```
-Data section in GeneralSettingsView:
-    Export History...      [button]
-    Import History...      [button]
-    ---
-    Clear All History...   [existing button]
-```
-
-#### 5. ClipboardMonitor ItemCount Update (MODIFY)
-
-After import, `clipboardMonitor.itemCount` must be updated. The import service should call:
-```swift
-clipboardMonitor?.itemCount = try modelContext.fetchCount(FetchDescriptor<ClipboardItem>())
-```
-
-### Data Model Changes
-
-None. Import/export operates on the existing ClipboardItem and Label models via Codable mapping structs. No new fields needed.
-
-### New Components
-
-| Component | Type | Purpose |
-|-----------|------|---------|
-| `ImportExportService` | @MainActor service | Export/import logic with Codable mapping |
-| Import/Export UI | SwiftUI section or buttons | NSSavePanel/NSOpenPanel triggers |
-
-### Files to Modify
-
-| File | Change | Scope |
-|------|--------|-------|
-| `GeneralSettingsView.swift` | Add Export/Import buttons to Data section | ~30 lines |
-| `AppState.swift` | Add ImportExportService property, wire to model context | ~5 lines |
-
----
-
-## Feature 4: Drag-and-Drop from Panel
-
-### Architecture Decision: .onDrag vs .draggable
-
-SwiftUI provides two approaches:
-1. **`.onDrag { NSItemProvider(...) }`** -- older API, returns NSItemProvider
-2. **`.draggable(value)`** -- newer API (macOS 13+), uses Transferable protocol
-
-The codebase already uses `.draggable` in ChipBarView for label drag:
-```swift
-.draggable(label.persistentModelID.asTransferString) {
-    LabelChipView(label: label)
-}
-```
-
-However, for clipboard item drag-and-drop to external apps, **`.onDrag` with NSItemProvider is the better choice** because:
-- External apps expect standard pasteboard types (UTType.plainText, UTType.png, UTType.fileURL)
-- NSItemProvider supports multiple representations (text + URL, text + RTF) which `.draggable` with Transferable does not handle as cleanly for cross-app scenarios
-- `.onDrag` allows lazy data loading (important for large images)
-- `.draggable` with String conformance only provides text -- we need type-specific providers
-
-### Critical Concern: NSPanel and Drag Sessions
-
-The panel is a non-activating `NSPanel` with `hidesOnDeactivate = false`. When a drag session starts from the panel and the user moves the cursor outside the panel to drop in another app, several things happen:
-
-1. The drag session is managed by the window server, not the panel
-2. The panel does NOT hide -- `hidesOnDeactivate` is already `false`
-3. The panel does NOT lose key status during the drag
-4. Once the drop completes (or drag is cancelled), focus returns to the target app
-
-**Key finding:** The panel's existing configuration (`hidesOnDeactivate = false`, `isFloatingPanel = true`, `collectionBehavior = .canJoinAllSpaces`) should work correctly with drag sessions. The panel stays visible during the drag. No modifications to SlidingPanel or PanelController are needed.
-
-**MEDIUM confidence:** This assessment is based on the panel's configuration flags and macOS window server behavior. Testing with actual drag sessions is needed to confirm. If the panel does hide during drag, the fix would be to suppress the global click monitor during active drag sessions.
-
-### Concern: .onDrag Conflicts with Existing Gestures
-
-FilteredCardListView currently attaches these gestures to each ClipboardCardView:
-```swift
-.onTapGesture(count: 2) { onPaste(item) }
-.onTapGesture(count: 1) { selectedIndex = index }
-```
-
-Adding `.onDrag` can conflict with click gestures on macOS. Known issues:
-- `.onDrag` can consume mouse-down events, interfering with `.onTapGesture`
-- Clicks on draggable content may not register
-
-**Mitigation strategy:** Apply `.onDrag` to the ClipboardCardView body rather than at the FilteredCardListView level. This keeps gesture scoping clean. The existing `.onTapGesture` handlers at the FilteredCardListView level should take priority because they are attached higher in the view hierarchy.
-
-If conflicts persist, the fallback is to use a longer press-and-drag threshold so that taps are distinguished from drags. SwiftUI's `.onDrag` has a built-in delay before initiating a drag session (it waits for the user to actually move the cursor), which should prevent most conflicts.
-
-### Integration Points
-
-#### 1. ClipboardCardView .onDrag (MODIFY)
-
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/ClipboardCardView.swift`
-
-Add `.onDrag` to the card's body:
-
-```swift
-.onDrag {
-    createItemProvider(for: item)
-}
-```
-
-**NSItemProvider construction by content type:**
-
-```swift
-private func createItemProvider(for item: ClipboardItem) -> NSItemProvider {
-    let provider = NSItemProvider()
-
-    switch item.type {
-    case .text, .richText, .code, .color:
-        // Register plain text
-        if let text = item.textContent {
-            provider.registerObject(text as NSString, visibility: .all)
-        }
-        // Register RTF if available
-        if let rtfData = item.rtfData {
-            provider.registerDataRepresentation(
-                forTypeIdentifier: UTType.rtf.identifier,
-                visibility: .all
-            ) { completion in
-                completion(rtfData, nil)
-                return nil
-            }
-        }
-
-    case .url:
-        if let urlString = item.textContent, let url = URL(string: urlString) {
-            provider.registerObject(url as NSURL, visibility: .all)
-            // Also register as plain text for apps that don't accept URLs
-            provider.registerObject(urlString as NSString, visibility: .all)
-        }
-
-    case .image:
-        if let imagePath = item.imagePath {
-            let imageURL = ImageStorageService.shared.resolveImageURL(imagePath)
-            // Register as file URL (apps can read the image file)
-            provider.registerFileRepresentation(
-                forTypeIdentifier: UTType.png.identifier,
-                visibility: .all
-            ) { completion in
-                completion(imageURL, true, nil)
-                return nil
-            }
-        }
-
-    case .file:
-        if let filePath = item.textContent {
-            let fileURL = URL(fileURLWithPath: filePath)
-            provider.registerObject(fileURL as NSURL, visibility: .all)
-        }
-    }
-
-    return provider
-}
-```
-
-#### 2. Drag Preview (MODIFY)
-
-SwiftUI's `.onDrag` supports a `preview:` parameter on macOS 13+. Provide a compact preview:
-
-```swift
-.onDrag {
-    createItemProvider(for: item)
-} preview: {
-    dragPreview(for: item)
-}
-```
-
-For text items, show a truncated text snippet in a small card. For images, show the thumbnail. For URLs, show the URL string. Keep previews small (max 200x60pt) to avoid obscuring drop targets.
-
-#### 3. PanelController Global Click Monitor (POTENTIAL MODIFY)
-
-**File:** `/Users/phulsechinmay/Desktop/Projects/pastel/Pastel/Views/Panel/PanelController.swift`
-**Method:** `installEventMonitors()` (lines 198-216)
-
-The global click monitor dismisses the panel on any click outside it:
-```swift
-globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
-    matching: [.leftMouseDown, .rightMouseDown]
-) { [weak self] _ in
-    self?.hide()
-}
-```
-
-**Risk:** If a drag-drop operation involves a mouse-down outside the panel (which it does -- the drop target is in another app), the global click monitor will hide the panel during the drag.
-
-**Fix:** Track whether a drag session is active and suppress the hide:
-
-```swift
-var isDragging: Bool = false  // Set by ClipboardCardView's .onDrag
-
-globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
-    matching: [.leftMouseDown, .rightMouseDown]
-) { [weak self] _ in
-    guard self?.isDragging != true else { return }
-    self?.hide()
-}
-```
-
-**Communication mechanism:** The `isDragging` flag could be set via:
-- A new callback on PanelActions (like `panelActions.onDragStarted` / `onDragEnded`)
-- A published property on AppState
-- Direct access to PanelController via environment
-
-**Recommendation:** Add `isDragging: Bool` to PanelActions since it is already the bridge between SwiftUI views and PanelController. ClipboardCardView sets it, PanelController reads it.
-
-However, SwiftUI's `.onDrag` does not provide start/end callbacks. Detecting drag state requires either:
-- Using `NSDraggingSource` protocol methods (requires NSView subclass)
-- Monitoring `NSEvent.addLocalMonitorForEvents(matching: .leftMouseDragged)` to detect drag initiation
-
-**Alternative approach:** Instead of tracking drag state, modify the global click monitor to only respond to `.leftMouseDown` events that are NOT drag-related. This is harder to distinguish at the event level.
-
-**Pragmatic solution:** Simply do not hide the panel during drag. After the drag completes (drop or cancel), the user can dismiss the panel manually or it auto-hides on the next global click. The user experience is: drag from panel -> drop in target app -> panel stays open -> click elsewhere or press Escape to dismiss. This is actually better UX because users might want to drag multiple items.
-
-**Simplest implementation:** Set `hidesOnDeactivate = false` (already done) and accept that the panel stays visible after a drag-drop. The existing Escape key handler and toggle hotkey provide explicit dismiss options.
-
-### Data Model Changes
-
-None.
-
-### New Components
-
-None. All changes are modifications to existing files.
-
-### Files to Modify
-
-| File | Change | Scope |
-|------|--------|-------|
-| `ClipboardCardView.swift` | Add `.onDrag` with NSItemProvider construction | ~40 lines added |
-| `FilteredCardListView.swift` | May need gesture conflict resolution | ~5 lines if needed |
-| `PanelController.swift` | Potentially modify global click monitor for drag compat | ~5 lines if needed |
-
----
-
-## Component Dependency Graph (v1.3)
-
-```
-                    +---------------------+
-                    |   ClipboardItem     |
-                    |   (@Model)          |
-                    |   (NO changes)      |
-                    +---------+-----------+
-                              |
-            +-----------+-----+--------+------------+
-            |           |              |            |
-            v           v              v            v
-  +-----------------+ +------------+ +----------+ +------------------+
-  |ClipboardMonitor | |PasteService| |ClipCard  | |ImportExportSvc   |
-  |+ appFilter check| |(unchanged) | |+ onDrag  | |+ export/import   |
-  |  (checkForChgs) | |            | |+ ctx menu| |+ Codable mapping |
-  +---------+-------+ +------------+ |+ shiftDbl| +--------+---------+
-            |                        +----------+          |
-            v                                              v
-  +------------------+                          +------------------+
-  |AppFilterService  | <-- NEW                  |GeneralSettingsVw |
-  |+ shouldCapture() |                          |+ Export/Import   |
-  |+ allow/ignore    |                          |  buttons         |
-  +--------+---------+                          +------------------+
-           |
-           v
-  +---------------------+
-  |AppFilterSettingsView | <-- NEW
-  |+ mode toggle        |
-  |+ app list management|
-  +---------------------+
 ```
 
 ---
 
-## Data Flow Changes
+## Entitlements and Project Configuration
 
-### Clipboard Capture Pipeline (Modified for App Filtering)
+### New Entitlements
 
-```
-NSPasteboard.general
-    |
-    v
-ClipboardMonitor.checkForChanges()
-    |
-    +-- Guard: isMonitoring
-    +-- Guard: changeCount changed
-    +-- Guard: skipNextChange
-    +-- NEW: Guard: AppFilterService.shouldCapture(bundleID)
-    |         |
-    |         +-- If ignore mode: skip if bundleID in list
-    |         +-- If allow mode: skip if bundleID NOT in list
-    |
-    v
-processPasteboardContent()  // unchanged from here down
+```xml
+<!-- Add to Pastel.entitlements -->
+<key>com.apple.developer.icloud-container-identifiers</key>
+<array>
+    <string>iCloud.app.pastel.Pastel</string>
+</array>
+<key>com.apple.developer.icloud-services</key>
+<array>
+    <string>CloudDocuments</string>
+    <string>CloudKit</string>
+</array>
+<!-- For syncing preferences (retention setting, sync state) across devices -->
+<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+<string>$(TeamIdentifierPrefix)app.pastel.Pastel</string>
 ```
 
-### Paste Flow (Modified for Plain Text UI)
+### project.yml Changes
 
-```
-User interaction:
-    |
-    +-- Double-click on card
-    |       +-- Check NSEvent.modifierFlags.contains(.shift)
-    |       +-- Shift held: onPastePlainText(item) -> PasteService.pastePlainText
-    |       +-- No shift: onPaste(item) -> PasteService.paste
-    |
-    +-- Enter key
-    |       +-- Check keyPress.modifiers.contains(.shift)
-    |       +-- Shift: pastePlainText
-    |       +-- No shift: paste
-    |
-    +-- Context menu "Paste as Plain Text"
-    |       +-- panelActions.pastePlainTextItem?(item)
-    |
-    +-- Cmd+Shift+1-9 (existing, unchanged)
-            +-- onPastePlainText(item)
+```yaml
+targets:
+  Pastel:
+    # ... existing config ...
+    settings:
+      base:
+        # ... existing settings ...
+    dependencies:
+      - package: KeyboardShortcuts
+      - package: LaunchAtLogin
+      - package: HighlightSwift
+      - framework: CloudKit.framework   # CRITICAL for macOS release builds
+    entitlements:
+      # Xcode manages this via Signing & Capabilities, but ensure
+      # the entitlements file path stays correct
 ```
 
-### Drag-and-Drop Flow (New)
+### CRITICAL macOS Pitfall: CloudKit.framework
 
-```
-User long-presses and drags card:
-    |
-    v
-ClipboardCardView.onDrag
-    |
-    +-- createItemProvider(for: item)
-    |       +-- .text/.richText: NSString + RTF data
-    |       +-- .url: NSURL + NSString fallback
-    |       +-- .image: file representation (PNG from disk)
-    |       +-- .file: NSURL (file URL)
-    |
-    v
-macOS drag session (window server managed)
-    |
-    +-- Panel stays visible (hidesOnDeactivate = false)
-    +-- User drags to target app
-    +-- Drop: target app receives NSItemProvider data
-    +-- Cancel: nothing happens, panel remains
+**Unlike iOS, macOS does NOT automatically link CloudKit.framework when you add the iCloud capability.** The app will compile and sync will work perfectly in Debug builds, but sync will **silently fail in Release/TestFlight/App Store builds** without explicitly linking the framework.
+
+This is the most commonly reported iCloud sync issue for macOS apps. It produces zero errors or warnings -- sync simply does nothing in production.
+
+**Fix:** Explicitly add CloudKit.framework to "Link Binary With Libraries" in Build Phases. In XcodeGen/project.yml, add it as a framework dependency.
+
+**Confidence: HIGH** -- Confirmed by fatbobman, Apple Developer Forums, and multiple independent developers.
+
+### CloudKit Schema Initialization
+
+CloudKit's "Just-In-Time" schema inference often fails with complex relationships or empty databases. Explicitly push the schema during development:
+
+```swift
+#if DEBUG
+// Drop to Core Data layer to initialize CloudKit schema
+func initializeCloudKitSchema(config: ModelConfiguration) {
+    let desc = NSPersistentStoreDescription(url: config.url)
+    let opts = NSPersistentCloudKitContainerOptions(
+        containerIdentifier: "iCloud.app.pastel.Pastel"
+    )
+    desc.cloudKitContainerOptions = opts
+    desc.shouldAddStoreAsynchronously = false
+
+    if let mom = NSManagedObjectModel.makeManagedObjectModel(
+        for: [ClipboardItem.self, Label.self]
+    ) {
+        let ckContainer = NSPersistentCloudKitContainer(
+            name: "Pastel", managedObjectModel: mom
+        )
+        ckContainer.persistentStoreDescriptions = [desc]
+        ckContainer.loadPersistentStores { _, err in
+            if let err { print("Schema init error: \(err)") }
+        }
+        try? ckContainer.initializeCloudKitSchema()
+        if let store = ckContainer.persistentStoreCoordinator.persistentStores.first {
+            try? ckContainer.persistentStoreCoordinator.remove(store)
+        }
+    }
+}
+#endif
 ```
 
-### Import/Export Flow (New)
+Run once after model changes, verify in CloudKit Dashboard (https://icloud.developer.apple.com/dashboard), then comment out.
 
-```
-Export:
-    User clicks "Export..." in Settings
-        |
-        v
-    NSSavePanel -> user picks location
-        |
-        v
-    ImportExportService.exportAll(modelContext:)
-        |-- Fetch all Labels
-        |-- Fetch all ClipboardItems (exclude concealed)
-        |-- For image items: read from disk, Base64-encode
-        |-- Encode to JSON
-        |
-        v
-    Write .pastel file to disk
-
-Import:
-    User clicks "Import..." in Settings
-        |
-        v
-    NSOpenPanel -> user picks .pastel file
-        |
-        v
-    ImportExportService.importFromData(_:modelContext:)
-        |-- Decode JSON
-        |-- Version check
-        |-- Import labels: match by name or create new
-        |-- Import items: skip if contentHash exists (dedup)
-        |-- For image items: decode Base64, save via ImageStorageService
-        |-- Save in batches of 500
-        |-- Update clipboardMonitor.itemCount
-        |
-        v
-    Show result summary (X imported, Y skipped, Z labels)
-```
+**Confidence: HIGH** -- Standard approach from fatbobman's guide.
 
 ---
 
-## New vs Modified Components Summary
+## Items That Should NOT Sync
 
-### New Components
+| Item Type | Should Sync? | Reason |
+|-----------|-------------|--------|
+| Text | Yes | Core use case |
+| Rich Text | Yes | Preserves formatting |
+| URL | Yes | Core use case, metadata can re-fetch |
+| Code | Yes | Useful across devices |
+| Color | Yes | Useful across devices |
+| Image | **No** | Binary data too large, file paths are device-local |
+| File | **No** | File paths are device-local, meaningless on other devices |
+| Concealed | **No** | Security-sensitive, should be ephemeral and local-only |
 
-| Component | Type | File | Purpose |
-|-----------|------|------|---------|
-| `AppFilterService` | @MainActor @Observable | `Services/AppFilterService.swift` | Allow/ignore list logic + persistence |
-| `AppFilterSettingsView` | SwiftUI View | `Views/Settings/AppFilterSettingsView.swift` | App filter UI (mode toggle + app list) |
-| `ImportExportService` | @MainActor service | `Services/ImportExportService.swift` | Export/import with Codable mapping |
+**Implementation:** Use the `syncExcluded` flag. These items still physically sync to CloudKit (unavoidable with single-store SwiftData), but:
+- The data footprint is small (no image binary data -- only metadata)
+- On receiving devices, items with `syncExcluded == true` are hidden from the panel and history
+- Users only see text-based synced items
 
-### Modified Components
+**Why not dual ModelConfiguration:** SwiftData requires different @Model types per configuration. Splitting ClipboardItem into SyncableClipboardItem and LocalClipboardItem would require duplicating the entire model, all views, all services. The complexity is not worth it for v1.5.
 
-| Component | File | Change | Lines |
-|-----------|------|--------|-------|
-| `ClipboardCardView` | `Views/Panel/ClipboardCardView.swift` | Context menu + .onDrag | ~50 lines |
-| `FilteredCardListView` | `Views/Panel/FilteredCardListView.swift` | Shift+Enter, Shift+double-click | ~15 lines |
-| `ClipboardMonitor` | `Services/ClipboardMonitor.swift` | App filter check in checkForChanges | ~10 lines |
-| `AppState` | `App/AppState.swift` | Wire AppFilterService + ImportExportService | ~10 lines |
-| `GeneralSettingsView` | `Views/Settings/GeneralSettingsView.swift` | Export/Import buttons | ~30 lines |
-| `SettingsView` | `Views/Settings/SettingsView.swift` | Add apps tab | ~5 lines |
-| `PanelController` | `Views/Panel/PanelController.swift` | Drag compat (if needed) | ~5 lines |
-
-### Unchanged Components
-
-| Component | Why Unchanged |
-|-----------|---------------|
-| `PasteService` | Already has full plain text support; no new paste logic |
-| `SlidingPanel` | Panel config already supports drag sessions |
-| `ImageStorageService` | Used as-is for import image saving |
-| `RetentionService` | No retention changes |
-| `ExpirationService` | Unrelated to v1.3 features |
-| All card subviews | No rendering changes |
-| `Label`, `LabelColor`, `ContentType` | No model changes |
-| `ChipBarView`, `SearchFieldView` | No interaction changes |
-| `HistoryBrowserView`, `HistoryGridView` | No changes (drag-and-drop is panel-only for v1.3) |
-| `EditItemView` | No changes |
+**Confidence: MEDIUM** -- The flag-based approach is pragmatic. A cleaner architecture would use dual stores, but the refactor cost is prohibitive.
 
 ---
 
-## Suggested Build Order
+## Schema Migration Strategy
 
-Based on dependency analysis, complexity, and risk:
+### Critical Rule: Add-Only After CloudKit Is Enabled
 
-### Phase 1: Paste-as-Plain-Text UI
+Once CloudKit sync is active in production:
+- **Cannot** rename entities or attributes (CloudKit sees rename as delete+create = data loss)
+- **Cannot** delete entities or attributes
+- **Cannot** change attribute types
+- **Can only** add new optional attributes with defaults
 
-**Why first:**
-- Zero dependencies on other v1.3 features
-- All infrastructure already exists (PasteService.pastePlainText)
-- Pure UI wiring task -- smallest scope, fastest to ship
-- Low risk -- proven patterns (modifier key checks)
-- Immediately useful
+### Implication for Build Order
 
-**Scope:** ~25 lines across 2 files
+**Ship the CloudKit-compatible model BEFORE enabling sync.** This means:
+1. Phase A: Migrate the data model to be CloudKit-compatible (remove unique, add defaults, make relationships optional, add sync fields) -- but keep CloudKit OFF
+2. Phase B: Enable CloudKit infrastructure -- now the schema is locked
 
-### Phase 2: App Allow/Ignore Lists
+If the model migration and CloudKit enablement happen in the same phase, any model bugs require painful CloudKit schema recreation.
 
-**Why second:**
-- Independent of other features
-- New service + settings view is moderate complexity
-- User-facing privacy feature that should land before import/export (users want to configure filtering before importing large histories)
-- Requires testing with real apps
+### Lightweight Migration
 
-**Scope:** ~200 lines across 4-5 files (2 new, 2-3 modified)
+All the changes needed (adding defaults, making relationships optional, adding new fields) are lightweight migrations that SwiftData handles automatically. No custom MigrationPlan is needed.
 
-### Phase 3: Import/Export
+**Confidence: HIGH** -- Well-documented constraint. Build order recommendation follows from the constraint.
 
-**Why third:**
-- Independent of other features but benefits from app filtering being done first (exported data respects user preferences)
-- Most complex new feature (Codable mapping, batch insert, image encoding)
-- Requires careful error handling and edge case testing
-- Benefits from the two simpler phases being done first to warm up
+---
 
-**Scope:** ~400 lines across 2-3 files (1 new service, 1-2 modified views)
+## Patterns to Follow
 
-### Phase 4: Drag-and-Drop from Panel
+### Pattern 1: Transaction Author Stamping
 
-**Why last:**
-- Has the most uncertainty (NSPanel + drag session interaction)
-- Potential gesture conflict with existing tap handlers
-- Requires manual testing that cannot be automated
-- If gesture conflicts arise, solutions may require refactoring gesture attachment points
-- Least critical of the four features (users have copy+paste as alternative)
+**What:** Set `transactionAuthor` on every ModelContext to distinguish local saves from CloudKit imports.
+**When:** In every service that writes to SwiftData (ClipboardMonitor, RetentionService, ImportExportService, DeduplicationService).
+**Why:** CloudKit imports have nil/empty author. This enables filtering remote-only changes.
 
-**Scope:** ~80 lines across 1-2 files, but higher testing overhead
+```swift
+modelContext.managedObjectContext?.transactionAuthor = "app"
+```
 
-### Parallel Build Opportunities
+### Pattern 2: Observe Remote Changes Specifically
 
-Phases 1 and 2 can be built in parallel -- they touch completely different files:
-- Phase 1: ClipboardCardView, FilteredCardListView
-- Phase 2: ClipboardMonitor, AppState, SettingsView, new AppFilterService + AppFilterSettingsView
+**What:** Use `.NSPersistentStoreRemoteChange` to react to CloudKit imports only.
+**When:** DeduplicationService -- should run after CloudKit import, not after every local save.
 
-Phase 3 (import/export) is independent and could theoretically parallel with Phase 2, but they both modify AppState and GeneralSettingsView, so sequential is safer.
+```swift
+NotificationCenter.default.addObserver(
+    forName: .NSPersistentStoreRemoteChange,
+    object: coordinator,
+    queue: .main
+) { _ in deduplicateItems() }
+```
 
-Phase 4 (drag-and-drop) modifies ClipboardCardView which Phase 1 also touches, so it must come after Phase 1.
+### Pattern 3: Device ID Stamping
 
-**Recommended order:** Phase 1 -> (Phase 2 can parallel) -> Phase 3 -> Phase 4
+**What:** Assign a stable per-device UUID to every ClipboardItem at creation time.
+**When:** In ClipboardMonitor when creating new items.
+**Why:** Enables "from MacBook Pro" UI badges, targeted retention, dedup awareness.
+
+### Pattern 4: Nil-Coalescing Relationship Access
+
+**What:** After making relationships optional, use convenience computed properties.
+**When:** Every `.labels` and `.items` access throughout the codebase.
+
+```swift
+extension ClipboardItem {
+    var safeLabels: [Label] { labels ?? [] }
+}
+extension Label {
+    var safeItems: [ClipboardItem] { items ?? [] }
+}
+```
+
+### Pattern 5: Launch-Time Sync Configuration
+
+**What:** Configure CloudKit at ModelContainer creation, not at runtime.
+**When:** In PastelApp.init, reading UserDefaults to decide cloudKitDatabase.
+**Why:** ModelContainer cannot be safely recreated at runtime.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Filtering in processPasteboardContent Instead of checkForChanges
+### Anti-Pattern 1: Building CKSyncEngine on Top of SwiftData
 
-**What:** Checking the app filter after content classification and before SwiftData insert.
-**Why bad:** Unnecessary work -- reads pasteboard data, classifies content type, computes hash, all to discard the result. For ignore-listed apps that copy frequently (e.g., a terminal with rapid clipboard changes), this wastes CPU cycles on every poll tick.
-**Instead:** Filter in `checkForChanges()` before entering `processPasteboardContent()`.
+**What:** Using CKSyncEngine or manual CKRecord management alongside SwiftData.
+**Why bad:** SwiftData already wraps NSPersistentCloudKitContainer. Two sync layers would conflict.
+**Instead:** Use SwiftData's built-in CloudKit sync exclusively.
 
-### Anti-Pattern 2: Using .draggable(String) for External Drag
+### Anti-Pattern 2: Keeping @Attribute(.unique)
 
-**What:** Using SwiftUI's `.draggable("text content")` for dragging to external apps.
-**Why bad:** `.draggable` with String only provides `UTType.plainText`. External apps that accept images, URLs, or rich text will not get the correct content type. No way to provide multiple representations.
-**Instead:** Use `.onDrag { NSItemProvider(...) }` with explicit type registration per content type.
+**What:** Leaving the unique constraint on contentHash and hoping CloudKit handles it.
+**Why bad:** CloudKit silently ignores unique constraints. You get duplicates with no errors, or worse, sync failures.
+**Instead:** Remove the constraint, implement application-level dedup.
 
-### Anti-Pattern 3: Storing Image Data in SwiftData for Export
+### Anti-Pattern 3: Runtime ModelContainer Recreation
 
-**What:** Loading image data into a SwiftData field (e.g., `imageExportData: Data?`) before export.
-**Why bad:** Bloats the database. Images are already on disk. Loading all images into memory for export can cause memory spikes.
-**Instead:** Read images from disk during export, Base64-encode them directly into the JSON, and write to file. Stream if possible.
+**What:** Destroying and recreating ModelContainer when user toggles sync.
+**Why bad:** Invalidates all @Query subscriptions, all ModelContext references. SwiftData was not designed for this.
+**Instead:** Configure at launch, require restart for sync toggle.
 
-### Anti-Pattern 4: SwiftUI .fileExporter for One-Shot Export
+### Anti-Pattern 4: Syncing Image Binary Data
 
-**What:** Using SwiftUI's `.fileExporter(isPresented:document:)` modifier.
-**Why bad:** Requires conforming to `FileDocument` protocol, which expects a read-write document lifecycle. Export is a one-shot operation -- there is no "document" to open and edit. The protocol machinery adds unnecessary complexity.
-**Instead:** Use NSSavePanel directly. The app is not sandboxed, so NSSavePanel works without security-scoped bookmarks.
+**What:** Attempting to sync images via CloudKit.
+**Why bad:** CKAsset is not directly supported by SwiftData's auto-sync. Image data bloats CloudKit storage (5GB free limit). File paths are device-local.
+**Instead:** Mark images as syncExcluded. Defer image sync to a future version.
 
-### Anti-Pattern 5: Re-Implementing Paste-as-Plain-Text Logic
+### Anti-Pattern 5: Syncing Concealed Items
 
-**What:** Creating new paste methods or duplicating pasteboard write logic for the context menu.
-**Why bad:** PasteService.pastePlainText already exists and is fully wired through AppState and PanelActions. Adding new code paths creates maintenance burden and potential for divergent behavior.
-**Instead:** Call the existing `panelActions.pastePlainTextItem?(item)` callback from the new context menu item. One line.
+**What:** Allowing password manager items (isConcealed) to sync.
+**Why bad:** Sensitive credentials should never leave the originating device.
+**Instead:** Mark concealed items as syncExcluded.
 
-### Anti-Pattern 6: Complex Drag State Tracking
+### Anti-Pattern 6: Complex Retention Coordination Across Devices
 
-**What:** Building an elaborate system to track drag session state (started, moved, ended, cancelled) to coordinate with PanelController.
-**Why bad:** Over-engineering. SwiftUI's `.onDrag` does not provide reliable lifecycle callbacks. NSPanel with `hidesOnDeactivate = false` already handles the common case.
-**Instead:** Accept that the panel stays visible during and after drag. Users dismiss it via Escape or hotkey toggle. If testing reveals the global click monitor hiding the panel during drag, add a simple flag -- but don't build the infrastructure until the problem is confirmed.
+**What:** Building a distributed consensus system for retention policies.
+**Why bad:** Over-engineering. CloudKit automatically propagates deletions.
+**Instead:** Each device applies its own retention. Deletions propagate naturally.
+
+---
+
+## Component Boundary Summary
+
+### New Components
+
+| Component | File | Type | Purpose |
+|-----------|------|------|---------|
+| `SyncMonitorService` | `Services/SyncMonitorService.swift` | @MainActor @Observable | Track sync status via NSPersistentCloudKitContainer events |
+| `DeduplicationService` | `Services/DeduplicationService.swift` | @MainActor | Remove duplicate items after CloudKit import |
+| `SyncSettingsView` | `Views/Settings/SyncSettingsView.swift` | SwiftUI View | Sync toggle, status display, account info |
+| `DeviceIdentifier` | `Utilities/DeviceIdentifier.swift` | Enum | Per-device UUID generation |
+
+### Modified Components
+
+| Component | File | Changes |
+|-----------|------|---------|
+| `ClipboardItem` | `Models/ClipboardItem.swift` | Remove @Attribute(.unique), add defaults, add originDeviceID/isSynced/syncExcluded |
+| `Label` | `Models/Label.swift` | Add defaults, make items optional |
+| `PastelApp` | `PastelApp.swift` | Conditional ModelConfiguration for CloudKit |
+| `ClipboardMonitor` | `Services/ClipboardMonitor.swift` | Set transactionAuthor, stamp deviceID, app-level dedup, mark syncExcluded |
+| `AppState` | `App/AppState.swift` | Wire SyncMonitorService and DeduplicationService |
+| `SettingsView` | `Views/Settings/SettingsView.swift` | Add Sync tab |
+| `Pastel.entitlements` | `Resources/Pastel.entitlements` | Add iCloud, CloudKit, KV store entitlements |
+| `project.yml` | Root | Add CloudKit.framework dependency |
+| **All views using .labels/.items** | Multiple | Change to .safeLabels/.safeItems |
+
+### Unchanged Components
+
+| Component | Why Unchanged |
+|-----------|---------------|
+| `PasteService` | Does not interact with sync layer |
+| `RetentionService` | Works correctly as-is (deletions propagate via CloudKit) |
+| `ImportExportService` | Already uses application-level dedup (hash Set) |
+| `ImageStorageService` | Images are local-only, not synced |
+| `ExpirationService` | Concealed items are local-only |
+| `PanelController`, `SlidingPanel` | UI infrastructure unchanged |
+| All card views | Rendering unchanged (except .safeLabels access) |
+
+---
+
+## Suggested Build Order
+
+### Phase A: CloudKit-Compatible Data Model (sync OFF)
+
+**Goal:** Get the data model CloudKit-ready without actually enabling sync.
+
+1. Remove `@Attribute(.unique)` from ClipboardItem.contentHash
+2. Add default values to all non-optional properties on both models
+3. Make `labels` and `items` relationships optional
+4. Add `safeLabels`/`safeItems` computed properties
+5. Update ALL call sites for optional relationship access (find-and-replace)
+6. Add `originDeviceID`, `isSynced`, `syncExcluded` fields with defaults
+7. Add application-level contentHash dedup in ClipboardMonitor (replace unique constraint behavior)
+8. Stamp `originDeviceID = DeviceIdentifier.current` and `syncExcluded` in ClipboardMonitor
+9. Verify everything works locally with zero sync
+
+**Rationale:** This is the highest-risk change -- it touches the data model and ripples through every file that accesses relationships. Do it first, test thoroughly, ship it before adding CloudKit complexity. If something breaks, the debugging surface is pure local SwiftData, not distributed sync.
+
+### Phase B: CloudKit Infrastructure
+
+**Goal:** Get CloudKit plumbing working. Basic sync between two Macs.
+
+1. Add iCloud + CloudKit entitlements to Pastel.entitlements
+2. Add CloudKit.framework to linked frameworks in project.yml
+3. Add NSUbiquitousKeyValueStore entitlement
+4. Conditional `ModelConfiguration` in PastelApp.init based on UserDefaults
+5. CloudKit schema initialization code (DEBUG only)
+6. Set `transactionAuthor = "app"` on ModelContext
+7. Build, run on two Macs with same Apple ID, verify items sync
+8. Verify CloudKit Dashboard shows correct schema
+
+**Rationale:** Pure infrastructure, no new UI. Gets the plumbing working and verifiable before building user-facing features.
+
+### Phase C: Sync Services and UI
+
+**Goal:** Dedup, monitoring, and settings UI.
+
+1. SyncMonitorService -- observe events, expose sync status
+2. DeduplicationService -- remote change handler, contentHash dedup
+3. SyncSettingsView -- toggle (with restart prompt), status, account info
+4. Add Sync tab to SettingsView
+5. Wire SyncMonitorService and DeduplicationService into AppState
+6. Sync status indicator in menu bar StatusPopoverView
+
+**Rationale:** Builds on working infrastructure. Each service is independently testable.
+
+### Phase D: Polish and Edge Cases
+
+**Goal:** Handle real-world scenarios.
+
+1. Handle offline -> online sync resume (verify automatic)
+2. Handle iCloud account sign-out mid-session
+3. First-sync with large existing history (performance testing)
+4. syncExcluded item handling on receiving devices (hide or placeholder)
+5. "From [device name]" badges on synced items (optional UI polish)
+6. NSUbiquitousKeyValueStore for syncing sync-related preferences
+7. Edge case testing across network conditions
+
+**Rationale:** Edge cases that only matter once core sync is working correctly.
+
+---
+
+## Scalability Considerations
+
+| Concern | At 1K items | At 10K items | At 100K items |
+|---------|------------|-------------|---------------|
+| Dedup scan time | Instant | ~100ms | ~500ms (consider batching) |
+| Initial sync (first enable) | Seconds | 1-2 minutes | 10+ minutes |
+| CloudKit storage | ~1MB (text only) | ~10MB | ~100MB (within 5GB free) |
+| @Query performance | No impact | No impact | No impact (local SQLite) |
+| Remote change batching | Individual | System batches | System batches |
+
+**Storage note:** CloudKit private database counts against the user's iCloud storage (shared 5GB free tier). Text-only clipboard items average ~1KB each. Even at 100K items, that is ~100MB -- well within typical iCloud quotas. Image sync would quickly approach limits, further justifying text-only sync.
 
 ---
 
 ## Sources
 
-- Direct source code analysis of all Pastel Swift files (HIGH confidence)
-- [Maccy clipboard manager -- app filtering implementation](https://github.com/p0deje/Maccy/blob/master/Maccy/Clipboard.swift) -- shouldIgnore pattern with allow/ignore mode toggle
-- [Maccy -- lightweight clipboard manager for macOS](https://github.com/p0deje/Maccy) -- reference for app filtering UX
-- [SwiftUI drag and drop on macOS](https://eclecticlight.co/2024/05/21/swiftui-on-macos-drag-and-drop-and-more/) -- DropDelegate and NSItemProvider patterns
-- [SwiftUI .onDrag conflicts with clicks on macOS](https://www.hackingwithswift.com/forums/swiftui/ondrag-conflicts-with-clicks-on-macos/8020) -- known gesture conflicts
-- [Drag and Drop in SwiftUI](https://swiftwithmajid.com/2020/04/01/drag-and-drop-in-swiftui/) -- NSItemProvider patterns
-- [SwiftUI Open and Save Panels](https://www.swiftdevjournal.com/swiftui-open-and-save-panels/) -- NSSavePanel/NSOpenPanel in SwiftUI apps
-- [SwiftData batch insert](https://www.hackingwithswift.com/quick-start/swiftdata/how-to-batch-insert-large-amounts-of-data-efficiently) -- batch import best practices
-- [SwiftData Codable conformance](https://www.hackingwithswift.com/quick-start/swiftdata/how-to-make-swiftdata-models-conform-to-codable) -- model serialization
-- [NSRunningApplication bundleIdentifier](https://developer.apple.com/documentation/appkit/nsrunningapplication/bundleidentifier) -- returns nil for apps without Info.plist
-- [NSPasteboard.org -- transient and concealed types](http://nspasteboard.org/) -- special pasteboard type conventions
+### HIGH Confidence
+- [Apple: Syncing model data across a person's devices](https://developer.apple.com/documentation/swiftdata/syncing-model-data-across-a-persons-devices)
+- [Hacking with Swift: How to sync SwiftData with iCloud](https://www.hackingwithswift.com/quick-start/swiftdata/how-to-sync-swiftdata-with-icloud)
+- [Hacking with Swift: How to stop SwiftData syncing](https://www.hackingwithswift.com/quick-start/swiftdata/how-to-stop-swiftdata-syncing-with-cloudkit)
+- [fatbobman: Rules for Adapting Data Models to CloudKit](https://fatbobman.com/en/snippet/rules-for-adapting-data-models-to-cloudkit/)
+- [fatbobman: Fix macOS SwiftData/CoreData Sync (CloudKit.framework)](https://fatbobman.com/en/snippet/fix-synchronization-issues-for-macos-apps-using-core-dataswiftdata/)
+- [fatbobman: initializeCloudKitSchema for SwiftData](https://fatbobman.com/en/snippet/resolving-incomplete-icloud-data-sync-in-ios-development-using-initializecloudkitschema/)
+- [fatbobman: Persistent History Tracking in SwiftData](https://fatbobman.com/en/posts/persistent-history-tracking-in-swiftdata/)
+- [fatbobman: Data Tracking and Notifications](https://fatbobman.com/en/posts/mastering-data-tracking-and-notifications-in-core-data-and-swiftdata/)
+- [Apple: NSPersistentCloudKitContainer](https://developer.apple.com/documentation/coredata/nspersistentcloudkitcontainer)
+- [Apple: Debugging NSPersistentCloudKitContainer (TN3164)](https://developer.apple.com/documentation/technotes/tn3164-debugging-the-synchronization-of-nspersistentcloudkitcontainer)
+- [Apple: NSMergePolicy (conflict resolution)](https://developer.apple.com/documentation/coredata/nsmergepolicy)
+
+### MEDIUM Confidence
+- [CloudKitSyncMonitor package](https://github.com/ggruen/CloudKitSyncMonitor) -- validates event monitoring approach
+- [fluffy.es: Toggle iCloud sync](https://fluffy.es/toggle-icloud-sync-nspersistentcloudkitcontainer/) -- Core Data toggle pattern
+- [Apple Forums: SwiftData CloudKit deduplication](https://developer.apple.com/forums/thread/745329)
+- [Apple Forums: Disable automatic iCloud sync](https://developer.apple.com/forums/thread/731375)
+- [Superwall: CKSyncEngine guide](https://superwall.com/blog/syncing-data-with-cloudkit-in-your-ios-app-using-cksyncengine-and-swift-and-swiftui/) -- confirms CKSyncEngine is NOT for SwiftData
+
+### LOW Confidence (needs validation during implementation)
+- `cloudKitDatabase: .none` reliability for preventing sync -- conflicting reports
+- SwiftData History API for processing remote changes -- limited real-world validation
+- `managedObjectContext?.transactionAuthor` access from SwiftData ModelContext -- works per guides, needs testing in Pastel's setup
