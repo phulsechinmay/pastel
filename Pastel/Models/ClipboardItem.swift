@@ -13,10 +13,10 @@ final class ClipboardItem {
     var rtfData: Data?
 
     /// Raw value of ContentType enum (stored as String for SwiftData predicate compatibility)
-    var contentType: String
+    var contentType: String = ContentType.text.rawValue
 
     /// When the clipboard item was captured
-    var timestamp: Date
+    var timestamp: Date = Date.now
 
     /// Bundle identifier of the source application
     var sourceAppBundleID: String?
@@ -25,13 +25,13 @@ final class ClipboardItem {
     var sourceAppName: String?
 
     /// Character count of text content
-    var characterCount: Int
+    var characterCount: Int = 0
 
     /// Byte count of the content
-    var byteCount: Int
+    var byteCount: Int = 0
 
     /// NSPasteboard changeCount at time of capture
-    var changeCount: Int
+    var changeCount: Int = 0
 
     /// Filename for stored image (UUID.png, NOT full path)
     var imagePath: String?
@@ -40,13 +40,18 @@ final class ClipboardItem {
     var thumbnailPath: String?
 
     /// Whether the item contains concealed/sensitive content
-    var isConcealed: Bool
+    var isConcealed: Bool = false
 
     /// Optional expiration date for auto-cleanup
     var expiresAt: Date?
 
     /// SHA256 hash of content for deduplication
-    @Attribute(.unique) var contentHash: String
+    var contentHash: String = ""
+
+    /// Per-device origin tracking for cross-device sync (Phase 19).
+    /// Stamped at capture time with DeviceIdentifier.current.
+    /// Empty string for items created before v1.5 or synced from other devices before stamping.
+    var originDeviceID: String = ""
 
     /// Optional label for organization/filtering
     // DEPRECATED: Kept for migration. Remove in v1.3+.
@@ -57,9 +62,15 @@ final class ClipboardItem {
     var title: String?
 
     /// Multiple labels for organization/filtering (many-to-many).
-    /// New in Phase 11. SwiftData auto-initializes to empty array.
+    /// New in Phase 11. Optional for CloudKit compatibility (Phase 19).
     @Relationship(deleteRule: .nullify, inverse: \Label.items)
-    var labels: [Label]
+    var labels: [Label]?
+
+    /// Nil-safe access to labels array. Use this everywhere instead of `labels` directly.
+    var safeLabels: [Label] {
+        get { labels ?? [] }
+        set { labels = newValue }
+    }
 
     /// Detected programming language (e.g., "swift", "python"). Nil = not code.
     /// Populated by CodeDetectionService in Phase 7.
@@ -129,5 +140,6 @@ final class ClipboardItem {
         self.contentHash = contentHash
         self.title = nil
         self.labels = []
+        self.originDeviceID = DeviceIdentifier.current
     }
 }
