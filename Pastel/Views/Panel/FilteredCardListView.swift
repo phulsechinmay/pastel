@@ -117,50 +117,9 @@ struct FilteredCardListView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: 8) {
                             ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                                let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
-                                ClipboardCardView(
-                                    item: item,
-                                    isSelected: selectedIndex == index,
-                                    allLabels: allLabels,
-                                    badgePosition: badge,
-                                    isDropTarget: dropTargetIndex == index,
-                                    isShiftHeld: isShiftHeld
-                                )
-                                .frame(width: 260, height: 195)
-                                .clipped()
-                                .onDrag {
-                                    onDragStarted?()
-                                    return DragItemProviderService.createItemProvider(for: item)
-                                }
-                                .onTapGesture(count: 2) {
-                                    if NSEvent.modifierFlags.contains(.shift) {
-                                        onPastePlainText(item)
-                                    } else {
-                                        onPaste(item)
-                                    }
-                                }
-                                .onTapGesture(count: 1) {
-                                    selectedIndex = index
-                                }
-                                .dropDestination(for: String.self) { strings, _ in
-                                    guard let encodedID = strings.first,
-                                          let labelID = PersistentIdentifier.fromTransferString(encodedID),
-                                          let label = try? modelContext.model(for: labelID) as? Label else {
-                                        return false
-                                    }
-                                    // Append label if not already assigned
-                                    guard !item.labels.contains(where: {
-                                        $0.persistentModelID == label.persistentModelID
-                                    }) else { return true }
-                                    item.labels.append(label)
-                                    saveWithLogging(modelContext, operation: "label drop assignment")
-                                    return true
-                                } isTargeted: { targeted in
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        dropTargetIndex = targeted ? index : nil
-                                    }
-                                }
-                                .id(index)
+                                cardView(for: item, at: index)
+                                    .frame(width: 260, height: 195)
+                                    .clipped()
                             }
                         }
                     }
@@ -179,48 +138,7 @@ struct FilteredCardListView: View {
                     ScrollView {
                         LazyVStack(spacing: 8) {
                             ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                                let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
-                                ClipboardCardView(
-                                    item: item,
-                                    isSelected: selectedIndex == index,
-                                    allLabels: allLabels,
-                                    badgePosition: badge,
-                                    isDropTarget: dropTargetIndex == index,
-                                    isShiftHeld: isShiftHeld
-                                )
-                                .onDrag {
-                                    onDragStarted?()
-                                    return DragItemProviderService.createItemProvider(for: item)
-                                }
-                                .onTapGesture(count: 2) {
-                                    if NSEvent.modifierFlags.contains(.shift) {
-                                        onPastePlainText(item)
-                                    } else {
-                                        onPaste(item)
-                                    }
-                                }
-                                .onTapGesture(count: 1) {
-                                    selectedIndex = index
-                                }
-                                .dropDestination(for: String.self) { strings, _ in
-                                    guard let encodedID = strings.first,
-                                          let labelID = PersistentIdentifier.fromTransferString(encodedID),
-                                          let label = try? modelContext.model(for: labelID) as? Label else {
-                                        return false
-                                    }
-                                    // Append label if not already assigned
-                                    guard !item.labels.contains(where: {
-                                        $0.persistentModelID == label.persistentModelID
-                                    }) else { return true }
-                                    item.labels.append(label)
-                                    saveWithLogging(modelContext, operation: "label drop assignment")
-                                    return true
-                                } isTargeted: { targeted in
-                                    withAnimation(.easeInOut(duration: 0.15)) {
-                                        dropTargetIndex = targeted ? index : nil
-                                    }
-                                }
-                                .id(index)
+                                cardView(for: item, at: index)
                             }
                         }
                     }
@@ -306,6 +224,54 @@ struct FilteredCardListView: View {
     }
 
     // MARK: - Private Helpers
+
+    /// Shared card rendering used by both horizontal and vertical layouts.
+    /// Horizontal-specific `.frame()` and `.clipped()` are applied by the caller.
+    @ViewBuilder
+    private func cardView(for item: ClipboardItem, at index: Int) -> some View {
+        let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
+        ClipboardCardView(
+            item: item,
+            isSelected: selectedIndex == index,
+            allLabels: allLabels,
+            badgePosition: badge,
+            isDropTarget: dropTargetIndex == index,
+            isShiftHeld: isShiftHeld
+        )
+        .onDrag {
+            onDragStarted?()
+            return DragItemProviderService.createItemProvider(for: item)
+        }
+        .onTapGesture(count: 2) {
+            if NSEvent.modifierFlags.contains(.shift) {
+                onPastePlainText(item)
+            } else {
+                onPaste(item)
+            }
+        }
+        .onTapGesture(count: 1) {
+            selectedIndex = index
+        }
+        .dropDestination(for: String.self) { strings, _ in
+            guard let encodedID = strings.first,
+                  let labelID = PersistentIdentifier.fromTransferString(encodedID),
+                  let label = try? modelContext.model(for: labelID) as? Label else {
+                return false
+            }
+            // Append label if not already assigned
+            guard !item.labels.contains(where: {
+                $0.persistentModelID == label.persistentModelID
+            }) else { return true }
+            item.labels.append(label)
+            saveWithLogging(modelContext, operation: "label drop assignment")
+            return true
+        } isTargeted: { targeted in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                dropTargetIndex = targeted ? index : nil
+            }
+        }
+        .id(index)
+    }
 
     /// Install NSEvent local monitor for arrow key handling.
     /// NSEvent monitors operate at the AppKit level and are immune to SwiftUI re-render
