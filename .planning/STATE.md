@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** v1.5 iCloud Sync -- Phase 20 Plan 01 complete, Plan 02 next
+**Current focus:** v1.5 iCloud Sync -- Phase 20 complete (Plan 02 checkpoint pending human verification)
 
 ## Current Position
 
 Phase: 20 of 21 (CloudKit Infrastructure and Sync Engine)
-Plan: 1 of 2 complete
-Status: Executing
-Last activity: 2026-02-14 -- Completed 20-01 (CloudKit entitlements, framework, conditional ModelContainer)
+Plan: 2 of 2 complete (Task 2 checkpoint:human-verify PENDING)
+Status: Checkpoint pending
+Last activity: 2026-02-14 -- Completed 20-02 Task 1 (sync-aware display filtering in panel and history views)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -69,6 +69,11 @@ Key decisions from Phase 20 (CloudKit Infrastructure):
 - [20-01]: cloudKitDatabase: .private (not .automatic) for explicit container identifier control
 - [20-01]: CloudKit schema init uses NSPersistentCloudKitContainer directly (CoreData API, not SwiftData)
 
+Key decisions from Phase 20 Plan 02 (Sync Display Filtering):
+
+- [20-02]: In-memory sync filtering (not #Predicate) -- avoids Swift type-checker timeout when combining search + sync conditions
+- [20-02]: filteredItems applies concealed exclusion + remote image/file exclusion before label filtering
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -106,5 +111,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed 20-01-PLAN.md (CloudKit entitlements, framework, conditional ModelContainer)
+Stopped at: Completed 20-02-PLAN.md Task 1 (sync-aware display filtering). Task 2 checkpoint:human-verify PENDING.
 Resume file: None
