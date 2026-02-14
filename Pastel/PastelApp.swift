@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import CloudKit
+import CoreData
 
 @main
 struct PastelApp: App {
@@ -7,10 +9,61 @@ struct PastelApp: App {
     @State private var appState: AppState
 
     init() {
-        // Create the model container eagerly so we can pass its context to AppState
+        // DEBUG-only: Push SwiftData schema to CloudKit Development environment
+        // Run once after model changes by adding -initializeCloudKitSchema to launch arguments
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-initializeCloudKitSchema") {
+            do {
+                try autoreleasepool {
+                    let schemaConfig = ModelConfiguration()
+                    let desc = NSPersistentStoreDescription(url: schemaConfig.url)
+                    let opts = NSPersistentCloudKitContainerOptions(
+                        containerIdentifier: "iCloud.app.pastel.Pastel"
+                    )
+                    desc.cloudKitContainerOptions = opts
+                    desc.shouldAddStoreAsynchronously = false
+                    if let mom = NSManagedObjectModel.makeManagedObjectModel(
+                        for: [ClipboardItem.self, Label.self]
+                    ) {
+                        let ckContainer = NSPersistentCloudKitContainer(
+                            name: "Pastel", managedObjectModel: mom
+                        )
+                        ckContainer.persistentStoreDescriptions = [desc]
+                        ckContainer.loadPersistentStores { _, err in
+                            if let err { fatalError("Schema init error: \(err)") }
+                        }
+                        try ckContainer.initializeCloudKitSchema()
+                        if let store = ckContainer.persistentStoreCoordinator.persistentStores.first {
+                            try ckContainer.persistentStoreCoordinator.remove(store)
+                        }
+                    }
+                }
+            } catch {
+                print("CloudKit schema initialization failed: \(error)")
+            }
+        }
+        #endif
+
+        // Create the model container with conditional CloudKit sync
+        let syncEnabled = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
+
+        let config: ModelConfiguration
+        if syncEnabled {
+            config = ModelConfiguration(
+                cloudKitDatabase: .private("iCloud.app.pastel.Pastel")
+            )
+        } else {
+            config = ModelConfiguration(
+                cloudKitDatabase: .none
+            )
+        }
+
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: ClipboardItem.self, Label.self)
+            container = try ModelContainer(
+                for: ClipboardItem.self, Label.self,
+                configurations: config
+            )
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
