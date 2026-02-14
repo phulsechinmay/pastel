@@ -49,6 +49,11 @@ struct HistoryGridView: View {
         self.onRequestBulkDelete = onRequestBulkDelete
         self.onPastePlainText = onPastePlainText
 
+        // Text-only predicate. Label filtering AND sync filtering are done in-memory
+        // via filteredItems because:
+        // 1. #Predicate cannot use .contains() on to-many relationships (labels)
+        // 2. Combining search + sync conditions in a single #Predicate causes
+        //    Swift type-checker timeout ("unable to type-check this expression")
         let predicate: Predicate<ClipboardItem>
         if !searchText.isEmpty {
             let search = searchText
@@ -66,11 +71,28 @@ struct HistoryGridView: View {
         _items = Query(filter: predicate, sort: \ClipboardItem.timestamp, order: .reverse)
     }
 
-    /// Items filtered by selected labels (in-memory, OR logic).
-    /// If no labels selected, returns all items from @Query.
+    /// Items filtered by sync rules and selected labels (in-memory).
+    ///
+    /// Sync filtering (applied first):
+    /// - Concealed items excluded (passwords never appear in browseable history)
+    /// - Remote image/file items excluded (no displayable content on receiving device)
+    /// - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
+    ///
+    /// Label filtering (applied second, OR logic):
+    /// If no labels selected, returns all sync-filtered items.
     private var filteredItems: [ClipboardItem] {
-        guard !selectedLabelIDs.isEmpty else { return items }
-        return items.filter { item in
+        let localDeviceID = DeviceIdentifier.current
+        let syncFiltered = items.filter { item in
+            // Exclude concealed items (passwords should never appear in browseable history)
+            guard !item.isConcealed else { return false }
+            // Allow local items and pre-v1.5 legacy items (empty originDeviceID)
+            let isLocal = item.originDeviceID == localDeviceID || item.originDeviceID.isEmpty
+            if isLocal { return true }
+            // Remote items: allow only if NOT image/file (those have no displayable content)
+            return item.type != .image && item.type != .file
+        }
+        guard !selectedLabelIDs.isEmpty else { return syncFiltered }
+        return syncFiltered.filter { item in
             item.safeLabels.contains { label in
                 selectedLabelIDs.contains(label.persistentModelID)
             }
