@@ -316,8 +316,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 19-01-PLAN.md -- CloudKit-compatible model changes (remove @Attribute(.unique), add defaults, optional relationships, safeLabels/safeItems, originDeviceID field, DeviceIdentifier utility)
-- [ ] 19-02-PLAN.md -- Application-level hash dedup in ClipboardMonitor, originDeviceID stamping, .labels -> .safeLabels across all 22 call sites in 8 files
+- [x] 19-01-PLAN.md -- CloudKit-compatible model changes (remove @Attribute(.unique), add defaults, optional relationships, safeLabels/safeItems, originDeviceID field, DeviceIdentifier utility)
+- [x] 19-02-PLAN.md -- Application-level hash dedup in ClipboardMonitor, originDeviceID stamping, .labels -> .safeLabels across all 22 call sites in 8 files
 
 ### Phase 20: CloudKit Infrastructure and Sync Engine
 **Goal**: Clipboard items (text, URL, code, color) and labels sync automatically between Macs logged into the same Apple ID, with concealed and image items excluded from sync
@@ -369,6 +369,6 @@ Phases execute in numeric order: 19 -> 20 -> 21
 | 16. Drag-and-Drop from Panel | v1.3 | 2/2 | Complete | 2026-02-09 |
 | 17. Liquid Glass Panel Fix | v1.4 | 0/2 | Deferred | - |
 | 18. Codebase Audit -- Anti-patterns, Performance, and Security | v1.4 | 3/3 | Complete | 2026-02-13 |
-| 19. CloudKit-Compatible Data Model | v1.5 | 0/2 | Not started | - |
+| 19. CloudKit-Compatible Data Model | v1.5 | 2/2 | Complete | 2026-02-14 |
 | 20. CloudKit Infrastructure and Sync Engine | v1.5 | 0/2 | Not started | - |
 | 21. Sync Controls, Deduplication, and Status | v1.5 | 0/2 | Not started | - |
