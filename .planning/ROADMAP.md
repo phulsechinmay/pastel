@@ -313,7 +313,11 @@ Plans:
   3. User copies any item and it has an originDeviceID stamped (visible in debug or verifiable via export)
   4. All relationship access throughout the app uses nil-safe patterns (no crashes when labels or items arrays are nil)
   5. App runs identically to v1.4 from the user's perspective -- no behavioral changes, no sync, purely internal model preparation
-**Plans**: 2 plans (estimate)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 19-01-PLAN.md -- CloudKit-compatible model changes (remove @Attribute(.unique), add defaults, optional relationships, safeLabels/safeItems, originDeviceID field, DeviceIdentifier utility)
+- [ ] 19-02-PLAN.md -- Application-level hash dedup in ClipboardMonitor, originDeviceID stamping, .labels -> .safeLabels across all 22 call sites in 8 files
 
 ### Phase 20: CloudKit Infrastructure and Sync Engine
 **Goal**: Clipboard items (text, URL, code, color) and labels sync automatically between Macs logged into the same Apple ID, with concealed and image items excluded from sync
