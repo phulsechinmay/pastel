@@ -146,6 +146,36 @@ Requirements for v1.3 milestone: Power User Features.
 - [x] **DRAG-04**: Panel remains visible during drag session (does not dismiss on drag)
 - [x] **DRAG-05**: Drag session does not trigger clipboard monitor self-capture
 
+## v1.5 Requirements
+
+Requirements for v1.5 milestone: iCloud Sync (minimal core).
+
+### CloudKit-Compatible Data Model
+
+- [ ] **SYNC-01**: Data model is CloudKit-compatible (no unique constraints, all properties have defaults, relationships optional)
+- [ ] **SYNC-02**: Application-level content hash deduplication replaces @Attribute(.unique) constraint
+- [ ] **SYNC-03**: ClipboardItem has originDeviceID field stamped at capture time (per-device UUID from UserDefaults)
+- [ ] **SYNC-04**: Existing local data migrates cleanly to CloudKit-compatible schema without data loss
+
+### iCloud Sync Infrastructure
+
+- [ ] **SYNC-05**: App has iCloud + CloudKit + Push Notifications entitlements and CloudKit.framework linked
+- [ ] **SYNC-06**: ModelContainer configured with cloudKitDatabase: .automatic when sync enabled, .none when disabled
+- [ ] **SYNC-07**: Clipboard items (text, URL, code, color) sync across Macs logged into the same Apple ID
+- [ ] **SYNC-08**: Labels sync across devices with relationships preserved
+
+### Sync Controls
+
+- [ ] **SYNC-09**: Settings has sync on/off toggle (off by default) with app restart prompt
+- [ ] **SYNC-10**: Concealed items (isConcealed = true) are never synced to iCloud
+- [ ] **SYNC-11**: Image and file items are excluded from sync (text-only sync for v1.5)
+
+### Sync Reliability
+
+- [ ] **SYNC-12**: Cross-device duplicate items are detected and merged by contentHash (keep earliest, merge labels)
+- [ ] **SYNC-13**: Lightweight sync monitor observes NSPersistentCloudKitContainer events and exposes sync state
+- [ ] **SYNC-14**: Sync status indicator in Settings shows current state (synced/syncing/error/offline/disabled)
+
 ## Future Requirements
 
 Deferred to future releases. Tracked but not in current roadmap.
@@ -170,23 +200,35 @@ Deferred to future releases. Tracked but not in current roadmap.
 - **DATA-11**: Import from other clipboard manager formats (Maccy, Paste 2, CopyClip)
 - **DATA-12**: Export includes images (directory bundle format)
 
+### iCloud Sync Enhancements
+
+- **SYNC-20**: Sync status badge in panel header (not just Settings)
+- **SYNC-21**: Separate local/cloud retention limits
+- **SYNC-22**: Device attribution ("Copied on MacBook Pro") shown on synced items
+- **SYNC-23**: Content type filtering for sync (choose what types sync)
+- **SYNC-24**: Per-item sync exclusion via context menu
+- **SYNC-25**: First-sync progress indicator
+- **SYNC-26**: Image sync support
+
 ## Out of Scope
 
 Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| iCloud sync | Massive complexity, server costs, privacy concerns. Universal Clipboard covers basic cross-device needs |
-| iOS companion app | macOS only for v1. Entirely different platform |
+| Image sync (v1.5) | Images are 10-1000x larger than text. Deferred to future version to avoid iCloud quota issues |
+| iOS companion app | macOS only. Entirely different platform |
 | Snippet templates / text expansion | Different product category (TextExpander, Typinator). Dilutes focus |
 | Browser extension integration | NSPasteboard already captures browser copies. No extension needed |
 | AI-powered features | Adds latency, cost, complexity. Tangential to core clipboard value |
-| Real-time collaboration / shared clipboard | Networking, auth, conflict resolution. Different product category |
-| Plugin/extension system | Massive API surface. Premature for v1 |
+| Real-time collaboration / shared clipboard | Requires CloudKit Sharing, access control, invitation flows. Different product category |
+| Plugin/extension system | Massive API surface. Premature |
 | Clipboard rules / automation | Rules engines are complex. Users who want this use Keyboard Maestro |
 | Multi-window / detachable panels | Window management complexity multiplies. Single configurable panel |
-| Encrypted clipboard history | Degrades search performance, false sense of security. Offer clear history instead |
+| E2E encryption beyond iCloud | Prevents server-side querying/sorting. iCloud encrypts at rest and in transit |
 | Custom theming / light mode | Always-dark is a feature. Ship one polished theme |
+| Cross-Apple-ID sync | Requires custom server infrastructure. Same Apple ID only |
+| Custom conflict resolution UI | Clipboard items are immutable. Last-writer-wins is sufficient for metadata |
 
 ## Traceability
 
@@ -294,6 +336,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Mapped to phases: 22
 - Unmapped: 0
 
+**v1.5 Coverage:**
+- v1.5 requirements: 14 total
+- Mapped to phases: 0
+- Unmapped: 14 (pending roadmap creation)
+
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-09 after v1.3 roadmap creation*
+*Last updated: 2026-02-14 after v1.5 requirements creation*
