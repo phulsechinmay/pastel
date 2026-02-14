@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** v1.5 iCloud Sync -- Phase 19 complete, Phase 20 ready to plan
+**Current focus:** v1.5 iCloud Sync -- Phase 20 Plan 01 complete, Plan 02 next
 
 ## Current Position
 
 Phase: 20 of 21 (CloudKit Infrastructure and Sync Engine)
-Plan: --
-Status: Ready to plan
-Last activity: 2026-02-14 -- Phase 19 verified and complete (CloudKit-compatible data model)
+Plan: 1 of 2 complete
+Status: Executing
+Last activity: 2026-02-14 -- Completed 20-01 (CloudKit entitlements, framework, conditional ModelContainer)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -63,6 +63,12 @@ Key decisions from Phase 19 (CloudKit-Compatible Data Model):
 - [19-02]: Keep both dedup methods: isDuplicateOfMostRecent (fast O(1)) + isDuplicateByHash (thorough)
 - [19-02]: Defensive originDeviceID stamping after insert (redundant with init for future-proofing)
 
+Key decisions from Phase 20 (CloudKit Infrastructure):
+
+- [20-01]: Use xcodegen `sdk` (not `framework`) dependency type for system frameworks -- correct SDKROOT sourceTree
+- [20-01]: cloudKitDatabase: .private (not .automatic) for explicit container identifier control
+- [20-01]: CloudKit schema init uses NSPersistentCloudKitContainer directly (CoreData API, not SwiftData)
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -75,7 +81,7 @@ Key architecture decisions for v1.5 (from research):
 
 - Phase 19: @Attribute(.unique) MUST be removed BEFORE enabling CloudKit (app crash otherwise)
 - Phase 19: Schema is permanent once deployed to CloudKit production -- finalize model FIRST
-- Phase 20: CloudKit.framework must be explicitly linked for macOS release builds (silent failure otherwise)
+- Phase 20: CloudKit.framework must be explicitly linked for macOS release builds (RESOLVED in 20-01: linked via sdk dependency)
 - Phase 20: cloudKitDatabase: .none reliability needs validation (conflicting reports)
 - Phase 20: managedObjectContext?.transactionAuthor access from SwiftData needs testing
 
@@ -100,5 +106,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Phase 19 verified and complete. Phase 20 ready to plan.
+Stopped at: Completed 20-01-PLAN.md (CloudKit entitlements, framework, conditional ModelContainer)
 Resume file: None
