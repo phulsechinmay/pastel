@@ -53,10 +53,6 @@ final class ClipboardItem {
     /// Empty string for items created before v1.5 or synced from other devices before stamping.
     var originDeviceID: String = ""
 
-    /// Optional label for organization/filtering
-    // DEPRECATED: Kept for migration. Remove in v1.3+.
-    var label: Label?
-
     /// User-assigned title for easier discovery via search.
     /// Nil means no title was set. Displayed in card header when present.
     var title: String?

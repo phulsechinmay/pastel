@@ -74,7 +74,6 @@ struct PastelApp: App {
         state.setup(modelContext: container.mainContext)
         state.setupPanel(modelContainer: container)
         state.modelContainer = container
-        MigrationService.migrateLabelsIfNeeded(modelContext: container.mainContext)
         state.handleFirstLaunch()
 
         // // Auto-open panel on startup for development (commented out for glass testing)
