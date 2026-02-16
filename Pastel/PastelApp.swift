@@ -7,6 +7,8 @@ import CoreData
 struct PastelApp: App {
     let modelContainer: ModelContainer
     @State private var appState: AppState
+    @State private var syncMonitor: SyncMonitor?
+    @State private var deduplicationService: DeduplicationService?
 
     init() {
         // DEBUG-only: Push SwiftData schema to CloudKit Development environment
@@ -84,12 +86,24 @@ struct PastelApp: App {
         // }
 
         self._appState = State(initialValue: state)
+
+        // Initialize sync services when iCloud sync is enabled
+        if syncEnabled {
+            let monitor = SyncMonitor()
+            monitor.startMonitoring()
+            self._syncMonitor = State(initialValue: monitor)
+
+            let dedup = DeduplicationService(modelContext: container.mainContext)
+            dedup.startMonitoring()
+            self._deduplicationService = State(initialValue: dedup)
+        }
     }
 
     var body: some Scene {
         MenuBarExtra {
             StatusPopoverView()
                 .environment(appState)
+                .environment(syncMonitor)
                 .modelContainer(modelContainer)
                 .frame(width: 260)
         } label: {
