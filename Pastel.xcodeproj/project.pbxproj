@@ -25,8 +25,10 @@
 		3AED169433F86C8E70EB00B7 /* ImportExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C57B64B0B047D80C2F7D4B3 /* ImportExportService.swift */; };
 		3E3278B3308A5ABB2B39E74B /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */; };
 		42B445F9B53C9938B8C7661C /* HistoryBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */; };
+		445924843227BBEFB0577AC3 /* AppRelaunchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2DBAFFC0300717000685459 /* AppRelaunchService.swift */; };
 		4A72AB5E7A1E848B071EFD98 /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = B33BB73FF430F4D698304521 /* LaunchAtLogin */; };
 		4DA18147B096FCF7C2973416 /* ChipBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EE7734FD97FDE51DA389F0 /* ChipBarView.swift */; };
+		4DED4706DEA246882DE6D749 /* DeduplicationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB102C1DD1C2714F0204D4E7 /* DeduplicationService.swift */; };
 		56831EBF806DA04E646ED2E7 /* LabelChipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E12D1FF5C4B00F62F48B0F4 /* LabelChipView.swift */; };
 		5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C93A57CFC2C8E44180B970A /* PastelApp.swift */; };
 		6102E3A79BDED41747B1CA1B /* CodeDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72D7644ACF10CD4DC890BE9E /* CodeDetectionService.swift */; };
@@ -35,6 +37,7 @@
 		69779D6C716BFFD410BA8F34 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E8102D1B1A6E4F5BCCF0A6 /* OnboardingWindowController.swift */; };
 		6AF5D219C387B0CA3EF35ED8 /* ImageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F339BF74219A6B2629B2C42 /* ImageCardView.swift */; };
 		77A34F0C407E0CDC0D03AD39 /* PasteBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D583EE522FF0443CE93DFE6 /* PasteBehavior.swift */; };
+		7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA88123A30157392A4055111 /* SyncMonitor.swift */; };
 		8557CEFECB6460592724EA0E /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6234E0274B828B16C2A57EA /* NSImage+Thumbnail.swift */; };
 		8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E931197AB3A47AD6193B9FF1 /* URLCardView.swift */; };
 		9568A5C18B45B7183E87ABE3 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */; };
@@ -132,12 +135,15 @@
 		D83722A01CB31BC92398C942 /* SlidingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidingPanel.swift; sourceTree = "<group>"; };
 		D9D50320FC5B6099D7C6B668 /* AsyncThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncThumbnailView.swift; sourceTree = "<group>"; };
 		DACD70AAF6888EBA275AC2BE /* Pastel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pastel.entitlements; sourceTree = "<group>"; };
+		DB102C1DD1C2714F0204D4E7 /* DeduplicationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeduplicationService.swift; sourceTree = "<group>"; };
+		E2DBAFFC0300717000685459 /* AppRelaunchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRelaunchService.swift; sourceTree = "<group>"; };
 		E4BADC66322076CEB1E831B5 /* SearchFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchFieldView.swift; sourceTree = "<group>"; };
 		E7628FEB0B879CD6BCCD59F6 /* TextCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCardView.swift; sourceTree = "<group>"; };
 		E7A89B1626914331B041874D /* PanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelController.swift; sourceTree = "<group>"; };
 		E931197AB3A47AD6193B9FF1 /* URLCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLCardView.swift; sourceTree = "<group>"; };
 		F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		F774B6CD032B1A682BACC9D7 /* ColorCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorCardView.swift; sourceTree = "<group>"; };
+		FA88123A30157392A4055111 /* SyncMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -196,6 +202,7 @@
 		4ED4A4C459972C653663222F /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				E2DBAFFC0300717000685459 /* AppRelaunchService.swift */,
 				A34B531FE14E94C513D7A73D /* DeviceIdentifier.swift */,
 			);
 			path = Utilities;
@@ -247,6 +254,7 @@
 				03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */,
 				72D7644ACF10CD4DC890BE9E /* CodeDetectionService.swift */,
 				2337ECFAF234829DF1605685 /* ColorDetectionService.swift */,
+				DB102C1DD1C2714F0204D4E7 /* DeduplicationService.swift */,
 				311A67E5A6FA0C55F53F34D2 /* DragItemProviderService.swift */,
 				5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */,
 				C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */,
@@ -254,6 +262,7 @@
 				4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */,
 				ADA2DA3D25FB59CE37228411 /* RetentionService.swift */,
 				B8EDC77C4CCB143B62248B29 /* SwiftDataHelpers.swift */,
+				FA88123A30157392A4055111 /* SyncMonitor.swift */,
 				7581ECF910A056323D87F4D2 /* URLMetadataService.swift */,
 			);
 			path = Services;
@@ -423,6 +432,7 @@
 				D79B822885FE78D1B40A7A79 /* AppDiscoveryService.swift in Sources */,
 				DA56D7DCAB8FE7ABF5DFD32E /* AppIconColorService.swift in Sources */,
 				122737920FB08FD4C003C5FC /* AppPickerView.swift in Sources */,
+				445924843227BBEFB0577AC3 /* AppRelaunchService.swift in Sources */,
 				D784DF24180305D270E7DDED /* AppState.swift in Sources */,
 				1FF817C58BBCAC1F6A6DA2DD /* AsyncThumbnailView.swift in Sources */,
 				4DA18147B096FCF7C2973416 /* ChipBarView.swift in Sources */,
@@ -434,6 +444,7 @@
 				06AA48B5B881CDC6751CA40B /* ColorCardView.swift in Sources */,
 				A12FDC50F1FD62206602CF49 /* ColorDetectionService.swift in Sources */,
 				B0CFC974AD1AC32A0A15644C /* ContentType.swift in Sources */,
+				4DED4706DEA246882DE6D749 /* DeduplicationService.swift in Sources */,
 				311D38AA5AD215646217479E /* DeviceIdentifier.swift in Sources */,
 				0705E8D7C6E0B9DFD944D17A /* DragItemProviderService.swift in Sources */,
 				3442E2E6EDB5B2E9A747C631 /* EditItemView.swift in Sources */,
@@ -473,6 +484,7 @@
 				61787566D6E9AF8D7887C7A4 /* SlidingPanel.swift in Sources */,
 				61FC3644E015576CBEB288A7 /* StatusPopoverView.swift in Sources */,
 				9A7F0AD153503A571F77A96A /* SwiftDataHelpers.swift in Sources */,
+				7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */,
 				3ADFAC504957D459F381AFB2 /* TextCardView.swift in Sources */,
 				8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */,
 				B140415A01B99DBECC39C8AF /* URLMetadataService.swift in Sources */,
