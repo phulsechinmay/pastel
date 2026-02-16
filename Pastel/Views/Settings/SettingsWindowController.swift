@@ -20,7 +20,7 @@ final class SettingsWindowController {
     ///   - modelContainer: The SwiftData model container so settings views
     ///     can access the database (e.g., for label management in Plan 02).
     ///   - appState: The app state so settings can trigger panel edge changes.
-    func showSettings(modelContainer: ModelContainer, appState: AppState) {
+    func showSettings(modelContainer: ModelContainer, appState: AppState, syncMonitor: SyncMonitor? = nil) {
         // If already visible, just bring to front
         if let window, window.isVisible {
             window.makeKeyAndOrderFront(nil)
@@ -32,6 +32,7 @@ final class SettingsWindowController {
             .preferredColorScheme(.dark)
             .modelContainer(modelContainer)
             .environment(appState)
+            .environment(syncMonitor)
 
         let hostingView = NSHostingView(rootView: settingsView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false

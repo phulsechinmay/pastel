@@ -44,6 +44,7 @@
 		97E8C96C50161A63AB0B871C /* PanelContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FEF0FE3AC5B3076726EAEB /* PanelContentView.swift */; };
 		9860CE67423A7F0C7A769D5B /* SearchFieldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4BADC66322076CEB1E831B5 /* SearchFieldView.swift */; };
 		9A7F0AD153503A571F77A96A /* SwiftDataHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8EDC77C4CCB143B62248B29 /* SwiftDataHelpers.swift */; };
+		9D191D480AC6C916F6BC879B /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463ED392A0FDA4E2FF91B1AA /* SyncSettingsView.swift */; };
 		A12FDC50F1FD62206602CF49 /* ColorDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2337ECFAF234829DF1605685 /* ColorDetectionService.swift */; };
 		A84BDBA4EE2E5EE99EEFDE1B /* ClipboardCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30EA2DC6C129FA8392D0E5CA /* ClipboardCardView.swift */; };
 		AA8186ED908A34E8F7C469E3 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00D664297F1ED550FBA3FC3E /* PrivacySettingsView.swift */; };
@@ -98,6 +99,7 @@
 		3E5CCEAC25DB293F9A16462A /* FilteredCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilteredCardListView.swift; sourceTree = "<group>"; };
 		3FB60546E14A2C7AF9096FE4 /* AppDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiscoveryService.swift; sourceTree = "<group>"; };
 		4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		463ED392A0FDA4E2FF91B1AA /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 		48DC4B0F54EF97DFD2C5F416 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteService.swift; sourceTree = "<group>"; };
 		4D583EE522FF0443CE93DFE6 /* PasteBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteBehavior.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 				A48C40766989658A71731EFD /* ScreenEdgePicker.swift */,
 				543EE2EEFDD439C620E6A0A0 /* SettingsView.swift */,
 				F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */,
+				463ED392A0FDA4E2FF91B1AA /* SyncSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -485,6 +488,7 @@
 				61FC3644E015576CBEB288A7 /* StatusPopoverView.swift in Sources */,
 				9A7F0AD153503A571F77A96A /* SwiftDataHelpers.swift in Sources */,
 				7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */,
+				9D191D480AC6C916F6BC879B /* SyncSettingsView.swift in Sources */,
 				3ADFAC504957D459F381AFB2 /* TextCardView.swift in Sources */,
 				8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */,
 				B140415A01B99DBECC39C8AF /* URLMetadataService.swift in Sources */,

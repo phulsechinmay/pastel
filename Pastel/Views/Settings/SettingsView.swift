@@ -6,6 +6,7 @@ private enum SettingsTab: String, CaseIterable {
     case labels
     case privacy
     case history
+    case iCloudSync
 
     var iconName: String {
         switch self {
@@ -13,6 +14,7 @@ private enum SettingsTab: String, CaseIterable {
         case .labels: return "tag"
         case .privacy: return "hand.raised"
         case .history: return "clock.arrow.circlepath"
+        case .iCloudSync: return "icloud"
         }
     }
 
@@ -22,6 +24,7 @@ private enum SettingsTab: String, CaseIterable {
         case .labels: return "Labels"
         case .privacy: return "Privacy"
         case .history: return "History"
+        case .iCloudSync: return "iCloud Sync"
         }
     }
 }
@@ -113,6 +116,8 @@ struct SettingsView: View {
                     PrivacySettingsView()
                 case .history:
                     HistoryBrowserView()
+                case .iCloudSync:
+                    SyncSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -46,7 +46,15 @@ final class SyncMonitor {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            self?.handleSyncEvent(notification)
+            // Extract sendable data from event before crossing to MainActor
+            let event = notification.userInfo?[
+                NSPersistentCloudKitContainer.eventNotificationUserInfoKey
+            ] as? NSPersistentCloudKitContainer.Event
+            let hasEnded = event?.endDate != nil
+            let errorMessage = event?.error?.localizedDescription
+            MainActor.assumeIsolated {
+                self?.handleSyncChange(hasEnded: hasEnded, errorMessage: errorMessage)
+            }
         }
 
         // Subscribe to iCloud account changes
@@ -64,21 +72,17 @@ final class SyncMonitor {
         Task { await checkAccountStatus() }
     }
 
-    private func handleSyncEvent(_ notification: Notification) {
-        guard let event = notification.userInfo?[
-            NSPersistentCloudKitContainer.eventNotificationUserInfoKey
-        ] as? NSPersistentCloudKitContainer.Event else { return }
-
-        if event.endDate == nil {
+    private func handleSyncChange(hasEnded: Bool, errorMessage: String?) {
+        if !hasEnded {
             // Event in progress -- cancel any pending synced transition
             syncedWorkItem?.cancel()
             syncedWorkItem = nil
             state = .syncing
-        } else if let error = event.error {
+        } else if let errorMessage {
             syncedWorkItem?.cancel()
             syncedWorkItem = nil
-            state = .error(error.localizedDescription)
-            logger.warning("Sync error: \(error.localizedDescription)")
+            state = .error(errorMessage)
+            logger.warning("Sync error: \(errorMessage)")
         } else {
             // Event completed -- debounce the transition to .synced (1s)
             // to avoid flickering when multiple events complete in sequence
@@ -104,15 +108,31 @@ final class SyncMonitor {
         }
 
         // Try to get user name without prompting for permission
-        if let recordID = try? await container.fetchUserRecordID(),
-           let identity = try? await container.discoverUserIdentity(
-               withUserRecordID: recordID
-           ) {
+        // Use completion-handler wrappers since async variants are unavailable in Swift 6.2
+        do {
+            let recordID: CKRecord.ID = try await withCheckedThrowingContinuation { continuation in
+                container.fetchUserRecordID { recordID, error in
+                    if let recordID {
+                        continuation.resume(returning: recordID)
+                    } else {
+                        continuation.resume(throwing: error ?? CKError(.internalError))
+                    }
+                }
+            }
+            let identity: CKUserIdentity = try await withCheckedThrowingContinuation { continuation in
+                container.discoverUserIdentity(withUserRecordID: recordID) { identity, error in
+                    if let identity {
+                        continuation.resume(returning: identity)
+                    } else {
+                        continuation.resume(throwing: error ?? CKError(.internalError))
+                    }
+                }
+            }
             let name = identity.nameComponents.flatMap {
                 PersonNameComponentsFormatter().string(from: $0)
             }
             iCloudAccountName = name
-        } else {
+        } catch {
             iCloudAccountName = nil
         }
 
