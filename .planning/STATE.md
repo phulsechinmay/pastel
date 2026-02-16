@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** v1.5 iCloud Sync -- Phase 21, Plan 01 complete (sync backend services)
+**Current focus:** v1.5 iCloud Sync -- Phase 21, Plan 02 checkpoint (sync settings UI awaiting human verification)
 
 ## Current Position
 
 Phase: 21 of 21 (Sync Controls, Deduplication, and Status)
 Plan: 1 of 2 complete
 Status: In progress
-Last activity: 2026-02-15 -- Completed 21-01 (SyncMonitor, DeduplicationService, AppRelaunchService, lifecycle wiring)
+Last activity: 2026-02-15 -- 21-02 Task 1 complete, awaiting human verification at Task 2 checkpoint
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -118,5 +118,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-15
-Stopped at: Completed 21-01-PLAN.md (sync backend services). Next: 21-02 (sync settings UI).
+Stopped at: 21-02-PLAN.md Task 2 checkpoint:human-verify (iCloud Sync tab UI verification). Task 1 committed as eaa3ea5.
 Resume file: None
