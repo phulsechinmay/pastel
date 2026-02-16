@@ -78,12 +78,12 @@ struct PastelApp: App {
         state.modelContainer = container
         state.handleFirstLaunch()
 
-        // // Auto-open panel on startup for development (commented out for glass testing)
-        // if UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
-        //     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-        //         state.togglePanel()
-        //     }
-        // }
+        // Auto-open panel on startup (skip on very first launch before onboarding)
+        if UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                state.togglePanel()
+            }
+        }
 
         self._appState = State(initialValue: state)
 

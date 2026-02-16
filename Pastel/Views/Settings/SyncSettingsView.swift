@@ -39,34 +39,51 @@ struct SyncSettingsView: View {
 
                 Divider()
 
-                // MARK: - Account & Status Section
+                // MARK: - iCloud Account Section
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("ACCOUNT & STATUS")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-
-                        Spacer()
-
-                        Button {
-                            showingHelpPopover.toggle()
-                        } label: {
-                            Image(systemName: "questionmark.circle")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .popover(isPresented: $showingHelpPopover) {
-                            helpPopoverContent
-                        }
-                    }
+                    Text("ACCOUNT")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
 
                     accountStatusView
-                    syncStatusView
                 }
 
                 Divider()
+
+                // MARK: - Sync Status Section
+
+                if iCloudSyncEnabled {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("STATUS")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+
+                            Spacer()
+
+                            Button {
+                                showingHelpPopover = true
+                            } label: {
+                                Image(systemName: "questionmark.circle")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .onHover { hovering in
+                                showingHelpPopover = hovering
+                            }
+                            .popover(isPresented: $showingHelpPopover) {
+                                helpPopoverContent
+                            }
+                        }
+
+                        syncStatusView
+                    }
+
+                    Divider()
+                }
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -102,7 +119,7 @@ struct SyncSettingsView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                    Text("iCloud Account: Available")
+                    Text("iCloud Account: Signed In & Ready to Sync")
                 }
             }
         } else {
