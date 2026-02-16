@@ -342,11 +342,15 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User opens Settings and sees a Sync tab with an on/off toggle that defaults to off
   2. User enables sync and sees a restart prompt; after restarting, sync begins working
-  3. User copies the same text on two different Macs and only one item remains after sync (cross-device dedup by contentHash, earliest timestamp kept, labels merged)
+  3. User copies the same text on two different Macs and only one item remains after sync (cross-device dedup by contentHash, local device's version wins, labels merged)
   4. User opens the Sync tab in Settings and sees the current sync state (synced/syncing/error/offline/disabled) updating in near-real-time
   5. User disables sync, restarts, and no further items sync between devices
 
-**Plans**: 2 plans (estimate)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 21-01-PLAN.md -- SyncMonitor, DeduplicationService, AppRelaunchService, PastelApp lifecycle wiring
+- [ ] 21-02-PLAN.md -- SyncSettingsView (toggle, restart alert, status display, account info, help popover), SettingsView tab addition
 
 ## Progress
 
