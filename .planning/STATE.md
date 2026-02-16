@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** v1.5 iCloud Sync -- Phase 20 complete (Plan 02 checkpoint pending human verification)
+**Current focus:** v1.5 iCloud Sync -- Phase 21, Plan 01 complete (sync backend services)
 
 ## Current Position
 
-Phase: 20 of 21 (CloudKit Infrastructure and Sync Engine)
-Plan: 2 of 2 complete (Task 2 checkpoint:human-verify PENDING)
-Status: Checkpoint pending
-Last activity: 2026-02-14 -- Completed 20-02 Task 1 (sync-aware display filtering in panel and history views)
+Phase: 21 of 21 (Sync Controls, Deduplication, and Status)
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-02-15 -- Completed 21-01 (SyncMonitor, DeduplicationService, AppRelaunchService, lifecycle wiring)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -74,6 +74,13 @@ Key decisions from Phase 20 Plan 02 (Sync Display Filtering):
 - [20-02]: In-memory sync filtering (not #Predicate) -- avoids Swift type-checker timeout when combining search + sync conditions
 - [20-02]: filteredItems applies concealed exclusion + remote image/file exclusion before label filtering
 
+Key decisions from Phase 21 Plan 01 (Sync Backend Services):
+
+- [21-01]: SyncMonitor debounces .synced state by 1 second to prevent UI flickering from rapid CloudKit events
+- [21-01]: DeduplicationService debounces by 3 seconds after last NSPersistentStoreRemoteChange for batch import handling
+- [21-01]: Label merge then delete in separate saves to avoid CloudKit merge conflicts
+- [21-01]: SyncState enum with Equatable conformance for UI comparison
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -110,6 +117,6 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-14
-Stopped at: Completed 20-02-PLAN.md Task 1 (sync-aware display filtering). Task 2 checkpoint:human-verify PENDING.
+Last session: 2026-02-15
+Stopped at: Completed 21-01-PLAN.md (sync backend services). Next: 21-02 (sync settings UI).
 Resume file: None
