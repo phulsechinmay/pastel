@@ -39,48 +39,34 @@ struct SyncSettingsView: View {
 
                 Divider()
 
-                // MARK: - iCloud Account Section
+                // MARK: - Account & Status Section
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("ACCOUNT")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
+                    HStack {
+                        Text("ACCOUNT & STATUS")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+
+                        Spacer()
+
+                        Button {
+                            showingHelpPopover.toggle()
+                        } label: {
+                            Image(systemName: "questionmark.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showingHelpPopover) {
+                            helpPopoverContent
+                        }
+                    }
 
                     accountStatusView
+                    syncStatusView
                 }
 
                 Divider()
-
-                // MARK: - Sync Status Section
-
-                if iCloudSyncEnabled {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("STATUS")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-
-                            Spacer()
-
-                            Button {
-                                showingHelpPopover.toggle()
-                            } label: {
-                                Image(systemName: "questionmark.circle")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .popover(isPresented: $showingHelpPopover) {
-                                helpPopoverContent
-                            }
-                        }
-
-                        syncStatusView
-                    }
-
-                    Divider()
-                }
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)

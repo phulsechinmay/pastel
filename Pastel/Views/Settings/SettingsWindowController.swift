@@ -14,13 +14,17 @@ final class SettingsWindowController {
 
     private var window: NSWindow?
 
+    /// Set once from PastelApp during init when sync is enabled.
+    /// Stored here so every call site (panel gear button, menu bar popover) injects it automatically.
+    var syncMonitor: SyncMonitor?
+
     /// Show the settings window, or bring it to front if already visible.
     ///
     /// - Parameters:
     ///   - modelContainer: The SwiftData model container so settings views
     ///     can access the database (e.g., for label management in Plan 02).
     ///   - appState: The app state so settings can trigger panel edge changes.
-    func showSettings(modelContainer: ModelContainer, appState: AppState, syncMonitor: SyncMonitor? = nil) {
+    func showSettings(modelContainer: ModelContainer, appState: AppState) {
         // If already visible, just bring to front
         if let window, window.isVisible {
             window.makeKeyAndOrderFront(nil)

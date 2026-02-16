@@ -91,6 +91,7 @@ struct PastelApp: App {
         if syncEnabled {
             let monitor = SyncMonitor()
             monitor.startMonitoring()
+            SettingsWindowController.shared.syncMonitor = monitor
             self._syncMonitor = State(initialValue: monitor)
 
             let dedup = DeduplicationService(modelContext: container.mainContext)

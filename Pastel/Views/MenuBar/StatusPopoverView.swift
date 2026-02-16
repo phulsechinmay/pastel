@@ -4,7 +4,6 @@ import KeyboardShortcuts
 
 struct StatusPopoverView: View {
     @Environment(AppState.self) private var appState
-    @Environment(SyncMonitor.self) private var syncMonitor: SyncMonitor?
     @Environment(\.modelContext) private var modelContext
 
     @State private var panelShortcutDescription: String?
@@ -41,8 +40,7 @@ struct StatusPopoverView: View {
                 if let container = appState.modelContainer {
                     SettingsWindowController.shared.showSettings(
                         modelContainer: container,
-                        appState: appState,
-                        syncMonitor: syncMonitor
+                        appState: appState
                     )
                 }
             }) {
