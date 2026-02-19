@@ -138,6 +138,10 @@ struct GeneralSettingsView: View {
                             performImport()
                         }
                         .disabled(importExportService.isProcessing)
+                        Button("Import from PastePal...") {
+                            performPastePalImport()
+                        }
+                        .disabled(importExportService.isProcessing)
                         Button("Clear All History...") {
                             showingClearConfirmation = true
                         }
@@ -162,7 +166,7 @@ struct GeneralSettingsView: View {
                         }
                     }
 
-                    Text("Export saves text-based clipboard history to a .pastel file. Images are not included.")
+                    Text("Export saves text-based clipboard history to a .pastel file. Images are not included. You can also import from PastePal JSON exports.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -240,6 +244,33 @@ struct GeneralSettingsView: View {
                 showingImportResult = true
             } catch {
                 importErrorMessage = "Import failed: \(error.localizedDescription)"
+                showingImportError = true
+            }
+        }
+    }
+
+    // MARK: - PastePal Import
+
+    private func performPastePalImport() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.title = "Import from PastePal"
+        panel.message = "Select a PastePal JSON export file."
+
+        let response = panel.runModal()
+        guard response == .OK, let url = panel.url else { return }
+
+        Task {
+            do {
+                let data = try Data(contentsOf: url)
+                let result = try importExportService.importPastePalHistory(from: data, modelContext: modelContext)
+                lastImportResult = result
+                showingImportResult = true
+            } catch {
+                importErrorMessage = "PastePal import failed: \(error.localizedDescription)"
                 showingImportError = true
             }
         }
