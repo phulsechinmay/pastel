@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SwiftData
 import UniformTypeIdentifiers
@@ -63,6 +64,58 @@ enum ImportExportError: LocalizedError {
         }
     }
 }
+
+// MARK: - PastePal Import Structs
+
+struct PastePalExport: Codable, Sendable {
+    let folders: [PastePalFolder]
+    let items: [PastePalItem]
+    // apps array exists but we don't need it
+}
+
+struct PastePalFolder: Codable, Sendable {
+    let name: String
+    let icon: String      // SF Symbol name like "calendar.badge.plus"
+    let id: String        // UUID string
+    let color: String     // "Green", "Red", "Teal", etc.
+    let createdAt: Double // TimeInterval since reference date (Jan 1, 2001)
+}
+
+struct PastePalItem: Codable, Sendable {
+    let id: String
+    let createdAt: Double   // TimeInterval since reference date
+    let string: String      // The actual clipboard content
+    let collectionId: String? // Links to PastePalFolder.id (may be nil for uncategorized)
+    let itemType: String    // "Rich Text" or "Text"
+    let appBundleId: String?
+    let appName: String?
+    // pbType and appBundleUrl exist but we don't need them
+}
+
+// MARK: - PastePal Icon-to-Emoji Mapping
+
+private let pastePalIconToEmoji: [String: String] = [
+    "calendar.badge.plus": "📅",
+    "ice-cream": "🍦",
+    "atom": "⚛️",
+    "address-book": "📒",
+    "inbox": "📥",
+    "glass-martini": "🍸",
+    "sim-card": "💳",
+    "anchor": "⚓",
+]
+
+// MARK: - PastePal Color Mapping
+
+private let pastePalColorMap: [String: String] = [
+    "Green": "green",
+    "Red": "red",
+    "Teal": "teal",
+    "Brown": "brown",
+    "Blue": "blue",
+    "Yellow": "yellow",
+    "Orange": "orange",
+]
 
 // MARK: - ImportExportService
 
@@ -255,6 +308,134 @@ final class ImportExportService {
 
                 modelContext.insert(item)
                 existingHashes.insert(hash)
+                importedCount += 1
+            }
+
+            // Batch save every 50 items
+            if (index + 1) % 50 == 0 {
+                try modelContext.save()
+                let rawProgress = 0.2 + 0.8 * (Double(index + 1) / Double(totalItems))
+                progress = rawProgress
+                progressMessage = "Imported \(importedCount), skipped \(skippedCount)..."
+            }
+        }
+
+        // Final save
+        try modelContext.save()
+        progress = 1.0
+        progressMessage = "Imported \(importedCount), skipped \(skippedCount)."
+
+        return ImportResult(
+            importedCount: importedCount,
+            skippedCount: skippedCount,
+            labelsCreated: labelsCreated
+        )
+    }
+
+    // MARK: - PastePal Import
+
+    func importPastePalHistory(from data: Data, modelContext: ModelContext) throws -> ImportResult {
+        isProcessing = true
+        progress = 0.0
+        progressMessage = "Reading PastePal export file..."
+
+        defer {
+            isProcessing = false
+        }
+
+        // Decode PastePal JSON (no custom date strategy -- dates are raw Doubles)
+        let export: PastePalExport
+        do {
+            export = try JSONDecoder().decode(PastePalExport.self, from: data)
+        } catch {
+            throw ImportExportError.decodingFailed(error.localizedDescription)
+        }
+
+        // Phase 1: Label resolution from folders
+        progressMessage = "Resolving labels..."
+        progress = 0.1
+
+        var labelMap: [String: Label] = [:]
+        let existingLabels = try modelContext.fetch(FetchDescriptor<Label>())
+        for label in existingLabels {
+            labelMap[label.name] = label
+        }
+
+        var labelsCreated = 0
+        let maxOrder = existingLabels.map(\.sortOrder).max() ?? -1
+
+        // Build folder ID -> Label map for item wiring
+        var folderIdToLabel: [String: Label] = [:]
+
+        for (index, folder) in export.folders.enumerated() {
+            let label: Label
+            if let existing = labelMap[folder.name] {
+                label = existing
+            } else {
+                let colorName = pastePalColorMap[folder.color] ?? "blue"
+                let emoji = pastePalIconToEmoji[folder.icon]
+                let newLabel = Label(
+                    name: folder.name,
+                    colorName: colorName,
+                    sortOrder: maxOrder + 1 + index,
+                    emoji: emoji
+                )
+                modelContext.insert(newLabel)
+                labelMap[folder.name] = newLabel
+                labelsCreated += 1
+                label = newLabel
+            }
+            folderIdToLabel[folder.id] = label
+        }
+        try modelContext.save()
+
+        // Phase 2: Item import with deduplication
+        progressMessage = "Importing items..."
+        progress = 0.2
+
+        // Pre-load all existing content hashes for O(1) dedup lookups
+        let allItemsDescriptor = FetchDescriptor<ClipboardItem>()
+        let existingItems = try modelContext.fetch(allItemsDescriptor)
+        var existingHashes = Set<String>(existingItems.map(\.contentHash))
+
+        var importedCount = 0
+        var skippedCount = 0
+        let totalItems = export.items.count
+
+        for (index, pastePalItem) in export.items.enumerated() {
+            // Compute SHA256 content hash from text content
+            let hashData = Data(pastePalItem.string.utf8)
+            let digest = SHA256.hash(data: hashData)
+            let contentHash = digest.compactMap { String(format: "%02x", $0) }.joined()
+
+            // O(1) in-memory dedup check
+            if existingHashes.contains(contentHash) {
+                skippedCount += 1
+            } else {
+                // Map itemType to ContentType
+                let itemContentType: ContentType = pastePalItem.itemType == "Rich Text" ? .richText : .text
+
+                let item = ClipboardItem(
+                    textContent: pastePalItem.string,
+                    contentType: itemContentType,
+                    timestamp: Date(timeIntervalSinceReferenceDate: pastePalItem.createdAt),
+                    sourceAppBundleID: pastePalItem.appBundleId,
+                    sourceAppName: pastePalItem.appName,
+                    characterCount: pastePalItem.string.count,
+                    byteCount: pastePalItem.string.utf8.count,
+                    changeCount: 0,
+                    isConcealed: false,
+                    contentHash: contentHash
+                )
+
+                // Wire label relationship
+                if let collectionId = pastePalItem.collectionId,
+                   let label = folderIdToLabel[collectionId] {
+                    item.safeLabels.append(label)
+                }
+
+                modelContext.insert(item)
+                existingHashes.insert(contentHash)
                 importedCount += 1
             }
 
