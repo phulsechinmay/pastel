@@ -1,0 +1,127 @@
+#!/bin/bash
+set -euo pipefail
+
+# ─── Config ───────────────────────────────────────────────────────────────────
+SCHEME="Pastel"
+TEAM_ID="QLSJ39DRSH"
+SIGNING_IDENTITY="Developer ID Application: Chinmay Phulse ($TEAM_ID)"
+NOTARY_PROFILE="notary-pastel"
+BUILD_DIR="build"
+ARCHIVE_PATH="$BUILD_DIR/Pastel.xcarchive"
+EXPORT_PATH="$BUILD_DIR/export"
+EXPORT_OPTIONS="$BUILD_DIR/ExportOptions.plist"
+
+# ─── Resolve version from Xcode project ──────────────────────────────────────
+VERSION=$(xcodebuild -scheme "$SCHEME" -configuration Release -showBuildSettings 2>/dev/null \
+    | grep MARKETING_VERSION | head -1 | awk '{print $NF}')
+
+if [ -z "$VERSION" ]; then
+    echo "Error: Could not determine MARKETING_VERSION from Xcode project"
+    exit 1
+fi
+
+DMG_NAME="Pastel-${VERSION}.dmg"
+DMG_PATH="$BUILD_DIR/$DMG_NAME"
+TAG="v${VERSION}"
+
+echo "==> Building Pastel $TAG"
+
+# ─── Preflight checks ────────────────────────────────────────────────────────
+if ! security find-identity -v -p codesigning | grep -q "Developer ID Application"; then
+    echo "Error: No Developer ID Application certificate found in keychain"
+    exit 1
+fi
+
+if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+    echo "Error: Notarization credentials not found. Run:"
+    echo "  xcrun notarytool store-credentials \"$NOTARY_PROFILE\" --apple-id <email> --team-id $TEAM_ID"
+    exit 1
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "Error: gh CLI not installed. Run: brew install gh"
+    exit 1
+fi
+
+if ! gh auth status >/dev/null 2>&1; then
+    echo "Error: gh not authenticated. Run: gh auth login"
+    exit 1
+fi
+
+if git tag -l "$TAG" | grep -q "$TAG"; then
+    echo "Error: Tag $TAG already exists. Bump MARKETING_VERSION in Xcode first."
+    exit 1
+fi
+
+# ─── Clean previous build artifacts ──────────────────────────────────────────
+echo "==> Cleaning build directory"
+rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH" "$BUILD_DIR/dmg-staging" "$DMG_PATH"
+
+# ─── Archive ──────────────────────────────────────────────────────────────────
+echo "==> Archiving ($SCHEME, Release, hardened runtime)"
+xcodebuild -scheme "$SCHEME" \
+    -configuration Release \
+    -archivePath "$ARCHIVE_PATH" \
+    archive \
+    DEVELOPMENT_TEAM="$TEAM_ID" \
+    ENABLE_HARDENED_RUNTIME=YES \
+    | tail -3
+
+# ─── Export with Developer ID signing ─────────────────────────────────────────
+echo "==> Exporting with Developer ID signing"
+xcodebuild -exportArchive \
+    -archivePath "$ARCHIVE_PATH" \
+    -exportPath "$EXPORT_PATH" \
+    -exportOptionsPlist "$EXPORT_OPTIONS" \
+    -allowProvisioningUpdates \
+    | tail -3
+
+# ─── Verify signing ──────────────────────────────────────────────────────────
+echo "==> Verifying code signature"
+codesign -dv --verbose=2 "$EXPORT_PATH/Pastel.app" 2>&1 | grep -E "(Authority|flags|Runtime)"
+
+# ─── Create DMG ───────────────────────────────────────────────────────────────
+echo "==> Creating DMG"
+mkdir -p "$BUILD_DIR/dmg-staging"
+cp -R "$EXPORT_PATH/Pastel.app" "$BUILD_DIR/dmg-staging/"
+ln -sf /Applications "$BUILD_DIR/dmg-staging/Applications"
+
+hdiutil create \
+    -volname "Pastel" \
+    -srcfolder "$BUILD_DIR/dmg-staging" \
+    -ov \
+    -format UDZO \
+    "$DMG_PATH"
+
+codesign --force --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+
+# ─── Notarize ─────────────────────────────────────────────────────────────────
+echo "==> Submitting for notarization (this may take a few minutes)"
+xcrun notarytool submit "$DMG_PATH" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --wait
+
+echo "==> Stapling notarization ticket"
+xcrun stapler staple "$DMG_PATH"
+
+# ─── Verify final DMG ────────────────────────────────────────────────────────
+echo "==> Verifying notarization"
+spctl -a -t open --context context:primary-signature -v "$DMG_PATH" 2>&1
+
+# ─── GitHub Release ───────────────────────────────────────────────────────────
+echo "==> Creating GitHub release $TAG"
+git tag "$TAG"
+git push origin "$TAG"
+
+gh release create "$TAG" "$DMG_PATH" \
+    --title "Pastel $TAG" \
+    --generate-notes
+
+DMG_SIZE=$(du -h "$DMG_PATH" | awk '{print $1}')
+RELEASE_URL=$(gh release view "$TAG" --json url -q .url)
+
+echo ""
+echo "==> Done!"
+echo "    Version:  $TAG"
+echo "    DMG:      $DMG_PATH ($DMG_SIZE)"
+echo "    Release:  $RELEASE_URL"
