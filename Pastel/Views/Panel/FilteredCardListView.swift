@@ -140,11 +140,10 @@ struct FilteredCardListView: View {
                 // Horizontal layout for top/bottom edges
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 8) {
+                        LazyHStack(spacing: PanelLayout.cardSpacing) {
                             ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
-                                    .frame(width: 260, height: 195)
-                                    .clipped()
+                                    .frame(width: PanelLayout.horizontalCardWidth, height: PanelLayout.cardMaxHeight)
                             }
                         }
                     }
@@ -161,7 +160,7 @@ struct FilteredCardListView: View {
                 // Vertical layout for left/right edges
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 8) {
+                        LazyVStack(spacing: PanelLayout.cardSpacing) {
                             ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
                             }

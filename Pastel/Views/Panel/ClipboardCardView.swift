@@ -23,8 +23,15 @@ struct ClipboardCardView: View {
     @Environment(PanelActions.self) private var panelActions
     @Environment(AppState.self) private var appState
 
+    @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
+
     @State private var isHovered = false
     @State private var dominantColor: Color?
+
+    private var isHorizontal: Bool {
+        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
+        return !edge.isVertical
+    }
 
     /// Whether this card is a color item (entire card uses the detected color).
     private var isColorCard: Bool { item.type == .color }
@@ -90,6 +97,11 @@ struct ClipboardCardView: View {
             // Content preview (full-width)
             contentPreview
 
+            // In horizontal mode, push footer to card bottom for uniform alignment
+            if isHorizontal {
+                Spacer(minLength: 0)
+            }
+
             // Footer row: title (bold) + keycap badge
             if (item.title != nil && !(item.title?.isEmpty ?? true)) || badgePosition != nil {
                 HStack(spacing: 4) {
@@ -108,13 +120,13 @@ struct ClipboardCardView: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: cardMinHeight, maxHeight: 195, alignment: .topLeading)
+        .padding(.horizontal, PanelLayout.cardHorizontalPadding)
+        .padding(.vertical, PanelLayout.cardVerticalPadding)
+        .frame(maxWidth: .infinity, minHeight: cardMinHeight, maxHeight: PanelLayout.cardMaxHeight, alignment: .topLeading)
         .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
         .background {
             ZStack(alignment: .top) {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: PanelLayout.cardCornerRadius)
                     .fill(cardBackground)
                 if !isColorCard, let dominantColor {
                     LinearGradient(
@@ -125,15 +137,15 @@ struct ClipboardCardView: View {
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardCornerRadius))
                 }
             }
         }
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: PanelLayout.cardCornerRadius)
                 .strokeBorder(cardBorderColor, lineWidth: 1.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardCornerRadius))
         .task {
             // Load dominant color for header gradient (deferred to avoid blocking panel open)
             if !isColorCard {
@@ -350,13 +362,9 @@ struct ClipboardCardView: View {
     }
 
     private var cardMinHeight: CGFloat {
-        if item.type == .image {
-            return 120
-        } else if item.type == .url && item.urlPreviewImagePath != nil {
-            return 140
-        } else {
-            return 80
-        }
+        if item.type == .image { return PanelLayout.cardMinHeightImage }
+        else if item.type == .url && item.urlPreviewImagePath != nil { return PanelLayout.cardMinHeightURL }
+        else { return PanelLayout.cardMinHeightDefault }
     }
 
 }
