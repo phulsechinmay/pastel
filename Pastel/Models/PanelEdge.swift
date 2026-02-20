@@ -11,26 +11,23 @@ enum PanelEdge: String, CaseIterable {
     /// Whether the panel slides horizontally (left/right) and occupies the full screen height.
     var isVertical: Bool { self == .left || self == .right }
 
-    /// Inset from all touching screen edges so the panel floats with visible rounded corners.
-    private static let edgeInset: CGFloat = 10
-
     /// Panel dimensions for the given screen frame, accounting for insets.
     ///
-    /// Vertical edges: 320pt wide, full height minus top/bottom insets.
-    /// Horizontal edges: full width minus left/right insets, 265 tall.
+    /// Vertical edges: panel width from PanelLayout, full height minus top/bottom insets.
+    /// Horizontal edges: full width minus left/right insets, panel height from PanelLayout.
     func panelSize(screenFrame: NSRect) -> NSSize {
-        let inset = Self.edgeInset
+        let inset = PanelLayout.edgeInset
         if isVertical {
-            return NSSize(width: 320, height: screenFrame.height - 2 * inset)
+            return NSSize(width: PanelLayout.verticalPanelWidth, height: screenFrame.height - 2 * inset)
         } else {
-            return NSSize(width: screenFrame.width - 2 * inset, height: 265)
+            return NSSize(width: screenFrame.width - 2 * inset, height: PanelLayout.horizontalPanelHeight)
         }
     }
 
     /// The visible (on-screen) frame for the panel on the given screen.
     func onScreenFrame(screenFrame: NSRect) -> NSRect {
         let size = panelSize(screenFrame: screenFrame)
-        let inset = Self.edgeInset
+        let inset = PanelLayout.edgeInset
         switch self {
         case .right:
             return NSRect(
@@ -66,7 +63,7 @@ enum PanelEdge: String, CaseIterable {
     /// The off-screen frame used as the start/end position for slide animations.
     func offScreenFrame(screenFrame: NSRect) -> NSRect {
         let size = panelSize(screenFrame: screenFrame)
-        let inset = Self.edgeInset
+        let inset = PanelLayout.edgeInset
         switch self {
         case .right:
             return NSRect(

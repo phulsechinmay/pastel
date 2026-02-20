@@ -388,7 +388,7 @@ final class PanelController {
 
         // Round all 4 corners uniformly. NSGlassEffectView also uses the same radius,
         // so both layers agree and no black corner gaps appear.
-        containerView.layer?.cornerRadius = 12
+        containerView.layer?.cornerRadius = PanelLayout.panelCornerRadius
         containerView.layer?.masksToBounds = true
 
         slidingPanel.contentView = containerView
@@ -438,7 +438,7 @@ final class PanelController {
             // Full glass quality (lensing, refraction, specular highlights) requires
             // the app to be active, which PanelController.show() ensures via NSApp.activate().
             let glassView = NSGlassEffectView()
-            glassView.cornerRadius = 12
+            glassView.cornerRadius = PanelLayout.panelCornerRadius
             glassView.translatesAutoresizingMaskIntoConstraints = false
             glassView.contentView = hostingView
             containerView.addSubview(glassView)

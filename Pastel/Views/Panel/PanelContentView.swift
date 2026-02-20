@@ -10,9 +10,6 @@ import SwiftData
 /// Layout: Header -> Divider -> SearchField -> ChipBar -> FilteredCardList
 struct PanelContentView: View {
 
-    /// Uniform distance from panel glass edge to content — reusable constant for all edges.
-    static let panelOuterPadding: CGFloat = 10
-
     @Environment(PanelActions.self) private var panelActions
     @Environment(AppState.self) private var appState
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
@@ -40,7 +37,7 @@ struct PanelContentView: View {
 
     /// Uniform rounded rectangle for glass effect — all 4 corners rounded.
     private var glassShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: PanelLayout.panelCornerRadius)
     }
 
     var body: some View {
@@ -118,7 +115,7 @@ struct PanelContentView: View {
             .id("\(appState.itemCount)\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
         }
         .fontDesign(.rounded)
-        .padding(Self.panelOuterPadding)
+        .padding(PanelLayout.panelOuterPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .modifier(GlassEffectModifier(shape: glassShape))
         .defaultFocus($panelFocus, .cardList)
