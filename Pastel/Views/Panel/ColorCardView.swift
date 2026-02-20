@@ -10,7 +10,7 @@ struct ColorCardView: View {
 
     let item: ClipboardItem
 
-    /// Whether the original text is a non-hex format that warrants a subtitle.
+    /// Whether the original text differs from the current detected hex.
     private var showsOriginalSubtitle: Bool {
         guard let text = item.textContent?.trimmingCharacters(in: .whitespacesAndNewlines) else {
             return false
@@ -20,15 +20,25 @@ struct ColorCardView: View {
         return upper != hexDisplay.uppercased() && upper != (item.detectedColorHex ?? "").uppercased()
     }
 
+    /// Whether the original text was a hex format (user edited the color)
+    /// vs a non-hex format like rgb()/hsl() (original was always different).
+    private var originalWasHex: Bool {
+        guard let text = item.textContent?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+        let hexPattern = /^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/
+        return text.wholeMatch(of: hexPattern) != nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             // Large hex title
             Text("#\(item.detectedColorHex ?? "------")")
                 .font(.system(size: 28, weight: .bold, design: .monospaced))
 
-            // Original format subtitle (for rgb/hsl)
+            // Original format subtitle (for rgb/hsl or edited hex)
             if showsOriginalSubtitle {
-                Text(item.textContent ?? "")
+                Text(originalWasHex ? "Original: \(item.textContent ?? "")" : item.textContent ?? "")
                     .font(.system(size: 11, design: .monospaced))
                     .opacity(0.7)
                     .lineLimit(1)

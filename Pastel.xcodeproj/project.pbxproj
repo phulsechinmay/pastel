@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -99,7 +99,7 @@
 		3C93A57CFC2C8E44180B970A /* PastelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastelApp.swift; sourceTree = "<group>"; };
 		3E5CCEAC25DB293F9A16462A /* FilteredCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilteredCardListView.swift; sourceTree = "<group>"; };
 		3FB60546E14A2C7AF9096FE4 /* AppDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiscoveryService.swift; sourceTree = "<group>"; };
-		4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		463ED392A0FDA4E2FF91B1AA /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 		48DC4B0F54EF97DFD2C5F416 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteService.swift; sourceTree = "<group>"; };
@@ -407,7 +407,6 @@
 				6D088F3E7D49E387347AE545 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 				B8552B06DA78E00BFB0CFA7A /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -519,7 +518,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
@@ -599,7 +598,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
