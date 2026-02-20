@@ -5,19 +5,20 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** v1.5 iCloud Sync -- Phase 21, Plan 02 checkpoint (sync settings UI awaiting human verification)
+**Current focus:** Phase 22 Panel Toolbar Tools -- Plan 02 complete (color picker + position switcher)
 
 ## Current Position
 
-Phase: 21 of 21 (Sync Controls, Deduplication, and Status)
-Plan: 1 of 2 complete
+Phase: 22 of 22 (Code/Color Edit Controls and Panel Toolbar Tools)
+Plan: 22-02 complete
 Status: In progress
-Last activity: 2026-02-15 -- 21-02 Task 1 complete, awaiting human verification at Task 2 checkpoint
+Last activity: 2026-02-19 -- 22-02 complete (color picker + position switcher toolbar buttons)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
 - Phase 18 added: Codebase Audit -- Anti-patterns, Performance, and Security (Encryption)
 - Phases 19-21 added: v1.5 iCloud Sync (CloudKit-compatible model, sync infrastructure, sync controls)
+- Phase 22 added: Code/Color Edit Controls and Panel Toolbar Tools (language override, color pickers, position switcher)
 
 ## Previous Milestones
 
@@ -81,6 +82,12 @@ Key decisions from Phase 21 Plan 01 (Sync Backend Services):
 - [21-01]: Label merge then delete in separate saves to avoid CloudKit merge conflicts
 - [21-01]: SyncState enum with Equatable conformance for UI comparison
 
+Key decisions from Phase 22 Plan 02 (Panel Toolbar Tools):
+
+- [22-02]: NSColorPanel level set to .statusBar to match sliding panel level
+- [22-02]: NotificationCenter willClose observer cleans up target/action to avoid SwiftUI ColorPicker conflicts
+- [22-02]: Menu with .borderlessButton style and .fixedSize() for position dropdown
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -119,5 +126,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed quick task 024 (PastePal import). Phase 21-02 still at checkpoint.
+Stopped at: Completed 22-02-PLAN.md (color picker + position switcher toolbar buttons)
 Resume file: None
