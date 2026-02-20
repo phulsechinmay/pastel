@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 23 Responsive Panel UI and Layout Fixes -- Plan 01 complete
+**Current focus:** Phase 24 Fix Panel Window Level for Screenshot Preview Compatibility -- Complete
 
 ## Current Position
 
-Phase: 23 of 23 (Responsive Panel UI and Layout Fixes)
+Phase: 24 of 24 (Fix Panel Window Level for Screenshot Preview Compatibility)
 Plan: 1 of 1 complete
 Status: Complete
-Last activity: 2026-02-20 - Completed 23-01: PanelLayout constants namespace and card footer alignment fix
+Last activity: 2026-02-20 - Completed 24-01: Panel window level lowered to dockWindow+3 for screenshot preview compatibility
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -20,6 +20,7 @@ Last activity: 2026-02-20 - Completed 23-01: PanelLayout constants namespace and
 - Phases 19-21 added: v1.5 iCloud Sync (CloudKit-compatible model, sync infrastructure, sync controls)
 - Phase 22 added: Code/Color Edit Controls and Panel Toolbar Tools (language override, color pickers, position switcher)
 - Phase 23 added: Responsive Panel UI and Layout Fixes
+- Phase 24 added: Fix Panel Window Level for Screenshot Preview Compatibility
 
 ## Previous Milestones
 
@@ -91,13 +92,17 @@ Key decisions from Phase 22 Plan 01 (Code/Color Edit Controls):
 
 Key decisions from Phase 22 Plan 02 (Panel Toolbar Tools):
 
-- [22-02]: NSColorPanel level set to .statusBar to match sliding panel level
+- [22-02]: NSColorPanel level set to .statusBar to match sliding panel level (updated in 24-01 to dockWindow+3)
 - [22-02]: NotificationCenter willClose observer cleans up target/action to avoid SwiftUI ColorPicker conflicts
 - [22-02]: Menu with .borderlessButton style and .fixedSize() for position dropdown
 
 Key decisions from Phase 23 Plan 01 (Panel Layout Constants):
 
 - [23-01]: PanelLayout as caseless enum namespace -- zero-instance guarantee for constants-only type
+
+Key decisions from Phase 24 Plan 01 (Panel Window Level Fix):
+
+- [24-01]: CGWindowLevelForKey(.dockWindow) + 3 (level 23) instead of .statusBar (25) -- above Dock, below screenshot overlay
 
 Key architecture decisions for v1.5 (from research):
 
@@ -139,5 +144,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed quick task 27 (color format copy options in context menu)
+Stopped at: Completed 24-01-PLAN.md (panel window level fix for screenshot preview compatibility)
 Resume file: None
