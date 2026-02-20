@@ -407,4 +407,4 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 24-01-PLAN.md — Lower panel and color picker window level from .statusBar (25) to custom level 23, verify screenshot preview visibility
+- [x] 24-01-PLAN.md -- Lower panel window level from .statusBar (25) to custom level 23 (dockWindow + 3), update ColorToolController to match
