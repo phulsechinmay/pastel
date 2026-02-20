@@ -399,3 +399,12 @@ Plans:
 
 Plans:
 - [x] 23-01-PLAN.md — Centralize layout constants into PanelLayout namespace, fix card footer alignment and clipping in horizontal mode
+
+### Phase 24: Fix Panel Window Level for Screenshot Preview Compatibility
+
+**Goal:** Fix the panel window level so macOS screenshot previews appear in front of the panel, while the panel remains above the Dock
+**Depends on:** Phase 23
+**Plans:** 1 plan
+
+Plans:
+- [ ] 24-01-PLAN.md — Lower panel and color picker window level from .statusBar (25) to custom level 23, verify screenshot preview visibility
