@@ -128,9 +128,10 @@ None currently.
 | 021 | Key repeat navigation, rounded font, header padding | 2026-02-12 | 08a9412 | [21-enable-key-repeat-navigation-rounded-fon](./quick/21-enable-key-repeat-navigation-rounded-fon/) |
 | 022 | Fix key repeat, All History chip, drag-paste dismiss | 2026-02-12 | 62903e4 | [22-fix-key-repeat-for-card-nav-add-all-hist](./quick/22-fix-key-repeat-for-card-nav-add-all-hist/) |
 | 024 | Add PastePal import option | 2026-02-19 | 689f14b | [24-add-pastepal-import-option-to-pastel](./quick/24-add-pastepal-import-option-to-pastel/) |
+| 025 | Fix panel dismissal when clicking edit modal/settings/color picker | 2026-02-19 | 3fe078c | [25-fix-panel-dismissal-when-clicking-edit-m](./quick/25-fix-panel-dismissal-when-clicking-edit-m/) |
 
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 22-01-PLAN.md (language override, color picker, code removal in edit modal). Phase 22 fully complete.
+Stopped at: Completed quick task 25 (fix panel dismissal for multi-window clicks)
 Resume file: None
