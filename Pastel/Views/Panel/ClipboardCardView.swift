@@ -172,6 +172,32 @@ struct ClipboardCardView: View {
                 panelActions.pastePlainTextItem?(item)
             }
 
+            if let colorHex = item.detectedColorHex {
+                Divider()
+                Menu("Copy Color As") {
+                    Button("Hex — \(ColorFormatService.toHex(colorHex))") {
+                        copyToClipboard(ColorFormatService.toHex(colorHex))
+                    }
+                    Button("RGB — \(ColorFormatService.toRGB(colorHex))") {
+                        copyToClipboard(ColorFormatService.toRGB(colorHex))
+                    }
+                    Button("HSL — \(ColorFormatService.toHSL(colorHex))") {
+                        copyToClipboard(ColorFormatService.toHSL(colorHex))
+                    }
+                    Button("CMYK — \(ColorFormatService.toCMYK(colorHex))") {
+                        copyToClipboard(ColorFormatService.toCMYK(colorHex))
+                    }
+
+                    if let text = item.textContent,
+                       !isHexVariant(text.trimmingCharacters(in: .whitespacesAndNewlines), of: colorHex) {
+                        Divider()
+                        Button("Copy Original — \(text)") {
+                            copyToClipboard(text)
+                        }
+                    }
+                }
+            }
+
             Divider()
 
             Button("Edit...") {
@@ -224,6 +250,18 @@ struct ClipboardCardView: View {
     }
 
     // MARK: - Actions
+
+    /// Copy a formatted string directly to the system clipboard.
+    private func copyToClipboard(_ string: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
+    }
+
+    /// Check whether the given text is a variant of the hex color (with/without #, upper/lower).
+    private func isHexVariant(_ text: String, of hex: String) -> Bool {
+        let variants = ["#" + hex, hex, "#" + hex.lowercased(), hex.lowercased()]
+        return variants.contains(text)
+    }
 
     /// Delete the clipboard item with full cleanup:
     /// 1. Remove image and thumbnail files from disk (if any)
