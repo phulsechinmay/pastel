@@ -398,4 +398,4 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 23-01-PLAN.md — Centralize layout constants into PanelLayout namespace, fix card footer alignment and clipping in horizontal mode
+- [x] 23-01-PLAN.md — Centralize layout constants into PanelLayout namespace, fix card footer alignment and clipping in horizontal mode
