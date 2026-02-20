@@ -284,18 +284,18 @@ final class PanelController {
         // Dismiss on any mouse click outside the panel.
         // Global monitors fire for events in OTHER apps, but with borderless
         // NSPanel + LSUIElement, macOS can occasionally route panel clicks as global.
-        // Guard by checking the click location against the panel frame.
+        // Guard by checking click location against ALL visible app windows
+        // (panel, edit modal, settings, color picker) so secondary windows don't trigger dismiss.
         globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] event in
             guard self?.isDragging != true else { return }
-            // Only dismiss if click is genuinely outside the panel
-            guard let panelFrame = self?.panel?.frame else {
-                self?.hide()
-                return
-            }
             let clickLocation = NSEvent.mouseLocation
-            if !panelFrame.contains(clickLocation) {
+            // Don't dismiss if clicking on ANY Pastel window (panel, edit modal, settings, color picker)
+            let clickedInsideApp = NSApp.windows.contains { window in
+                window.isVisible && window.frame.contains(clickLocation)
+            }
+            if !clickedInsideApp {
                 self?.hide()
             }
         }
