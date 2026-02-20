@@ -154,6 +154,12 @@ actor HighlightCache {
         cache[hash]
     }
 
+    /// Remove a specific entry from the cache (e.g., when user changes language).
+    func evict(_ hash: String) {
+        cache.removeValue(forKey: hash)
+        insertionOrder.removeAll { $0 == hash }
+    }
+
     /// Store a highlighted AttributedString keyed by content hash.
     func set(_ hash: String, value: AttributedString) {
         if cache[hash] == nil {

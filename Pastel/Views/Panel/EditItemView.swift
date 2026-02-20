@@ -11,6 +11,13 @@ struct EditItemView: View {
     /// When nil, falls back to SwiftUI dismiss (sheet context).
     var onDone: (() -> Void)?
 
+    /// Tracks selected language for the code language picker.
+    /// Empty string means "Auto-detect", non-empty is a specific language ID.
+    @State private var selectedLanguage: String = ""
+
+    /// Tracks the edited color for the color picker.
+    @State private var editColor: Color = .white
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Edit Item")
@@ -47,6 +54,16 @@ struct EditItemView: View {
                 }
             }
 
+            // Code edit section (language picker + remove code formatting)
+            if item.type == .code {
+                CodeEditSection(item: item, selectedLanguage: $selectedLanguage)
+            }
+
+            // Color edit section (color picker)
+            if item.type == .color {
+                ColorEditSection(item: item, editColor: $editColor)
+            }
+
             HStack {
                 Spacer()
                 Button("Done") { closeSelf() }
@@ -56,6 +73,15 @@ struct EditItemView: View {
         .padding()
         .frame(width: 280)
         .onExitCommand { closeSelf() }
+        .onAppear {
+            // Initialize language picker state
+            selectedLanguage = item.detectedLanguage ?? ""
+
+            // Initialize color picker state
+            if let hex = item.detectedColorHex {
+                editColor = Color(hex: hex)
+            }
+        }
     }
 
     // MARK: - Dismiss
@@ -137,5 +163,144 @@ enum EditItemWindow {
         }
 
         currentPanel = panel
+    }
+}
+
+// MARK: - Code Edit Section
+
+/// Language picker and "Remove code formatting" button for code items.
+private struct CodeEditSection: View {
+    @Bindable var item: ClipboardItem
+    @Binding var selectedLanguage: String
+
+    /// Curated list of popular languages with display names and highlight.js IDs.
+    private static let languages: [(display: String, id: String)] = [
+        ("Auto-detect", ""),
+        ("Bash", "bash"),
+        ("C", "c"),
+        ("C#", "csharp"),
+        ("C++", "cpp"),
+        ("CSS", "css"),
+        ("Dart", "dart"),
+        ("Dockerfile", "dockerfile"),
+        ("Elixir", "elixir"),
+        ("Go", "go"),
+        ("GraphQL", "graphql"),
+        ("Haskell", "haskell"),
+        ("HTML", "html"),
+        ("Java", "java"),
+        ("JavaScript", "javascript"),
+        ("JSON", "json"),
+        ("Kotlin", "kotlin"),
+        ("Lua", "lua"),
+        ("Markdown", "markdown"),
+        ("Objective-C", "objectivec"),
+        ("Perl", "perl"),
+        ("PHP", "php"),
+        ("PowerShell", "powershell"),
+        ("Python", "python"),
+        ("R", "r"),
+        ("Ruby", "ruby"),
+        ("Rust", "rust"),
+        ("Scala", "scala"),
+        ("SQL", "sql"),
+        ("Swift", "swift"),
+        ("TypeScript", "typescript"),
+        ("XML", "xml"),
+        ("YAML", "yaml"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Code")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Picker("Language", selection: $selectedLanguage) {
+                ForEach(Self.languages, id: \.id) { lang in
+                    Text(lang.display).tag(lang.id)
+                }
+            }
+            .onChange(of: selectedLanguage) { _, newValue in
+                let language: String? = newValue.isEmpty ? nil : newValue
+                item.detectedLanguage = language
+
+                // Ensure item is marked as code when a language is selected
+                if language != nil && item.type != .code {
+                    item.contentType = ContentType.code.rawValue
+                }
+
+                // Evict stale highlight cache
+                Task {
+                    await HighlightCache.shared.evict(item.contentHash)
+                }
+            }
+
+            Button("Remove code formatting", role: .destructive) {
+                item.detectedLanguage = nil
+                // Revert to richText if RTF data exists, otherwise plain text
+                item.contentType = (item.rtfData != nil)
+                    ? ContentType.richText.rawValue
+                    : ContentType.text.rawValue
+
+                Task {
+                    await HighlightCache.shared.evict(item.contentHash)
+                }
+            }
+            .foregroundStyle(.red)
+            .buttonStyle(.plain)
+            .font(.caption)
+        }
+    }
+}
+
+// MARK: - Color Edit Section
+
+/// Color picker for color items, with hex display.
+private struct ColorEditSection: View {
+    @Bindable var item: ClipboardItem
+    @Binding var editColor: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Color")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                ColorPicker("Color", selection: $editColor, supportsOpacity: false)
+                    .labelsHidden()
+
+                Text("#\(item.detectedColorHex ?? "FFFFFF")")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            .onChange(of: editColor) { _, newColor in
+                // Convert Color to NSColor to extract sRGB components
+                guard let nsColor = NSColor(newColor).usingColorSpace(.sRGB) else { return }
+                let r = Int(round(nsColor.redComponent * 255))
+                let g = Int(round(nsColor.greenComponent * 255))
+                let b = Int(round(nsColor.blueComponent * 255))
+                item.detectedColorHex = String(format: "%02X%02X%02X", r, g, b)
+            }
+        }
+    }
+}
+
+// MARK: - Color Hex Extension
+
+private extension Color {
+    /// Creates a SwiftUI Color from a 6-character hex string (no # prefix).
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        guard hex.count == 6,
+              let value = UInt64(hex, radix: 16) else {
+            self = .white
+            return
+        }
+        let r = Double((value >> 16) & 0xFF) / 255.0
+        let g = Double((value >> 8) & 0xFF) / 255.0
+        let b = Double(value & 0xFF) / 255.0
+        self.init(red: r, green: g, blue: b)
     }
 }

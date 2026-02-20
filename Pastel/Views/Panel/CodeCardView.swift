@@ -37,7 +37,7 @@ struct CodeCardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: item.contentHash) {
+        .task(id: "\(item.contentHash)_\(item.detectedLanguage ?? "")") {
             await loadHighlighting()
         }
     }
