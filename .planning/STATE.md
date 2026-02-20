@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 22 Panel Toolbar Tools -- Plan 02 complete (color picker + position switcher)
+**Current focus:** Phase 22 Code/Color Edit Controls and Panel Toolbar Tools -- Plans 01 and 02 complete
 
 ## Current Position
 
 Phase: 22 of 22 (Code/Color Edit Controls and Panel Toolbar Tools)
-Plan: 22-02 complete
-Status: In progress
-Last activity: 2026-02-19 -- 22-02 complete (color picker + position switcher toolbar buttons)
+Plan: 2 of 2 complete
+Status: Complete
+Last activity: 2026-02-19 -- 22-01 complete (language override, color picker, code removal in edit modal)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -82,6 +82,12 @@ Key decisions from Phase 21 Plan 01 (Sync Backend Services):
 - [21-01]: Label merge then delete in separate saves to avoid CloudKit merge conflicts
 - [21-01]: SyncState enum with Equatable conformance for UI comparison
 
+Key decisions from Phase 22 Plan 01 (Code/Color Edit Controls):
+
+- [22-01]: Picker for language selection (native macOS dropdown) with 33 language options
+- [22-01]: Cache eviction + task ID update for language-aware re-highlighting
+- [22-01]: Private Color hex init extension to avoid namespace pollution
+
 Key decisions from Phase 22 Plan 02 (Panel Toolbar Tools):
 
 - [22-02]: NSColorPanel level set to .statusBar to match sliding panel level
@@ -126,5 +132,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 22-02-PLAN.md (color picker + position switcher toolbar buttons)
+Stopped at: Completed 22-01-PLAN.md (language override, color picker, code removal in edit modal). Phase 22 fully complete.
 Resume file: None
