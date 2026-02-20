@@ -134,9 +134,10 @@ None currently.
 | 022 | Fix key repeat, All History chip, drag-paste dismiss | 2026-02-12 | 62903e4 | [22-fix-key-repeat-for-card-nav-add-all-hist](./quick/22-fix-key-repeat-for-card-nav-add-all-hist/) |
 | 024 | Add PastePal import option | 2026-02-19 | 689f14b | [24-add-pastepal-import-option-to-pastel](./quick/24-add-pastepal-import-option-to-pastel/) |
 | 025 | Fix panel dismissal when clicking edit modal/settings/color picker | 2026-02-19 | 3fe078c | [25-fix-panel-dismissal-when-clicking-edit-m](./quick/25-fix-panel-dismissal-when-clicking-edit-m/) |
+| 027 | Add color format copy options (Hex/RGB/HSL/CMYK) to right-click menu | 2026-02-20 | 49409ed | [27-add-color-format-copy-options-to-right-c](./quick/27-add-color-format-copy-options-to-right-c/) |
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 23-01-PLAN.md (PanelLayout constants and card footer fix)
+Stopped at: Completed quick task 27 (color format copy options in context menu)
 Resume file: None
