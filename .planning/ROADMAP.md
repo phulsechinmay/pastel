@@ -380,3 +380,13 @@ Phases execute in numeric order: 19 -> 20 -> 21
 | 19. CloudKit-Compatible Data Model | v1.5 | 2/2 | Complete | 2026-02-14 |
 | 20. CloudKit Infrastructure and Sync Engine | v1.5 | 0/2 | Not started | - |
 | 21. Sync Controls, Deduplication, and Status | v1.5 | 0/2 | Not started | - |
+
+### Phase 22: Code/Color Edit Controls and Panel Toolbar Tools (language override, color pickers, position switcher)
+
+**Goal:** Users can override or remove code language detection in the edit modal, adjust colors via the macOS color picker in the edit modal, pick standalone colors from a toolbar color wheel tool, and reposition the panel from a toolbar dropdown
+**Depends on:** Phase 21
+**Plans:** 2 plans
+
+Plans:
+- [ ] 22-01-PLAN.md -- Edit modal enhancements: language override picker + color picker for code/color items
+- [ ] 22-02-PLAN.md -- Panel toolbar tools: standalone color picker button + position switcher dropdown
