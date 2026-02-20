@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -40,6 +40,7 @@
 		7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA88123A30157392A4055111 /* SyncMonitor.swift */; };
 		8557CEFECB6460592724EA0E /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6234E0274B828B16C2A57EA /* NSImage+Thumbnail.swift */; };
 		8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E931197AB3A47AD6193B9FF1 /* URLCardView.swift */; };
+		93896FFED1F319E354A4940A /* ColorToolController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4FC404F56DB93E075FCDEB /* ColorToolController.swift */; };
 		9568A5C18B45B7183E87ABE3 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */; };
 		97E8C96C50161A63AB0B871C /* PanelContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FEF0FE3AC5B3076726EAEB /* PanelContentView.swift */; };
 		9860CE67423A7F0C7A769D5B /* SearchFieldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4BADC66322076CEB1E831B5 /* SearchFieldView.swift */; };
@@ -98,7 +99,7 @@
 		3C93A57CFC2C8E44180B970A /* PastelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastelApp.swift; sourceTree = "<group>"; };
 		3E5CCEAC25DB293F9A16462A /* FilteredCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilteredCardListView.swift; sourceTree = "<group>"; };
 		3FB60546E14A2C7AF9096FE4 /* AppDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiscoveryService.swift; sourceTree = "<group>"; };
-		4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		463ED392A0FDA4E2FF91B1AA /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 		48DC4B0F54EF97DFD2C5F416 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteService.swift; sourceTree = "<group>"; };
@@ -119,6 +120,7 @@
 		79CFDAC2AF0FE47B9F09BCD5 /* AppPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPickerView.swift; sourceTree = "<group>"; };
 		7B6FC5171BA6D8C3F714E834 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7CA38A9FD4344A6EBC84615B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8E4FC404F56DB93E075FCDEB /* ColorToolController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorToolController.swift; sourceTree = "<group>"; };
 		9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		9C7F8E05C490820A909E5D51 /* Label.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Label.swift; sourceTree = "<group>"; };
 		A34B531FE14E94C513D7A73D /* DeviceIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentifier.swift; sourceTree = "<group>"; };
@@ -257,6 +259,7 @@
 				03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */,
 				72D7644ACF10CD4DC890BE9E /* CodeDetectionService.swift */,
 				2337ECFAF234829DF1605685 /* ColorDetectionService.swift */,
+				8E4FC404F56DB93E075FCDEB /* ColorToolController.swift */,
 				DB102C1DD1C2714F0204D4E7 /* DeduplicationService.swift */,
 				311A67E5A6FA0C55F53F34D2 /* DragItemProviderService.swift */,
 				5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */,
@@ -404,6 +407,7 @@
 				6D088F3E7D49E387347AE545 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 				B8552B06DA78E00BFB0CFA7A /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 			);
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -445,6 +449,7 @@
 				6102E3A79BDED41747B1CA1B /* CodeDetectionService.swift in Sources */,
 				06AA48B5B881CDC6751CA40B /* ColorCardView.swift in Sources */,
 				A12FDC50F1FD62206602CF49 /* ColorDetectionService.swift in Sources */,
+				93896FFED1F319E354A4940A /* ColorToolController.swift in Sources */,
 				B0CFC974AD1AC32A0A15644C /* ContentType.swift in Sources */,
 				4DED4706DEA246882DE6D749 /* DeduplicationService.swift in Sources */,
 				311D38AA5AD215646217479E /* DeviceIdentifier.swift in Sources */,
@@ -514,7 +519,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
@@ -594,7 +599,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;

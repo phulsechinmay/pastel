@@ -65,19 +65,7 @@ struct PanelContentView: View {
 
                     Spacer()
 
-                    Button {
-                        if let container = appState.modelContainer {
-                            SettingsWindowController.shared.showSettings(
-                                modelContainer: container,
-                                appState: appState
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                    }
-                    .modifier(AdaptiveGlassButtonStyle())
+                    toolbarButtons
                 }
                 .padding(.bottom, 4)
             } else {
@@ -88,19 +76,7 @@ struct PanelContentView: View {
                         .scaledToFit()
                         .frame(height: 38)
                     Spacer()
-                    Button {
-                        if let container = appState.modelContainer {
-                            SettingsWindowController.shared.showSettings(
-                                modelContainer: container,
-                                appState: appState
-                            )
-                        }
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
-                    }
-                    .modifier(AdaptiveGlassButtonStyle())
+                    toolbarButtons
                 }
 
                 Divider()
@@ -170,12 +146,66 @@ struct PanelContentView: View {
         .onChange(of: selectedLabelIDs) { _, _ in
             panelFocus = .cardList
         }
+        .onChange(of: panelEdgeRaw) {
+            appState.panelController.handleEdgeChange()
+        }
         .task(id: searchText) {
             try? await Task.sleep(for: .milliseconds(200))
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
         }
         .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Toolbar Buttons
+
+    /// Color picker, position switcher, and settings gear — shared between both layouts.
+    private var toolbarButtons: some View {
+        HStack(spacing: 4) {
+            Button {
+                ColorToolController.shared.showColorPicker()
+            } label: {
+                Image(systemName: "eyedropper")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+
+            Menu {
+                ForEach(PanelEdge.allCases, id: \.self) { edge in
+                    Button {
+                        panelEdgeRaw = edge.rawValue
+                    } label: {
+                        if edge.rawValue == panelEdgeRaw {
+                            Label(edge.rawValue.capitalized, systemImage: "checkmark")
+                        } else {
+                            Text(edge.rawValue.capitalized)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "rectangle.leadinghalf.inset.filled.arrow.leading")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+
+            Button {
+                if let container = appState.modelContainer {
+                    SettingsWindowController.shared.showSettings(
+                        modelContainer: container,
+                        appState: appState
+                    )
+                }
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+        }
     }
 
     // MARK: - Private Helpers
