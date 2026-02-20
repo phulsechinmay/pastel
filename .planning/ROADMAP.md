@@ -388,5 +388,5 @@ Phases execute in numeric order: 19 -> 20 -> 21
 **Plans:** 2 plans
 
 Plans:
-- [ ] 22-01-PLAN.md -- Edit modal enhancements: language override picker + color picker for code/color items
-- [ ] 22-02-PLAN.md -- Panel toolbar tools: standalone color picker button + position switcher dropdown
+- [x] 22-01-PLAN.md -- Edit modal enhancements: language override picker + color picker for code/color items
+- [x] 22-02-PLAN.md -- Panel toolbar tools: standalone color picker button + position switcher dropdown
