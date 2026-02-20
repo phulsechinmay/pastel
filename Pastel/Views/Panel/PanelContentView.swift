@@ -172,14 +172,16 @@ struct PanelContentView: View {
             .modifier(AdaptiveGlassButtonStyle())
 
             Menu {
-                ForEach(PanelEdge.allCases, id: \.self) { edge in
+                ForEach(Array(PanelEdge.allCases), id: \.self) { (edge: PanelEdge) in
                     Button {
                         panelEdgeRaw = edge.rawValue
                     } label: {
-                        if edge.rawValue == panelEdgeRaw {
-                            Label(edge.rawValue.capitalized, systemImage: "checkmark")
-                        } else {
+                        HStack {
                             Text(edge.rawValue.capitalized)
+                            if edge.rawValue == panelEdgeRaw {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
                         }
                     }
                 }
