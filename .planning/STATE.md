@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 22 of 22 (Code/Color Edit Controls and Panel Toolbar Tools)
 Plan: 2 of 2 complete
 Status: Complete
-Last activity: 2026-02-19 -- Phase 22 complete (edit modal controls + panel toolbar tools), verified 9/9 must-haves
+Last activity: 2026-02-20 - Completed quick task 25: Fix panel dismissal when clicking edit modal or other Pastel windows
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
