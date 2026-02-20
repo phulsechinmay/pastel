@@ -16,9 +16,10 @@ final class SlidingPanel: NSPanel {
             defer: true
         )
 
-        // Floating behavior -- above regular windows and the dock
+        // Floating behavior -- above Dock (20), below Screenshot overlay (24)
         isFloatingPanel = true
-        level = .statusBar
+        let dockLevel = Int(CGWindowLevelForKey(.dockWindow))
+        level = NSWindow.Level(rawValue: dockLevel + 3)  // 23
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
 

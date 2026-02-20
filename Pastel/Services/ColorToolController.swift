@@ -23,7 +23,8 @@ final class ColorToolController: NSObject {
         panel.setTarget(self)
         panel.setAction(#selector(colorDidChange(_:)))
         panel.isContinuous = true
-        panel.level = .statusBar
+        let dockLevel = Int(CGWindowLevelForKey(.dockWindow))
+        panel.level = NSWindow.Level(rawValue: dockLevel + 3)  // 23 -- match SlidingPanel
         panel.orderFront(nil)
 
         // Clean up target/action when the color panel closes to avoid
