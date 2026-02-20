@@ -16,8 +16,11 @@ enum PanelLayout {
     static let verticalPanelWidth: CGFloat = 320
 
     // Horizontal panel (top/bottom edges)
-    static let horizontalPanelHeight: CGFloat = 265
+    static let horizontalPanelHeight: CGFloat = 270
     static let horizontalCardWidth: CGFloat = 260
+
+    // Section spacing (between header, search, chips, cards)
+    static let sectionSpacing: CGFloat = 6
 
     // Card dimensions
     static let cardSpacing: CGFloat = 8
@@ -26,5 +29,5 @@ enum PanelLayout {
     static let cardMinHeightDefault: CGFloat = 80
     static let cardMinHeightImage: CGFloat = 120
     static let cardMinHeightURL: CGFloat = 140
-    static let cardMaxHeight: CGFloat = 195
+    static let cardMaxHeight: CGFloat = 200
 }

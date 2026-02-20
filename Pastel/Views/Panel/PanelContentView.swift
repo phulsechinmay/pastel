@@ -64,7 +64,7 @@ struct PanelContentView: View {
 
                     toolbarButtons
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, PanelLayout.sectionSpacing)
             } else {
                 // Vertical mode: header on top, search and chips stacked below
                 HStack {
@@ -75,16 +75,19 @@ struct PanelContentView: View {
                     Spacer()
                     toolbarButtons
                 }
+                .padding(.bottom, PanelLayout.sectionSpacing)
 
                 Divider()
 
                 SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
+                    .padding(.vertical, PanelLayout.sectionSpacing)
                 ChipBarView(
                     labels: labels,
                     selectedLabelIDs: $selectedLabelIDs,
                     isAllHistoryActive: selectedLabelIDs.isEmpty,
                     onSelectAllHistory: { selectedLabelIDs.removeAll() }
                 )
+                .padding(.bottom, PanelLayout.sectionSpacing)
             }
 
             // Filtered content area with keyboard navigation
@@ -164,7 +167,7 @@ struct PanelContentView: View {
             } label: {
                 Image(systemName: "eyedropper")
                     .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary.opacity(0.7))
             }
             .modifier(AdaptiveGlassButtonStyle())
 
@@ -185,7 +188,7 @@ struct PanelContentView: View {
             } label: {
                 Image(systemName: "rectangle.leadinghalf.inset.filled.arrow.leading")
                     .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary.opacity(0.7))
             }
             .modifier(AdaptiveGlassButtonStyle())
             .menuStyle(.borderlessButton)
@@ -201,7 +204,7 @@ struct PanelContentView: View {
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary.opacity(0.7))
             }
             .modifier(AdaptiveGlassButtonStyle())
         }
