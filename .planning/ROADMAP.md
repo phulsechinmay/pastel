@@ -390,3 +390,12 @@ Phases execute in numeric order: 19 -> 20 -> 21
 Plans:
 - [x] 22-01-PLAN.md -- Edit modal enhancements: language override picker + color picker for code/color items
 - [x] 22-02-PLAN.md -- Panel toolbar tools: standalone color picker button + position switcher dropdown
+
+### Phase 23: Responsive Panel UI and Layout Fixes
+
+**Goal:** Panel UI uses centralized layout constants instead of hardcoded values, card footers align properly in horizontal mode, and consistent padding/margins throughout
+**Depends on:** Phase 22
+**Plans:** 1 plan
+
+Plans:
+- [ ] 23-01-PLAN.md — Centralize layout constants into PanelLayout namespace, fix card footer alignment and clipping in horizontal mode
