@@ -147,7 +147,7 @@ struct PanelContentView: View {
             panelFocus = .cardList
         }
         .onChange(of: panelEdgeRaw) {
-            appState.panelController.handleEdgeChange()
+            appState.panelController.handleEdgeChange(reopen: true)
         }
         .task(id: searchText) {
             try? await Task.sleep(for: .milliseconds(200))

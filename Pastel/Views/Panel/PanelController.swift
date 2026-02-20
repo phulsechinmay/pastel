@@ -246,8 +246,9 @@ final class PanelController {
     ///
     /// If the panel is visible, hide it immediately. Then destroy the panel
     /// so it gets recreated with the correct orientation on next toggle.
-    func handleEdgeChange() {
-        if isVisible {
+    func handleEdgeChange(reopen: Bool = false) {
+        let wasVisible = isVisible
+        if wasVisible {
             // Quick hide without animation
             panel?.orderOut(nil)
             removeEventMonitors()
@@ -256,6 +257,10 @@ final class PanelController {
         panel = nil
         let newEdge = currentEdge
         logger.info("Panel edge changed to \(newEdge.rawValue), panel will recreate on next toggle")
+
+        if wasVisible || reopen {
+            toggle()
+        }
     }
 
     // MARK: - Screen Detection
