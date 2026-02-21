@@ -434,5 +434,15 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 26-01-PLAN.md -- Eliminate .id() nuclear recreation, app icon caching, pre-warm caches on capture
-- [ ] 26-02-PLAN.md -- Memoize filteredItems, display pagination with load-more for panel and history grid
+- [x] 26-01-PLAN.md -- Eliminate .id() nuclear recreation, app icon caching, pre-warm caches on capture
+- [x] 26-02-PLAN.md -- Memoize filteredItems, display pagination with load-more for panel and history grid
+
+### Phase 27: Service layer audit — refactor, combine, or remove redundant services to reduce app bloat and improve performance
+
+**Goal:** Eliminate duplicated service code by extracting a centralized deletion helper (5 call sites), a shared SHA256 hashing utility (3 call sites), and merging ExpirationService + RetentionService into a unified ItemLifecycleService -- with AppIconCache relocated from Extensions/ to Services/
+**Depends on:** Phase 26
+**Plans:** 2 plans
+
+Plans:
+- [ ] 27-01-PLAN.md -- Extract deleteClipboardItemWithCleanup and ContentHash helpers, replace all duplication call sites
+- [ ] 27-02-PLAN.md -- Merge ExpirationService + RetentionService into ItemLifecycleService, move AppIconCache to Services/
