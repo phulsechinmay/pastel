@@ -171,16 +171,7 @@ final class AppState {
             // many-to-many label relationships before removing the model.
             // Batch delete (modelContext.delete(model:)) cannot handle MTM relationships.
             for item in allItems {
-                ImageStorageService.shared.deleteImage(
-                    imagePath: item.imagePath,
-                    thumbnailPath: item.thumbnailPath
-                )
-                ImageStorageService.shared.deleteImage(
-                    imagePath: item.urlFaviconPath,
-                    thumbnailPath: item.urlPreviewImagePath
-                )
-                item.safeLabels.removeAll()
-                modelContext.delete(item)
+                deleteClipboardItemWithCleanup(item, from: modelContext)
             }
             try modelContext.save()
 

@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import SwiftData
 import UniformTypeIdentifiers
@@ -447,9 +446,7 @@ final class ImportExportService {
 
         for (index, pastePalItem) in export.items.enumerated() {
             // Compute SHA256 content hash from text content
-            let hashData = Data(pastePalItem.string.utf8)
-            let digest = SHA256.hash(data: hashData)
-            let contentHash = digest.compactMap { String(format: "%02x", $0) }.joined()
+            let contentHash = ContentHash.hash(text: pastePalItem.string)
 
             // O(1) in-memory dedup check
             if existingHashes.contains(contentHash) {

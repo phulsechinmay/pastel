@@ -64,22 +64,9 @@ final class RetentionService {
                 return
             }
 
-            // Delete associated image files from disk
+            // Delete expired items with full cleanup (images, labels, model)
             for item in expiredItems {
-                ImageStorageService.shared.deleteImage(
-                    imagePath: item.imagePath,
-                    thumbnailPath: item.thumbnailPath
-                )
-                // Clean up URL metadata cached images
-                ImageStorageService.shared.deleteImage(
-                    imagePath: item.urlFaviconPath,
-                    thumbnailPath: item.urlPreviewImagePath
-                )
-            }
-
-            // Delete expired items from SwiftData
-            for item in expiredItems {
-                modelContext.delete(item)
+                deleteClipboardItemWithCleanup(item, from: modelContext)
             }
             try modelContext.save()
 

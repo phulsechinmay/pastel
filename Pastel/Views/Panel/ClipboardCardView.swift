@@ -271,17 +271,7 @@ struct ClipboardCardView: View {
     /// ExpirationService.performExpiration checks if the item still exists
     /// via `modelContext.model(for:)` and no-ops if already deleted.
     private func deleteItem() {
-        // Clean up disk images before removing the model
-        ImageStorageService.shared.deleteImage(
-            imagePath: item.imagePath,
-            thumbnailPath: item.thumbnailPath
-        )
-        // Clean up URL metadata cached images
-        ImageStorageService.shared.deleteImage(
-            imagePath: item.urlFaviconPath,
-            thumbnailPath: item.urlPreviewImagePath
-        )
-        modelContext.delete(item)
+        deleteClipboardItemWithCleanup(item, from: modelContext)
         saveWithLogging(modelContext, operation: "delete item")
         appState.itemCount -= 1
     }

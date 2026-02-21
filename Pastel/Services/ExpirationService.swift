@@ -72,12 +72,7 @@ final class ExpirationService {
             var expiredCount = 0
             for item in concealedItems {
                 if let expiresAt = item.expiresAt, expiresAt < now {
-                    // Delete associated images from disk
-                    ImageStorageService.shared.deleteImage(
-                        imagePath: item.imagePath,
-                        thumbnailPath: item.thumbnailPath
-                    )
-                    modelContext.delete(item)
+                    deleteClipboardItemWithCleanup(item, from: modelContext)
                     expiredCount += 1
                 }
             }
@@ -113,11 +108,8 @@ final class ExpirationService {
             return
         }
 
-        // Delete associated images from disk
-        ImageStorageService.shared.deleteImage(imagePath: imagePath, thumbnailPath: thumbnailPath)
-
-        // Delete from SwiftData
-        modelContext.delete(item)
+        // Delete with full cleanup (images, URL metadata, labels, model)
+        deleteClipboardItemWithCleanup(item, from: modelContext)
 
         do {
             try modelContext.save()

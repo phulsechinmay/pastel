@@ -1,5 +1,4 @@
 import AppKit
-import CryptoKit
 import OSLog
 import SwiftData
 
@@ -239,9 +238,7 @@ final class ClipboardMonitor {
         let sourceAppName = sourceApp?.localizedName
 
         // Compute SHA256 content hash
-        let hashData = Data(primaryContent.utf8)
-        let digest = SHA256.hash(data: hashData)
-        let contentHash = digest.compactMap { String(format: "%02x", $0) }.joined()
+        let contentHash = ContentHash.hash(text: primaryContent)
 
         // Consecutive duplicate check: fetch most recent item
         if isDuplicateOfMostRecent(contentHash: contentHash) { return }
@@ -337,7 +334,7 @@ final class ClipboardMonitor {
         }
 
         // Compute hash for dedup (first 4KB for speed)
-        let contentHash = ImageStorageService.computeImageHash(data: imageData)
+        let contentHash = ContentHash.hash(imageData: imageData)
 
         // Consecutive duplicate check
         if isDuplicateOfMostRecent(contentHash: contentHash) { return }

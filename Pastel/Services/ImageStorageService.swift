@@ -1,5 +1,4 @@
 import AppKit
-import CryptoKit
 import ImageIO
 import OSLog
 
@@ -199,9 +198,7 @@ final class ImageStorageService: Sendable {
     /// - Parameter data: Raw image data.
     /// - Returns: Hex-encoded SHA256 hash string.
     static func computeImageHash(data: Data) -> String {
-        let prefix = data.prefix(4096)
-        let digest = SHA256.hash(data: prefix)
-        return digest.compactMap { String(format: "%02x", $0) }.joined()
+        ContentHash.hash(imageData: data)
     }
 
     // MARK: - Private Helpers

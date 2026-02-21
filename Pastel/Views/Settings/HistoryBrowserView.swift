@@ -160,18 +160,7 @@ struct HistoryBrowserView: View {
     private func bulkDelete() {
         let itemsToDelete = resolvedItems.filter { selectedIDs.contains($0.persistentModelID) }
         for item in itemsToDelete {
-            // Clean up disk images (both regular and URL metadata images)
-            ImageStorageService.shared.deleteImage(
-                imagePath: item.imagePath,
-                thumbnailPath: item.thumbnailPath
-            )
-            ImageStorageService.shared.deleteImage(
-                imagePath: item.urlFaviconPath,
-                thumbnailPath: item.urlPreviewImagePath
-            )
-            // Clear many-to-many label relationships before delete (SwiftData MTM requirement)
-            item.safeLabels.removeAll()
-            modelContext.delete(item)
+            deleteClipboardItemWithCleanup(item, from: modelContext)
         }
         saveWithLogging(modelContext, operation: "bulk delete")
         appState.itemCount -= itemsToDelete.count
