@@ -23,6 +23,9 @@ struct HistoryGridView: View {
     // Resolved items exposed to parent for bulk operations
     @Binding var resolvedItems: [ClipboardItem]
     @State private var lastClickedID: PersistentIdentifier? = nil
+    @State private var memoizedFilteredItems: [ClipboardItem] = []
+    @State private var displayLimit: Int = 100
+    private let pageSize: Int = 100
 
     // Labels passed from parent for ClipboardCardView context menus
     let allLabels: [Label]
@@ -71,7 +74,12 @@ struct HistoryGridView: View {
         _items = Query(filter: predicate, sort: \ClipboardItem.timestamp, order: .reverse)
     }
 
-    /// Items filtered by sync rules and selected labels (in-memory).
+    /// Items visible after pagination (first `displayLimit` of memoizedFilteredItems).
+    private var visibleItems: [ClipboardItem] {
+        Array(memoizedFilteredItems.prefix(displayLimit))
+    }
+
+    /// Compute items filtered by sync rules and selected labels (in-memory).
     ///
     /// Sync filtering (applied first):
     /// - Concealed items excluded (passwords never appear in browseable history)
@@ -80,7 +88,7 @@ struct HistoryGridView: View {
     ///
     /// Label filtering (applied second, OR logic):
     /// If no labels selected, returns all sync-filtered items.
-    private var filteredItems: [ClipboardItem] {
+    private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
         let localDeviceID = DeviceIdentifier.current
         let syncFiltered = items.filter { item in
             // Exclude concealed items (passwords should never appear in browseable history)
@@ -101,7 +109,7 @@ struct HistoryGridView: View {
 
     var body: some View {
         Group {
-            if filteredItems.isEmpty {
+            if memoizedFilteredItems.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 32))
@@ -114,7 +122,7 @@ struct HistoryGridView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
                             let isInSelection = selectedIDs.contains(item.persistentModelID)
                             ClipboardCardView(
                                 item: item,
@@ -124,6 +132,11 @@ struct HistoryGridView: View {
                             )
                             .onTapGesture {
                                 handleTap(item: item, index: index)
+                            }
+                            .onAppear {
+                                if index >= displayLimit - 10 && displayLimit < memoizedFilteredItems.count {
+                                    displayLimit += pageSize
+                                }
                             }
                             .contextMenu {
                                 if isInSelection && selectedIDs.count > 1 {
@@ -171,9 +184,9 @@ struct HistoryGridView: View {
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(characters: .init(charactersIn: "aA")) { keyPress in
-            // Cmd+A: select all visible items
+            // Cmd+A: select all filtered items (not just visible, for bulk operations)
             guard keyPress.modifiers.contains(.command) else { return .ignored }
-            selectedIDs = Set(filteredItems.map(\.persistentModelID))
+            selectedIDs = Set(memoizedFilteredItems.map(\.persistentModelID))
             return .handled
         }
         .onKeyPress(.escape) {
@@ -182,8 +195,15 @@ struct HistoryGridView: View {
             lastClickedID = nil
             return .handled
         }
-        .onAppear { resolvedItems = filteredItems }
-        .onChange(of: items) { _, _ in resolvedItems = filteredItems }
+        .onAppear {
+            displayLimit = pageSize
+            memoizedFilteredItems = computeFilteredItems(from: items)
+            resolvedItems = memoizedFilteredItems
+        }
+        .onChange(of: items) { _, newItems in
+            memoizedFilteredItems = computeFilteredItems(from: newItems)
+            resolvedItems = memoizedFilteredItems
+        }
     }
 
     // MARK: - Multi-Selection
@@ -202,15 +222,15 @@ struct HistoryGridView: View {
             lastClickedID = id
         } else if modifiers.contains(.shift), let anchorID = lastClickedID {
             // Shift-click: range selection from anchor to clicked item
-            guard let anchorIndex = filteredItems.firstIndex(where: { $0.persistentModelID == anchorID }) else {
-                // Anchor no longer in filtered results, treat as single select
+            guard let anchorIndex = visibleItems.firstIndex(where: { $0.persistentModelID == anchorID }) else {
+                // Anchor no longer in visible results, treat as single select
                 selectedIDs = [id]
                 lastClickedID = id
                 return
             }
             let range = min(anchorIndex, index)...max(anchorIndex, index)
             for i in range {
-                selectedIDs.insert(filteredItems[i].persistentModelID)
+                selectedIDs.insert(visibleItems[i].persistentModelID)
             }
             // Do NOT update lastClickedID on shift-click (anchor stays)
         } else {
