@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 26 Panel Performance Optimization -- In Progress (1/2 plans)
+**Current focus:** Phase 26 Panel Performance Optimization -- Complete (2/2 plans)
 
 ## Current Position
 
 Phase: 26 of 26 (Panel Performance Optimization)
-Plan: 1 of 2 complete
-Status: In Progress
-Last activity: 2026-02-21 - Completed 26-01: showCount-based .id() refresh and AppIconCache
+Plan: 2 of 2 complete
+Status: Complete
+Last activity: 2026-02-21 - Completed 26-02: Filter memoization and display pagination
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -123,6 +123,13 @@ Key decisions from Phase 26 Plan 01 (Panel Open Lag Reduction):
 - [26-01]: Replaced NSWorkspace.appIcon extension entirely -- all call sites use AppIconCache.shared directly
 - [26-01]: showCount-based .id() refresh (not itemCount) to avoid hidden-panel view recreation
 
+Key decisions from Phase 26 Plan 02 (Filter Memoization & Display Pagination):
+
+- [26-02]: @State memoization pattern -- convert expensive computed property to @State + computeX() + onChange/onAppear triggers
+- [26-02]: Display pagination is post-filter (visibleItems = filteredItems.prefix(displayLimit)), not pre-filter, to avoid truncating label results
+- [26-02]: HistoryGridView uses 100-item page size (panel uses 50) since grid cards are smaller
+- [26-02]: Cmd+A in HistoryGridView selects all memoizedFilteredItems (not just visible) for correct bulk operations
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -164,5 +171,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 26-01-PLAN.md (showCount .id() refresh + AppIconCache)
+Stopped at: Completed 26-02-PLAN.md (filter memoization + display pagination)
 Resume file: None
