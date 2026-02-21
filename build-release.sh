@@ -129,8 +129,15 @@ if [ -z "$GENERATE_APPCAST" ]; then
 fi
 if [ -n "$GENERATE_APPCAST" ]; then
     REPO_URL=$(gh repo view --json url -q .url)
-    "$GENERATE_APPCAST" "$BUILD_DIR" \
+    # Use a staging directory with only the current DMG to avoid duplicate version errors
+    APPCAST_DIR="$BUILD_DIR/appcast-staging"
+    rm -rf "$APPCAST_DIR"
+    mkdir -p "$APPCAST_DIR"
+    cp "$DMG_PATH" "$APPCAST_DIR/"
+    "$GENERATE_APPCAST" "$APPCAST_DIR" \
         --download-url-prefix "${REPO_URL}/releases/download/${TAG}/"
+    cp "$APPCAST_DIR/appcast.xml" "$BUILD_DIR/appcast.xml"
+    rm -rf "$APPCAST_DIR"
     echo "    Appcast: $BUILD_DIR/appcast.xml"
 else
     echo "WARNING: generate_appcast not found. Run manually after release."

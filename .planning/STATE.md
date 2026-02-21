@@ -22,6 +22,7 @@ Last activity: 2026-02-21 - Completed quick task 28: Improve export/import UI wi
 - Phase 23 added: Responsive Panel UI and Layout Fixes
 - Phase 24 added: Fix Panel Window Level for Screenshot Preview Compatibility
 - Phase 25 added: OTA Updates with Sparkle (DMG distribution, conditional compilation for App Store exclusion)
+- Phase 26 added: Panel Performance Optimization (first-open lag, scroll jank, filter switch latency)
 
 ## Previous Milestones
 
