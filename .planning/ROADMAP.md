@@ -451,7 +451,7 @@ Plans:
 
 **Goal:** Panel keyboard activation (Enter, Cmd+1-9, Cmd+Shift+1-9) works reliably via NSEvent local monitor, replacing broken SwiftUI `.onKeyPress` handlers that never fire due to focus issues in the NSPanel context
 **Depends on:** Phase 27
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 28-01-PLAN.md -- Extend NSEvent keyboard monitor for Enter and Cmd+digit activation, remove broken .onKeyPress handlers, human-verify all activation methods

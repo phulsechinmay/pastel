@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 26 Panel Performance Optimization -- Verified Complete (2/2 plans)
+**Current focus:** Phase 28 Fix Panel Item Activation -- Complete (1/1 plans)
 
 ## Current Position
 
-Phase: 26 of 26 (Panel Performance Optimization)
-Plan: 2 of 2 complete
-Status: Verified Complete
-Last activity: 2026-02-21 - Phase 26 verified (10/10 must-haves pass)
+Phase: 28 of 28 (Fix Panel Item Activation)
+Plan: 1 of 1 complete
+Status: Complete
+Last activity: 2026-02-21 - Phase 28-01 executed and verified (keyboard activation working)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -132,6 +132,13 @@ Key decisions from Phase 26 Plan 02 (Filter Memoization & Display Pagination):
 - [26-02]: HistoryGridView uses 100-item page size (panel uses 50) since grid cards are smaller
 - [26-02]: Cmd+A in HistoryGridView selects all memoizedFilteredItems (not just visible) for correct bulk operations
 
+Key decisions from Phase 28 Plan 01 (Fix Panel Item Activation):
+
+- [28-01]: NSEvent local monitor for all keyboard activation (Enter, Cmd+digits) -- SwiftUI .onKeyPress unreliable in NSPanel context
+- [28-01]: event.keyCode for digit detection (not event.characters) -- macOS modifies characters with Cmd modifier
+- [28-01]: Static digitKeyCodeMap for physical key code to digit value mapping -- non-sequential ANSI key codes
+- [28-01]: Keep .focusable() and type-to-search .onKeyPress -- separate category per user decision
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -173,5 +180,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Phase 26 verified complete (10/10 must-haves)
+Stopped at: Completed 28-01-PLAN.md
 Resume file: None
