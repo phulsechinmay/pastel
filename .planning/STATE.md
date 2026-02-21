@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 26 Panel Performance Optimization -- Complete (2/2 plans)
+**Current focus:** Phase 26 Panel Performance Optimization -- Verified Complete (2/2 plans)
 
 ## Current Position
 
 Phase: 26 of 26 (Panel Performance Optimization)
 Plan: 2 of 2 complete
-Status: Complete
-Last activity: 2026-02-21 - Completed 26-02: Filter memoization and display pagination
+Status: Verified Complete
+Last activity: 2026-02-21 - Phase 26 verified (10/10 must-haves pass)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -23,6 +23,8 @@ Last activity: 2026-02-21 - Completed 26-02: Filter memoization and display pagi
 - Phase 24 added: Fix Panel Window Level for Screenshot Preview Compatibility
 - Phase 25 added: OTA Updates with Sparkle (DMG distribution, conditional compilation for App Store exclusion)
 - Phase 26 added: Panel Performance Optimization (first-open lag, scroll jank, filter switch latency)
+- Phase 27 added: Service layer audit — refactor, combine, or remove redundant services to reduce app bloat and improve performance
+- Phase 28 added: Fix panel item activation — unify hotkey, keyboard Enter, click, and drag activation into a durable shared method
 
 ## Previous Milestones
 
@@ -171,5 +173,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 26-02-PLAN.md (filter memoization + display pagination)
+Stopped at: Phase 26 verified complete (10/10 must-haves)
 Resume file: None
