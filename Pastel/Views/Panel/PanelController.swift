@@ -234,15 +234,8 @@ final class PanelController {
         } completionHandler: { [weak self] in
             panel.orderOut(nil)
             self?.removeEventMonitors()
-            // Only return focus to the previous app if no other Pastel windows are visible
-            // (e.g., Settings, Edit modal). As an LSUIElement app, activating another app
-            // hides ALL Pastel windows -- which would close Settings unexpectedly.
-            let hasOtherVisibleWindows = NSApp.windows.contains { window in
-                window.isVisible && window != panel
-            }
-            if !hasOtherVisibleWindows {
-                self?.previousApp?.activate()
-            }
+            // Return focus to the app that was frontmost before the panel was shown.
+            self?.previousApp?.activate()
             self?.previousApp = nil
         }
 

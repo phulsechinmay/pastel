@@ -218,8 +218,8 @@ struct FilteredCardListView: View {
             filteredItems = computeFilteredItems(from: items)
             installKeyboardMonitor()
         }
-        .onChange(of: items.map(\.id)) { _, _ in
-            filteredItems = computeFilteredItems(from: items)
+        .onChange(of: items) { _, newItems in
+            filteredItems = computeFilteredItems(from: newItems)
         }
         .onDisappear {
             if let monitor = keyMonitor {
