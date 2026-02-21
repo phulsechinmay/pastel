@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 25 OTA Updates with Sparkle -- Complete (2/2 plans)
+**Current focus:** Phase 26 Panel Performance Optimization -- In Progress (1/2 plans)
 
 ## Current Position
 
-Phase: 25 of 25 (OTA Updates with Sparkle)
-Plan: 2 of 2 complete
-Status: Complete
-Last activity: 2026-02-21 - Completed quick task 28: Improve export/import UI with type filters, label selection, date range, and import modal
+Phase: 26 of 26 (Panel Performance Optimization)
+Plan: 1 of 2 complete
+Status: In Progress
+Last activity: 2026-02-21 - Completed 26-01: showCount-based .id() refresh and AppIconCache
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -117,6 +117,12 @@ Key decisions from Phase 25 Plan 02 (Sparkle Integration Layer):
 - [25-02]: UpdaterService auto-starts in init via DispatchQueue.main.async (avoids struct init escaping closure issue)
 - [25-02]: @StateObject for UpdaterService (not @State) to propagate @Published changes to @ObservedObject consumers
 
+Key decisions from Phase 26 Plan 01 (Panel Open Lag Reduction):
+
+- [26-01]: AppIconCache as @MainActor singleton (matches AppIconColorService pattern) for cached app icon lookups
+- [26-01]: Replaced NSWorkspace.appIcon extension entirely -- all call sites use AppIconCache.shared directly
+- [26-01]: showCount-based .id() refresh (not itemCount) to avoid hidden-panel view recreation
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -158,5 +164,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed quick task 28 (export/import UI with filters)
+Stopped at: Completed 26-01-PLAN.md (showCount .id() refresh + AppIconCache)
 Resume file: None
