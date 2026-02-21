@@ -1,9 +1,8 @@
 import SwiftUI
 import LaunchAtLogin
 import KeyboardShortcuts
-import UniformTypeIdentifiers
 
-/// General settings tab with all 5 user-configurable settings.
+/// General settings tab with all user-configurable settings.
 ///
 /// Layout (top to bottom):
 /// 1. Launch at login toggle (LaunchAtLogin package)
@@ -11,19 +10,16 @@ import UniformTypeIdentifiers
 /// 3. Panel position selector (ScreenEdgePicker bound to @AppStorage "panelEdge")
 /// 4. History retention dropdown (Picker bound to @AppStorage "historyRetention")
 /// 5. Paste behavior dropdown (Picker bound to @AppStorage "pasteBehavior")
+/// 6. URL Previews toggle
+/// 7. Data (Export sheet, Import sheet, Clear All History)
 struct GeneralSettingsView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
 
     @State private var showingClearConfirmation = false
-    @State private var importExportService = ImportExportService()
-    @State private var showingExportSuccess = false
-    @State private var showingImportResult = false
-    @State private var showingImportError = false
-    @State private var exportedItemCount = 0
-    @State private var lastImportResult: ImportResult?
-    @State private var importErrorMessage = ""
+    @State private var showingExportSheet = false
+    @State private var showingImportSheet = false
 
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("historyRetention") private var retentionDays: Int = 90
@@ -131,22 +127,15 @@ struct GeneralSettingsView: View {
                             .font(.headline)
                         Spacer()
                         Button("Export...") {
-                            performExport()
+                            showingExportSheet = true
                         }
-                        .disabled(importExportService.isProcessing)
                         Button("Import...") {
-                            performImport()
+                            showingImportSheet = true
                         }
-                        .disabled(importExportService.isProcessing)
-                        Button("Import from PastePal...") {
-                            performPastePalImport()
-                        }
-                        .disabled(importExportService.isProcessing)
                         Button("Clear All History...") {
                             showingClearConfirmation = true
                         }
                         .foregroundStyle(.red)
-                        .disabled(importExportService.isProcessing)
                         .alert("Clear All History", isPresented: $showingClearConfirmation) {
                             Button("Clear All", role: .destructive) {
                                 appState.clearAllHistory(modelContext: modelContext)
@@ -157,35 +146,9 @@ struct GeneralSettingsView: View {
                         }
                     }
 
-                    if importExportService.isProcessing {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ProgressView(value: importExportService.progress)
-                            Text(importExportService.progressMessage)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Text("Export saves text-based clipboard history to a .pastel file. Images are not included. You can also import from PastePal JSON exports.")
+                    Text("Export saves clipboard history with filters. Import supports Pastel and PastePal formats.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-                .alert("Export Complete", isPresented: $showingExportSuccess) {
-                    Button("OK") {}
-                } message: {
-                    Text("Exported \(exportedItemCount) items to .pastel file.")
-                }
-                .alert("Import Complete", isPresented: $showingImportResult) {
-                    Button("OK") {}
-                } message: {
-                    if let result = lastImportResult {
-                        Text("Imported \(result.importedCount) items, skipped \(result.skippedCount) duplicates. \(result.labelsCreated) new labels created.")
-                    }
-                }
-                .alert("Import Failed", isPresented: $showingImportError) {
-                    Button("OK") {}
-                } message: {
-                    Text(importErrorMessage)
                 }
             }
             .padding(24)
@@ -194,85 +157,11 @@ struct GeneralSettingsView: View {
         .onChange(of: panelEdgeRaw) {
             appState.panelController.handleEdgeChange()
         }
-    }
-
-    // MARK: - Export
-
-    private func performExport() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.pastelExport]
-        panel.nameFieldStringValue = "Clipboard History.pastel"
-        panel.title = "Export Clipboard History"
-        panel.message = "Choose where to save your clipboard history."
-        panel.canCreateDirectories = true
-
-        let response = panel.runModal()
-        guard response == .OK, let url = panel.url else { return }
-
-        Task {
-            do {
-                let data = try importExportService.exportHistory(modelContext: modelContext)
-                try data.write(to: url, options: .atomic)
-                exportedItemCount = importExportService.lastExportCount
-                showingExportSuccess = true
-            } catch {
-                importErrorMessage = "Export failed: \(error.localizedDescription)"
-                showingImportError = true
-            }
+        .sheet(isPresented: $showingExportSheet) {
+            ExportSheetView()
         }
-    }
-
-    // MARK: - Import
-
-    private func performImport() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.pastelExport]
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.title = "Import Clipboard History"
-        panel.message = "Select a .pastel file to import."
-
-        let response = panel.runModal()
-        guard response == .OK, let url = panel.url else { return }
-
-        Task {
-            do {
-                let data = try Data(contentsOf: url)
-                let result = try importExportService.importHistory(from: data, modelContext: modelContext)
-                lastImportResult = result
-                showingImportResult = true
-            } catch {
-                importErrorMessage = "Import failed: \(error.localizedDescription)"
-                showingImportError = true
-            }
-        }
-    }
-
-    // MARK: - PastePal Import
-
-    private func performPastePalImport() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.title = "Import from PastePal"
-        panel.message = "Select a PastePal JSON export file."
-
-        let response = panel.runModal()
-        guard response == .OK, let url = panel.url else { return }
-
-        Task {
-            do {
-                let data = try Data(contentsOf: url)
-                let result = try importExportService.importPastePalHistory(from: data, modelContext: modelContext)
-                lastImportResult = result
-                showingImportResult = true
-            } catch {
-                importErrorMessage = "PastePal import failed: \(error.localizedDescription)"
-                showingImportError = true
-            }
+        .sheet(isPresented: $showingImportSheet) {
+            ImportSheetView()
         }
     }
 }
