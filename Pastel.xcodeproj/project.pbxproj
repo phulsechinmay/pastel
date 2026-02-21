@@ -11,6 +11,7 @@
 		06AA48B5B881CDC6751CA40B /* ColorCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F774B6CD032B1A682BACC9D7 /* ColorCardView.swift */; };
 		0705E8D7C6E0B9DFD944D17A /* DragItemProviderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311A67E5A6FA0C55F53F34D2 /* DragItemProviderService.swift */; };
 		0718766F684C890B0D3CC008 /* LabelColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A1A38C2FA151019789426E /* LabelColor.swift */; };
+		0DBAA351E86CE7AD5ACF5EA8 /* CheckForUpdatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D016E956757FC54451ADA9B /* CheckForUpdatesView.swift */; };
 		0E86EEAF47C438D35E602BE4 /* AccessibilityPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1291C4BDF0D13A50048E2CAE /* AccessibilityPromptView.swift */; };
 		109EFD935C1F151E8429118F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */; };
 		122737920FB08FD4C003C5FC /* AppPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79CFDAC2AF0FE47B9F09BCD5 /* AppPickerView.swift */; };
@@ -40,6 +41,7 @@
 		7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA88123A30157392A4055111 /* SyncMonitor.swift */; };
 		8557CEFECB6460592724EA0E /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6234E0274B828B16C2A57EA /* NSImage+Thumbnail.swift */; };
 		8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E931197AB3A47AD6193B9FF1 /* URLCardView.swift */; };
+		8D3A1DE972AB5DED09F5C907 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018D70F413FB3449B315242B /* UpdaterService.swift */; };
 		8DBC176CDC96ACB4D5E1C831 /* PanelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E518463722AA3C82269FBC5B /* PanelLayout.swift */; };
 		93896FFED1F319E354A4940A /* ColorToolController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4FC404F56DB93E075FCDEB /* ColorToolController.swift */; };
 		9568A5C18B45B7183E87ABE3 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */; };
@@ -63,6 +65,7 @@
 		C84AA84FF0EC7D6DCF2661B5 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 6A162463274A6F07E5B4303C /* HighlightSwift */; };
 		C9DA10258BC9D50AC228BA4C /* LabelSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E69FA6363380EEB64EF71E /* LabelSettingsView.swift */; };
 		CB24B8C2681CF4B5F1AB5DC9 /* NSWorkspace+AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00804B3DBC5EB02EA738DEC2 /* NSWorkspace+AppIcon.swift */; };
+		CE356E5667558F435C423DA9 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 916E66CD9690BB1D7E2FB9AC /* Sparkle */; };
 		CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */; };
 		D08F6F7B616F247E759ACBA6 /* HistoryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC3454A6A688FE2B0DF6845 /* HistoryGridView.swift */; };
 		D3022838FBC0C60D3B9FBCC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7CA38A9FD4344A6EBC84615B /* Assets.xcassets */; };
@@ -83,15 +86,18 @@
 /* Begin PBXFileReference section */
 		00804B3DBC5EB02EA738DEC2 /* NSWorkspace+AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSWorkspace+AppIcon.swift"; sourceTree = "<group>"; };
 		00D664297F1ED550FBA3FC3E /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
+		018D70F413FB3449B315242B /* UpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdaterService.swift; sourceTree = "<group>"; };
 		03E82EAEFFC6D30098BC07E9 /* ClipboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardMonitor.swift; sourceTree = "<group>"; };
 		10FC617DD35144DF808D4822 /* FileCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileCardView.swift; sourceTree = "<group>"; };
 		12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryBrowserView.swift; sourceTree = "<group>"; };
 		1291C4BDF0D13A50048E2CAE /* AccessibilityPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPromptView.swift; sourceTree = "<group>"; };
 		1317D22929AB0FAE7702656B /* NSPasteboard+Reading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Reading.swift"; sourceTree = "<group>"; };
+		1D016E956757FC54451ADA9B /* CheckForUpdatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckForUpdatesView.swift; sourceTree = "<group>"; };
 		20EE7734FD97FDE51DA389F0 /* ChipBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChipBarView.swift; sourceTree = "<group>"; };
 		2337ECFAF234829DF1605685 /* ColorDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorDetectionService.swift; sourceTree = "<group>"; };
 		2552B517F7D234BBB9E3FB05 /* Pastel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pastel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		27309449A76C08F456D24215 /* FocusableTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusableTextField.swift; sourceTree = "<group>"; };
+		280E0321399C143F087FBEAB /* Pastel-Sparkle.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Pastel-Sparkle.entitlements"; sourceTree = "<group>"; };
 		2A06BBF36C8BBCBBB40C2522 /* ContentType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentType.swift; sourceTree = "<group>"; };
 		2F339BF74219A6B2629B2C42 /* ImageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCardView.swift; sourceTree = "<group>"; };
 		30EA2DC6C129FA8392D0E5CA /* ClipboardCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardCardView.swift; sourceTree = "<group>"; };
@@ -162,6 +168,7 @@
 				B936EBEE374527897FA897DE /* KeyboardShortcuts in Frameworks */,
 				4A72AB5E7A1E848B071EFD98 /* LaunchAtLogin in Frameworks */,
 				C84AA84FF0EC7D6DCF2661B5 /* HighlightSwift in Frameworks */,
+				CE356E5667558F435C423DA9 /* Sparkle in Frameworks */,
 				EBE43F0C7BE6AC9E23ACA40C /* CloudKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -274,6 +281,7 @@
 				ADA2DA3D25FB59CE37228411 /* RetentionService.swift */,
 				B8EDC77C4CCB143B62248B29 /* SwiftDataHelpers.swift */,
 				FA88123A30157392A4055111 /* SyncMonitor.swift */,
+				018D70F413FB3449B315242B /* UpdaterService.swift */,
 				7581ECF910A056323D87F4D2 /* URLMetadataService.swift */,
 			);
 			path = Services;
@@ -344,6 +352,7 @@
 			children = (
 				7CA38A9FD4344A6EBC84615B /* Assets.xcassets */,
 				7B6FC5171BA6D8C3F714E834 /* Info.plist */,
+				280E0321399C143F087FBEAB /* Pastel-Sparkle.entitlements */,
 				DACD70AAF6888EBA275AC2BE /* Pastel.entitlements */,
 				4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */,
 			);
@@ -353,6 +362,7 @@
 		EF7C09501060152172C163BE /* MenuBar */ = {
 			isa = PBXGroup;
 			children = (
+				1D016E956757FC54451ADA9B /* CheckForUpdatesView.swift */,
 				71138AD30E90615916853DD4 /* StatusPopoverView.swift */,
 			);
 			path = MenuBar;
@@ -368,6 +378,7 @@
 				CFC9BE05F2B5543679DC7E52 /* Sources */,
 				8F8F46F73644967BE391FF51 /* Resources */,
 				23E0D0C9A555E2CDA93BE9F8 /* Frameworks */,
+				38CFC1AD4304D17F79BB87D9 /* Strip Sparkle from App Store Builds */,
 			);
 			buildRules = (
 			);
@@ -378,6 +389,7 @@
 				A9A03DD46B1694F403E4ACF4 /* KeyboardShortcuts */,
 				B33BB73FF430F4D698304521 /* LaunchAtLogin */,
 				6A162463274A6F07E5B4303C /* HighlightSwift */,
+				916E66CD9690BB1D7E2FB9AC /* Sparkle */,
 			);
 			productName = Pastel;
 			productReference = 2552B517F7D234BBB9E3FB05 /* Pastel.app */;
@@ -412,6 +424,7 @@
 				1623D6B40C410029E90CC981 /* XCRemoteSwiftPackageReference "HighlightSwift" */,
 				6D088F3E7D49E387347AE545 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 				B8552B06DA78E00BFB0CFA7A /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
+				140537C5759703954B8459CA /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
@@ -434,6 +447,27 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		38CFC1AD4304D17F79BB87D9 /* Strip Sparkle from App Store Builds */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Sparkle from App Store Builds";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [[ \"$CONFIGURATION\" == *\"Sparkle\"* ]]; then\n  echo \"Sparkle build -- keeping Sparkle.framework\"\nelse\n  echo \"App Store build -- removing Sparkle.framework\"\n  rm -rf \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle.framework\"\n  rm -rf \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle_XPCServices.framework\" 2>/dev/null || true\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		CFC9BE05F2B5543679DC7E52 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -447,6 +481,7 @@
 				445924843227BBEFB0577AC3 /* AppRelaunchService.swift in Sources */,
 				D784DF24180305D270E7DDED /* AppState.swift in Sources */,
 				1FF817C58BBCAC1F6A6DA2DD /* AsyncThumbnailView.swift in Sources */,
+				0DBAA351E86CE7AD5ACF5EA8 /* CheckForUpdatesView.swift in Sources */,
 				4DA18147B096FCF7C2973416 /* ChipBarView.swift in Sources */,
 				A84BDBA4EE2E5EE99EEFDE1B /* ClipboardCardView.swift in Sources */,
 				04769AF24E5670F5A628D811 /* ClipboardItem.swift in Sources */,
@@ -504,37 +539,14 @@
 				3ADFAC504957D459F381AFB2 /* TextCardView.swift in Sources */,
 				8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */,
 				B140415A01B99DBECC39C8AF /* URLMetadataService.swift in Sources */,
+				8D3A1DE972AB5DED09F5C907 /* UpdaterService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		0BFB465F711782BF6D39DE09 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Pastel/Resources/Pastel.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QLSJ39DRSH;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Pastel/Resources/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
-				SDKROOT = macosx;
-				SWIFT_VERSION = 6.0;
-			};
-			name = Release;
-		};
-		469C31C43047930E08E6A6BA /* Release */ = {
+		2BADFA311FA6871C36900FD6 /* Release-Sparkle */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -588,33 +600,9 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 			};
-			name = Release;
+			name = "Release-Sparkle";
 		};
-		4D34B74F36CB3664F9B31D03 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Pastel/Resources/Pastel.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QLSJ39DRSH;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Pastel/Resources/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
-				SDKROOT = macosx;
-				SWIFT_VERSION = 6.0;
-			};
-			name = Debug;
-		};
-		BC576749034C8B29EE3A8D58 /* Debug */ = {
+		6FE5766374227699988A3A28 /* Debug-AppStore */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -675,7 +663,224 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
-			name = Debug;
+			name = "Debug-AppStore";
+		};
+		826E8FF7BD82DBD1682D317D /* Release-Sparkle */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Pastel/Resources/Pastel-Sparkle.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QLSJ39DRSH;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Pastel/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SPARKLE";
+				SWIFT_VERSION = 6.0;
+			};
+			name = "Release-Sparkle";
+		};
+		8EBB30F6E1A010705E502756 /* Release-AppStore */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Pastel/Resources/Pastel.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QLSJ39DRSH;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Pastel/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = "Release-AppStore";
+		};
+		CBE4B1B8DC8DAFD64136CA4D /* Debug-Sparkle */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Pastel/Resources/Pastel-Sparkle.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QLSJ39DRSH;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Pastel/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SPARKLE";
+				SWIFT_VERSION = 6.0;
+			};
+			name = "Debug-Sparkle";
+		};
+		CC9FC9ECE8897CB452D4EA6C /* Release-AppStore */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = "Release-AppStore";
+		};
+		F51677937AE516BDA7429FF6 /* Debug-Sparkle */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = "Debug-Sparkle";
+		};
+		FC9BE3BFB4CCFB32F52730B4 /* Debug-AppStore */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Pastel/Resources/Pastel.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QLSJ39DRSH;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Pastel/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = "Debug-AppStore";
 		};
 /* End XCBuildConfiguration section */
 
@@ -683,24 +888,36 @@
 		2A8FEF64CF15070A564B8B5E /* Build configuration list for PBXNativeTarget "Pastel" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				4D34B74F36CB3664F9B31D03 /* Debug */,
-				0BFB465F711782BF6D39DE09 /* Release */,
+				FC9BE3BFB4CCFB32F52730B4 /* Debug-AppStore */,
+				CBE4B1B8DC8DAFD64136CA4D /* Debug-Sparkle */,
+				8EBB30F6E1A010705E502756 /* Release-AppStore */,
+				826E8FF7BD82DBD1682D317D /* Release-Sparkle */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = "Debug-AppStore";
 		};
 		5A8B1C26A723555E9D7D5F1F /* Build configuration list for PBXProject "Pastel" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BC576749034C8B29EE3A8D58 /* Debug */,
-				469C31C43047930E08E6A6BA /* Release */,
+				6FE5766374227699988A3A28 /* Debug-AppStore */,
+				F51677937AE516BDA7429FF6 /* Debug-Sparkle */,
+				CC9FC9ECE8897CB452D4EA6C /* Release-AppStore */,
+				2BADFA311FA6871C36900FD6 /* Release-Sparkle */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = "Debug-AppStore";
 		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		140537C5759703954B8459CA /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.0;
+			};
+		};
 		1623D6B40C410029E90CC981 /* XCRemoteSwiftPackageReference "HighlightSwift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/appstefan/HighlightSwift";
@@ -732,6 +949,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1623D6B40C410029E90CC981 /* XCRemoteSwiftPackageReference "HighlightSwift" */;
 			productName = HighlightSwift;
+		};
+		916E66CD9690BB1D7E2FB9AC /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 140537C5759703954B8459CA /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		A9A03DD46B1694F403E4ACF4 /* KeyboardShortcuts */ = {
 			isa = XCSwiftPackageProductDependency;

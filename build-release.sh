@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-SCHEME="Pastel"
+SCHEME="Pastel Sparkle"
 TEAM_ID="QLSJ39DRSH"
 SIGNING_IDENTITY="Developer ID Application: Chinmay Phulse ($TEAM_ID)"
 NOTARY_PROFILE="notary-pastel"
@@ -12,7 +12,7 @@ EXPORT_PATH="$BUILD_DIR/export"
 EXPORT_OPTIONS="$BUILD_DIR/ExportOptions.plist"
 
 # ─── Resolve version from Xcode project ──────────────────────────────────────
-VERSION=$(xcodebuild -scheme "$SCHEME" -configuration Release -showBuildSettings 2>/dev/null \
+VERSION=$(xcodebuild -scheme "$SCHEME" -configuration Release-Sparkle -showBuildSettings 2>/dev/null \
     | grep MARKETING_VERSION | head -1 | awk '{print $NF}')
 
 if [ -z "$VERSION" ]; then
@@ -58,9 +58,9 @@ echo "==> Cleaning build directory"
 rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH" "$BUILD_DIR/dmg-staging" "$DMG_PATH"
 
 # ─── Archive ──────────────────────────────────────────────────────────────────
-echo "==> Archiving ($SCHEME, Release, hardened runtime)"
+echo "==> Archiving ($SCHEME, Release-Sparkle, hardened runtime)"
 xcodebuild -scheme "$SCHEME" \
-    -configuration Release \
+    -configuration Release-Sparkle \
     -archivePath "$ARCHIVE_PATH" \
     archive \
     DEVELOPMENT_TEAM="$TEAM_ID" \
@@ -108,12 +108,31 @@ xcrun stapler staple "$DMG_PATH"
 echo "==> Verifying notarization"
 spctl -a -t open --context context:primary-signature -v "$DMG_PATH" 2>&1
 
+# ─── Generate Sparkle Appcast ────────────────────────────────────────────────
+echo "==> Generating Sparkle appcast"
+GENERATE_APPCAST=$(find "$BUILD_DIR" -name "generate_appcast" -type f 2>/dev/null | head -1)
+if [ -z "$GENERATE_APPCAST" ]; then
+    GENERATE_APPCAST=$(find ~/Library/Developer/Xcode/DerivedData -name "generate_appcast" -type f 2>/dev/null | head -1)
+fi
+if [ -n "$GENERATE_APPCAST" ]; then
+    REPO_URL=$(gh repo view --json url -q .url)
+    "$GENERATE_APPCAST" "$BUILD_DIR" \
+        --download-url-prefix "${REPO_URL}/releases/download/${TAG}/"
+    echo "    Appcast: $BUILD_DIR/appcast.xml"
+else
+    echo "WARNING: generate_appcast not found. Run manually after release."
+fi
+
 # ─── GitHub Release ───────────────────────────────────────────────────────────
 echo "==> Creating GitHub release $TAG"
 git tag "$TAG"
 git push origin "$TAG"
 
-gh release create "$TAG" "$DMG_PATH" \
+RELEASE_ASSETS=("$DMG_PATH")
+if [ -f "$BUILD_DIR/appcast.xml" ]; then
+    RELEASE_ASSETS+=("$BUILD_DIR/appcast.xml")
+fi
+gh release create "$TAG" "${RELEASE_ASSETS[@]}" \
     --title "Pastel $TAG" \
     --generate-notes
 
