@@ -380,6 +380,7 @@ Phases execute in numeric order: 19 -> 20 -> 21
 | 19. CloudKit-Compatible Data Model | v1.5 | 2/2 | Complete | 2026-02-14 |
 | 20. CloudKit Infrastructure and Sync Engine | v1.5 | 0/2 | Not started | - |
 | 21. Sync Controls, Deduplication, and Status | v1.5 | 0/2 | Not started | - |
+| 25. OTA Updates with Sparkle | - | 2/2 | Complete | 2026-02-20 |
 
 ### Phase 22: Code/Color Edit Controls and Panel Toolbar Tools (language override, color pickers, position switcher)
 
@@ -423,5 +424,5 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 25-01-PLAN.md -- xcodegen configVariants (AppStore/Sparkle), Sparkle SPM dependency, Sparkle entitlements, Info.plist keys, strip script
-- [ ] 25-02-PLAN.md -- UpdaterService, CheckForUpdatesView, PastelApp/StatusPopoverView wiring, DMG build/notarize script
+- [x] 25-01-PLAN.md -- xcodegen configVariants (AppStore/Sparkle), Sparkle SPM dependency, Sparkle entitlements, Info.plist keys, strip script
+- [x] 25-02-PLAN.md -- UpdaterService, CheckForUpdatesView, PastelApp/StatusPopoverView wiring, DMG build/notarize script
