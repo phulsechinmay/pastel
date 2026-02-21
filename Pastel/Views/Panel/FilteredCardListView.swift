@@ -77,6 +77,20 @@ struct FilteredCardListView: View {
         }
     }
 
+    /// Static dictionary mapping NSEvent.keyCode to digit value (1-9).
+    /// Key codes are non-sequential because they map to physical ANSI key positions.
+    private static let digitKeyCodeMap: [UInt16: Int] = [
+        0x12: 1,  // kVK_ANSI_1
+        0x13: 2,  // kVK_ANSI_2
+        0x14: 3,  // kVK_ANSI_3
+        0x15: 4,  // kVK_ANSI_4
+        0x17: 5,  // kVK_ANSI_5
+        0x16: 6,  // kVK_ANSI_6
+        0x1A: 7,  // kVK_ANSI_7
+        0x1C: 8,  // kVK_ANSI_8
+        0x19: 9,  // kVK_ANSI_9
+    ]
+
     /// Whether the panel is on a horizontal edge (top/bottom), requiring horizontal card layout.
     private var isHorizontal: Bool {
         let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
@@ -186,51 +200,6 @@ struct FilteredCardListView: View {
         }
         .focusable()
         .focusEffectDisabled()
-        .onKeyPress(keys: [.return]) { keyPress in
-            if let index = selectedIndex, index < visibleItems.count {
-                if keyPress.modifiers.contains(.shift) {
-                    onPastePlainText(visibleItems[index])
-                } else {
-                    onPaste(visibleItems[index])
-                }
-            }
-            return .handled
-        }
-        .onKeyPress(characters: .decimalDigits) { keyPress in
-            // Cmd+N: Normal paste (preserving formatting)
-            guard quickPasteEnabled, keyPress.modifiers.contains(.command) else { return .ignored }
-
-            guard let digit = keyPress.characters.first,
-                  let number = digit.wholeNumberValue,
-                  number >= 1, number <= 9 else { return .ignored }
-
-            let index = number - 1
-            guard index < visibleItems.count else { return .ignored }
-
-            onPaste(visibleItems[index])
-            return .handled
-        }
-        .onKeyPress(characters: CharacterSet(charactersIn: "!@#$%^&*(")) { keyPress in
-            // Cmd+Shift+N: Plain text paste
-            // Shift+1-9 produces !@#$%^&*( so .decimalDigits won't match
-            guard quickPasteEnabled,
-                  keyPress.modifiers.contains(.command),
-                  keyPress.modifiers.contains(.shift) else { return .ignored }
-
-            let shiftedDigitMap: [Character: Int] = [
-                "!": 1, "@": 2, "#": 3, "$": 4, "%": 5,
-                "^": 6, "&": 7, "*": 8, "(": 9
-            ]
-
-            guard let char = keyPress.characters.first,
-                  let number = shiftedDigitMap[char] else { return .ignored }
-
-            let index = number - 1
-            guard index < visibleItems.count else { return .ignored }
-
-            onPastePlainText(visibleItems[index])
-            return .handled
-        }
         .onKeyPress(characters: .alphanumerics.union(.punctuationCharacters)) { keyPress in
             // Don't intercept Cmd/Ctrl modified keys (those go to quick paste or system)
             guard !keyPress.modifiers.contains(.command),
@@ -247,7 +216,7 @@ struct FilteredCardListView: View {
             selectedIndex = nil
             displayLimit = pageSize
             filteredItems = computeFilteredItems(from: items)
-            installArrowKeyMonitor()
+            installKeyboardMonitor()
         }
         .onChange(of: items) { _, newItems in
             filteredItems = computeFilteredItems(from: newItems)
@@ -315,10 +284,10 @@ struct FilteredCardListView: View {
         .id(index)
     }
 
-    /// Install NSEvent local monitor for arrow key handling.
+    /// Install NSEvent local monitor for keyboard handling (arrows, Enter, Cmd+digit activation).
     /// NSEvent monitors operate at the AppKit level and are immune to SwiftUI re-render
-    /// interruptions, enabling reliable key repeat for card navigation.
-    private func installArrowKeyMonitor() {
+    /// interruptions and focus issues, enabling reliable keyboard interaction in NSPanel contexts.
+    private func installKeyboardMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             switch event.keyCode {
             case 123: // Left arrow
@@ -351,7 +320,30 @@ struct FilteredCardListView: View {
                     return nil
                 }
                 return event
+            case 0x24, 0x4C: // Return, Keypad Enter
+                if let index = selectedIndex, index < visibleItems.count {
+                    if event.modifierFlags.contains(.shift) {
+                        onPastePlainText(visibleItems[index])
+                    } else {
+                        onPaste(visibleItems[index])
+                    }
+                    return nil // consumed
+                }
+                return event // no valid selection, pass through
             default:
+                // Cmd+1-9 / Cmd+Shift+1-9 quick paste activation
+                if event.modifierFlags.contains(.command),
+                   let digit = Self.digitKeyCodeMap[event.keyCode] {
+                    guard quickPasteEnabled else { return event }
+                    let index = digit - 1
+                    guard index < visibleItems.count else { return event }
+                    if event.modifierFlags.contains(.shift) {
+                        onPastePlainText(visibleItems[index])
+                    } else {
+                        onPaste(visibleItems[index])
+                    }
+                    return nil // consumed
+                }
                 return event // pass through all other keys
             }
         }
