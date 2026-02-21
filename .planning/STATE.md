@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 24 Fix Panel Window Level for Screenshot Preview Compatibility -- Complete
+**Current focus:** Phase 25 OTA Updates with Sparkle -- Plan 01 Complete
 
 ## Current Position
 
-Phase: 24 of 24 (Fix Panel Window Level for Screenshot Preview Compatibility)
-Plan: 1 of 1 complete
-Status: Complete
-Last activity: 2026-02-20 - Completed 24-01: Panel window level lowered to dockWindow+3 for screenshot preview compatibility
+Phase: 25 of 25 (OTA Updates with Sparkle)
+Plan: 1 of 2 complete
+Status: In Progress
+Last activity: 2026-02-20 - Completed 25-01: Dual-distribution build system with Sparkle SPM, configVariants, and separate entitlements
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -21,6 +21,7 @@ Last activity: 2026-02-20 - Completed 24-01: Panel window level lowered to dockW
 - Phase 22 added: Code/Color Edit Controls and Panel Toolbar Tools (language override, color pickers, position switcher)
 - Phase 23 added: Responsive Panel UI and Layout Fixes
 - Phase 24 added: Fix Panel Window Level for Screenshot Preview Compatibility
+- Phase 25 added: OTA Updates with Sparkle (DMG distribution, conditional compilation for App Store exclusion)
 
 ## Previous Milestones
 
@@ -104,6 +105,12 @@ Key decisions from Phase 24 Plan 01 (Panel Window Level Fix):
 
 - [24-01]: CGWindowLevelForKey(.dockWindow) + 3 (level 23) instead of .statusBar (25) -- above Dock, below screenshot overlay
 
+Key decisions from Phase 25 Plan 01 (Build System Configuration):
+
+- [25-01]: configVariants generates Pastel AppStore and Pastel Sparkle schemes (replaces single Pastel scheme)
+- [25-01]: SUPublicEDKey placeholder in Info.plist -- user replaces after running generate_keys
+- [25-01]: SUFeedURL points to GitHub raw appcast.xml (placeholder repo URL)
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -144,5 +151,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 24-01-PLAN.md (panel window level fix for screenshot preview compatibility)
+Stopped at: Completed 25-01-PLAN.md (dual-distribution build system with Sparkle)
 Resume file: None
