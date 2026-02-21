@@ -27,6 +27,9 @@ struct FilteredCardListView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var dropTargetIndex: Int? = nil
     @State private var keyMonitor: Any? = nil
+    @State private var filteredItems: [ClipboardItem] = []
+    @State private var displayLimit: Int = 50
+    private let pageSize: Int = 50
 
     let allLabels: [Label]
     @Binding var selectedIndex: Int?
@@ -41,7 +44,12 @@ struct FilteredCardListView: View {
     /// Selected label IDs for in-memory post-filtering (OR logic).
     private let selectedLabelIDs: Set<PersistentIdentifier>
 
-    /// Items filtered by sync rules and selected labels (in-memory).
+    /// Items visible after pagination (first `displayLimit` of filteredItems).
+    private var visibleItems: [ClipboardItem] {
+        Array(filteredItems.prefix(displayLimit))
+    }
+
+    /// Compute items filtered by sync rules and selected labels (in-memory).
     ///
     /// Sync filtering (applied first):
     /// - Concealed items excluded (passwords never appear in browseable panel)
@@ -50,7 +58,7 @@ struct FilteredCardListView: View {
     ///
     /// Label filtering (applied second, OR logic):
     /// If no labels selected, returns all sync-filtered items.
-    private var filteredItems: [ClipboardItem] {
+    private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
         let localDeviceID = DeviceIdentifier.current
         let syncFiltered = items.filter { item in
             // Exclude concealed items (passwords should never appear in browseable history)
@@ -130,7 +138,7 @@ struct FilteredCardListView: View {
 
     var body: some View {
         Group {
-            if filteredItems.isEmpty {
+            if visibleItems.isEmpty {
                     SwiftUI.Label("No matching items", systemImage: "magnifyingglass")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -141,7 +149,7 @@ struct FilteredCardListView: View {
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: PanelLayout.cardSpacing) {
-                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
                                     .frame(width: PanelLayout.horizontalCardWidth, height: PanelLayout.cardMaxHeight)
                             }
@@ -161,7 +169,7 @@ struct FilteredCardListView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: PanelLayout.cardSpacing) {
-                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
                             }
                         }
@@ -179,11 +187,11 @@ struct FilteredCardListView: View {
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(keys: [.return]) { keyPress in
-            if let index = selectedIndex, index < filteredItems.count {
+            if let index = selectedIndex, index < visibleItems.count {
                 if keyPress.modifiers.contains(.shift) {
-                    onPastePlainText(filteredItems[index])
+                    onPastePlainText(visibleItems[index])
                 } else {
-                    onPaste(filteredItems[index])
+                    onPaste(visibleItems[index])
                 }
             }
             return .handled
@@ -197,9 +205,9 @@ struct FilteredCardListView: View {
                   number >= 1, number <= 9 else { return .ignored }
 
             let index = number - 1
-            guard index < filteredItems.count else { return .ignored }
+            guard index < visibleItems.count else { return .ignored }
 
-            onPaste(filteredItems[index])
+            onPaste(visibleItems[index])
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "!@#$%^&*(")) { keyPress in
@@ -218,9 +226,9 @@ struct FilteredCardListView: View {
                   let number = shiftedDigitMap[char] else { return .ignored }
 
             let index = number - 1
-            guard index < filteredItems.count else { return .ignored }
+            guard index < visibleItems.count else { return .ignored }
 
-            onPastePlainText(filteredItems[index])
+            onPastePlainText(visibleItems[index])
             return .handled
         }
         .onKeyPress(characters: .alphanumerics.union(.punctuationCharacters)) { keyPress in
@@ -237,7 +245,12 @@ struct FilteredCardListView: View {
         }
         .onAppear {
             selectedIndex = nil
+            displayLimit = pageSize
+            filteredItems = computeFilteredItems(from: items)
             installArrowKeyMonitor()
+        }
+        .onChange(of: items) { _, newItems in
+            filteredItems = computeFilteredItems(from: newItems)
         }
         .onDisappear {
             if let monitor = keyMonitor {
@@ -294,6 +307,11 @@ struct FilteredCardListView: View {
                 dropTargetIndex = targeted ? index : nil
             }
         }
+        .onAppear {
+            if index >= displayLimit - 10 && displayLimit < filteredItems.count {
+                displayLimit += pageSize
+            }
+        }
         .id(index)
     }
 
@@ -340,9 +358,14 @@ struct FilteredCardListView: View {
     }
 
     private func moveSelection(by offset: Int) {
-        guard !filteredItems.isEmpty else { return }
+        guard !visibleItems.isEmpty else { return }
         if let current = selectedIndex {
-            selectedIndex = max(0, min(filteredItems.count - 1, current + offset))
+            let newIndex = max(0, min(visibleItems.count - 1, current + offset))
+            selectedIndex = newIndex
+            // Load more items if navigating near the end
+            if newIndex >= displayLimit - 10 && displayLimit < filteredItems.count {
+                displayLimit += pageSize
+            }
         } else {
             selectedIndex = 0
         }
