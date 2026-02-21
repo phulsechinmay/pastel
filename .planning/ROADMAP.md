@@ -426,3 +426,13 @@ Plans:
 Plans:
 - [x] 25-01-PLAN.md -- xcodegen configVariants (AppStore/Sparkle), Sparkle SPM dependency, Sparkle entitlements, Info.plist keys, strip script
 - [x] 25-02-PLAN.md -- UpdaterService, CheckForUpdatesView, PastelApp/StatusPopoverView wiring, DMG build/notarize script
+
+### Phase 26: Panel Performance Optimization (first-open lag, scroll jank, filter switch latency)
+
+**Goal:** Panel opens instantly, scrolls smoothly, and switches label filters without visible lag -- regardless of clipboard history size
+**Depends on:** Phase 25
+**Plans:** 2 plans
+
+Plans:
+- [ ] 26-01-PLAN.md -- Eliminate .id() nuclear recreation, app icon caching, pre-warm caches on capture
+- [ ] 26-02-PLAN.md -- Memoize filteredItems, display pagination with load-more for panel and history grid
