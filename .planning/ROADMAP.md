@@ -408,3 +408,20 @@ Plans:
 
 Plans:
 - [x] 24-01-PLAN.md -- Lower panel window level from .statusBar (25) to custom level 23 (dockWindow + 3), update ColorToolController to match
+
+### Phase 25: OTA Updates with Sparkle (DMG distribution, conditional compilation for App Store exclusion)
+
+**Goal:** Add automatic OTA updates via Sparkle 2.x for DMG/GitHub Releases distribution, with conditional compilation to completely exclude Sparkle from Mac App Store builds. Sparkle checks GitHub Releases for new versions and prompts the user to update in-app. App Store builds rely solely on Apple's update mechanism.
+**Depends on:** Phase 24
+**Key Constraints:**
+- Sparkle 2.x required (sandbox-compatible via XPC services)
+- Every DMG release must be notarized (Gatekeeper rejects un-notarized Sparkle updates)
+- App Store Review Guideline 2.5.2 prohibits OTA — Sparkle must be fully stripped from App Store builds
+- `#if SPARKLE` conditional compilation flag to toggle inclusion
+- Sandbox entitlements needed: `mach-lookup.global-name` for Sparkle XPC (`-spks`, `-spki`)
+- Consider Xcode build configurations or xcodegen targets over script-only separation
+**Plans:** 2 plans
+
+Plans:
+- [ ] 25-01-PLAN.md -- xcodegen configVariants (AppStore/Sparkle), Sparkle SPM dependency, Sparkle entitlements, Info.plist keys, strip script
+- [ ] 25-02-PLAN.md -- UpdaterService, CheckForUpdatesView, PastelApp/StatusPopoverView wiring, DMG build/notarize script
