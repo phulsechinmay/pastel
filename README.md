@@ -19,8 +19,9 @@ Pastel lives in your menu bar and saves everything you copy — text, images, UR
 - **Keyboard-first** — arrow key navigation, hotkey-driven pasting, Shift+Enter for plain text paste
 - **History browser** — grid view with multi-select, bulk actions, and import/export
 - **Drag and drop** — drag items from the panel directly into other apps
+- **iCloud sync** — optionally sync clipboard history across Macs via your own iCloud account
 - **Privacy controls** — exclude specific apps from monitoring, respects password manager concealed types
-- **Local by default** — all data stored on your Mac, no accounts, no analytics
+- **Private by default** — all data stored locally on your Mac, no accounts, no analytics. Optional iCloud sync uses your personal iCloud — nothing touches our servers
 
 ## Install
 
