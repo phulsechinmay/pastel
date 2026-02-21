@@ -152,9 +152,10 @@ None currently.
 | 024 | Add PastePal import option | 2026-02-19 | 689f14b | [24-add-pastepal-import-option-to-pastel](./quick/24-add-pastepal-import-option-to-pastel/) |
 | 025 | Fix panel dismissal when clicking edit modal/settings/color picker | 2026-02-19 | 3fe078c | [25-fix-panel-dismissal-when-clicking-edit-m](./quick/25-fix-panel-dismissal-when-clicking-edit-m/) |
 | 027 | Add color format copy options (Hex/RGB/HSL/CMYK) to right-click menu | 2026-02-20 | 49409ed | [27-add-color-format-copy-options-to-right-c](./quick/27-add-color-format-copy-options-to-right-c/) |
+| 028 | Improve export/import UI with type filters, label select, date range | 2026-02-21 | 0d1833c | [28-improve-export-import-ui-with-type-filte](./quick/28-improve-export-import-ui-with-type-filte/) |
 
 ## Session Continuity
 
-Last session: 2026-02-20
-Stopped at: Completed 25-02-PLAN.md (Sparkle integration layer -- phase 25 complete)
+Last session: 2026-02-21
+Stopped at: Completed quick task 28 (export/import UI with filters)
 Resume file: None
