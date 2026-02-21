@@ -54,6 +54,7 @@ struct ImportResult: Sendable {
 enum ImportExportError: LocalizedError {
     case unsupportedVersion(Int)
     case decodingFailed(String)
+    case invalidFormat(String)
 
     var errorDescription: String? {
         switch self {
@@ -61,6 +62,8 @@ enum ImportExportError: LocalizedError {
             "Unsupported export format version \(version). This file may have been created by a newer version of Pastel."
         case .decodingFailed(let detail):
             "Failed to read the export file: \(detail)"
+        case .invalidFormat(let detail):
+            detail
         }
     }
 }
