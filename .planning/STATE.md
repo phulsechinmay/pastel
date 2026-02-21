@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 25 of 25 (OTA Updates with Sparkle)
 Plan: 2 of 2 complete
 Status: Complete
-Last activity: 2026-02-20 - Completed 25-02: Sparkle integration layer (UpdaterService, CheckForUpdatesView, DMG build script)
+Last activity: 2026-02-21 - Completed quick task 28: Improve export/import UI with type filters, label selection, date range, and import modal
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
