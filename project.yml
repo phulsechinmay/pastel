@@ -5,6 +5,11 @@ options:
     macOS: "14.0"
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
+configs:
+  Debug-AppStore: debug
+  Release-AppStore: release
+  Debug-Sparkle: debug
+  Release-Sparkle: release
 packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
@@ -15,6 +20,9 @@ packages:
   HighlightSwift:
     url: https://github.com/appstefan/HighlightSwift
     from: "1.0.0"
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.8.0"
 targets:
   Pastel:
     type: application
@@ -35,8 +43,30 @@ targets:
         DEVELOPMENT_TEAM: QLSJ39DRSH
         CODE_SIGN_IDENTITY: "Apple Development"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+      configs:
+        Debug-Sparkle:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) SPARKLE"
+          CODE_SIGN_ENTITLEMENTS: Pastel/Resources/Pastel-Sparkle.entitlements
+        Release-Sparkle:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) SPARKLE"
+          CODE_SIGN_ENTITLEMENTS: Pastel/Resources/Pastel-Sparkle.entitlements
     dependencies:
       - package: KeyboardShortcuts
       - package: LaunchAtLogin
       - package: HighlightSwift
+      - package: Sparkle
       - sdk: CloudKit.framework
+    scheme:
+      configVariants:
+        - AppStore
+        - Sparkle
+    postBuildScripts:
+      - script: |
+          if [[ "$CONFIGURATION" == *"Sparkle"* ]]; then
+            echo "Sparkle build -- keeping Sparkle.framework"
+          else
+            echo "App Store build -- removing Sparkle.framework"
+            rm -rf "${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle.framework"
+            rm -rf "${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Sparkle_XPCServices.framework" 2>/dev/null || true
+          fi
+        name: "Strip Sparkle from App Store Builds"
