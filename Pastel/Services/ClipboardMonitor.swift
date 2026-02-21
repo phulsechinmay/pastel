@@ -278,6 +278,12 @@ final class ClipboardMonitor {
             itemCount += 1
             Self.logger.info("Captured \(detectedContentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes)")
 
+            // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
+            if let bundleID = sourceAppBundleID {
+                _ = AppIconCache.shared.icon(forBundleID: bundleID)
+                _ = AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+            }
+
             // Schedule expiration for concealed items (password managers)
             if isConcealed {
                 expirationService.scheduleExpiration(for: item)
@@ -375,6 +381,12 @@ final class ClipboardMonitor {
                 try self.modelContext.save()
                 self.itemCount += 1
                 Self.logger.info("Captured image from \(sourceAppName ?? "unknown") (\(imageByteCount) bytes, path: \(imagePath ?? "none"))")
+
+                // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
+                if let bundleID = sourceAppBundleID {
+                    _ = AppIconCache.shared.icon(forBundleID: bundleID)
+                    _ = AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                }
 
                 // Schedule expiration for concealed items
                 if isConcealed {
