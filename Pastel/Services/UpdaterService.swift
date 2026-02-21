@@ -16,6 +16,11 @@ final class UpdaterService: ObservableObject {
         )
         self.cancellable = controller.updater.publisher(for: \.canCheckForUpdates)
             .assign(to: \.canCheckForUpdates, on: self)
+
+        // Start updater after initialization completes
+        DispatchQueue.main.async { [weak self] in
+            self?.startUpdater()
+        }
     }
 
     func startUpdater() {

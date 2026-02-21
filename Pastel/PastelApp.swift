@@ -2,6 +2,9 @@ import SwiftUI
 import SwiftData
 import CloudKit
 import CoreData
+#if SPARKLE
+import Sparkle
+#endif
 
 @main
 struct PastelApp: App {
@@ -9,6 +12,9 @@ struct PastelApp: App {
     @State private var appState: AppState
     @State private var syncMonitor: SyncMonitor?
     @State private var deduplicationService: DeduplicationService?
+    #if SPARKLE
+    @StateObject private var updaterService = UpdaterService()
+    #endif
 
     init() {
         // DEBUG-only: Push SwiftData schema to CloudKit Development environment
@@ -98,6 +104,7 @@ struct PastelApp: App {
             dedup.startMonitoring()
             self._deduplicationService = State(initialValue: dedup)
         }
+
     }
 
     var body: some Scene {
@@ -105,6 +112,9 @@ struct PastelApp: App {
             StatusPopoverView()
                 .environment(appState)
                 .environment(syncMonitor)
+                #if SPARKLE
+                .environmentObject(updaterService)
+                #endif
                 .modelContainer(modelContainer)
                 .frame(width: 260)
         } label: {

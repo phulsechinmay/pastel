@@ -5,6 +5,9 @@ import KeyboardShortcuts
 struct StatusPopoverView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    #if SPARKLE
+    @EnvironmentObject var updaterService: UpdaterService
+    #endif
 
     @State private var panelShortcutDescription: String?
 
@@ -51,6 +54,10 @@ struct StatusPopoverView: View {
                 }
             }
             .buttonStyle(.plain)
+
+            #if SPARKLE
+            CheckForUpdatesView(updaterService: updaterService)
+            #endif
 
             // Clear All History button (destructive action with NSAlert confirmation)
             Button(role: .destructive) {
