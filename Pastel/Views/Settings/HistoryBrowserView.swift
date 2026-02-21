@@ -36,7 +36,10 @@ struct HistoryBrowserView: View {
             SearchFieldView(searchText: $searchText)
                 .frame(maxWidth: 350)
                 .frame(maxWidth: .infinity)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
             ChipBarView(labels: labels, selectedLabelIDs: $selectedLabelIDs)
+                .padding(.bottom, 8)
 
             Divider()
 

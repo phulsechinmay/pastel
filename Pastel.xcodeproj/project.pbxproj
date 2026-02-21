@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -60,6 +60,7 @@
 		B72B20976A3C77C590C3E68B /* CodeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6FD4DDB3C6EA32691798901 /* CodeCardView.swift */; };
 		B936EBEE374527897FA897DE /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = A9A03DD46B1694F403E4ACF4 /* KeyboardShortcuts */; };
 		BAE74603B44F4338BBDCD644 /* ScreenEdgePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48C40766989658A71731EFD /* ScreenEdgePicker.swift */; };
+		C0DB041EF0AF499CDA7D663C /* ExportSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7048429BF3FE4D9EB1CB547 /* ExportSheetView.swift */; };
 		C52C3E0064018BECA1F46497 /* ColorFormatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 338F16EE8766601609575DB2 /* ColorFormatService.swift */; };
 		C5DDC68198250D3A003DB9D7 /* PanelEdge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76EB886434FC096E9A770705 /* PanelEdge.swift */; };
 		C84AA84FF0EC7D6DCF2661B5 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 6A162463274A6F07E5B4303C /* HighlightSwift */; };
@@ -70,6 +71,7 @@
 		D08F6F7B616F247E759ACBA6 /* HistoryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAC3454A6A688FE2B0DF6845 /* HistoryGridView.swift */; };
 		D3022838FBC0C60D3B9FBCC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7CA38A9FD4344A6EBC84615B /* Assets.xcassets */; };
 		D629BC5C08282F4295FA0416 /* FocusableTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27309449A76C08F456D24215 /* FocusableTextField.swift */; };
+		D6DBC62B5BFAA514DE489339 /* ImportSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA5E3A1BDE7881C5A191BB4 /* ImportSheetView.swift */; };
 		D6F7C0FF5984EC498B94BCC3 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C99DE2608198777D57CA9B /* EmptyStateView.swift */; };
 		D784DF24180305D270E7DDED /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 595BAEC04C890C9BF73C4F5D /* AppState.swift */; };
 		D79B822885FE78D1B40A7A79 /* AppDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB60546E14A2C7AF9096FE4 /* AppDiscoveryService.swift */; };
@@ -107,8 +109,9 @@
 		3C57B64B0B047D80C2F7D4B3 /* ImportExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportExportService.swift; sourceTree = "<group>"; };
 		3C93A57CFC2C8E44180B970A /* PastelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastelApp.swift; sourceTree = "<group>"; };
 		3E5CCEAC25DB293F9A16462A /* FilteredCardListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilteredCardListView.swift; sourceTree = "<group>"; };
+		3FA5E3A1BDE7881C5A191BB4 /* ImportSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSheetView.swift; sourceTree = "<group>"; };
 		3FB60546E14A2C7AF9096FE4 /* AppDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDiscoveryService.swift; sourceTree = "<group>"; };
-		4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		463ED392A0FDA4E2FF91B1AA /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 		48DC4B0F54EF97DFD2C5F416 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteService.swift; sourceTree = "<group>"; };
@@ -143,6 +146,7 @@
 		C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStorageService.swift; sourceTree = "<group>"; };
 		C5E8102D1B1A6E4F5BCCF0A6 /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
 		C6FD4DDB3C6EA32691798901 /* CodeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeCardView.swift; sourceTree = "<group>"; };
+		C7048429BF3FE4D9EB1CB547 /* ExportSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheetView.swift; sourceTree = "<group>"; };
 		CAC3454A6A688FE2B0DF6845 /* HistoryGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryGridView.swift; sourceTree = "<group>"; };
 		D74628F6FDF4E2185687683A /* AppIconColorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconColorService.swift; sourceTree = "<group>"; };
 		D83722A01CB31BC92398C942 /* SlidingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidingPanel.swift; sourceTree = "<group>"; };
@@ -235,9 +239,11 @@
 			isa = PBXGroup;
 			children = (
 				79CFDAC2AF0FE47B9F09BCD5 /* AppPickerView.swift */,
+				C7048429BF3FE4D9EB1CB547 /* ExportSheetView.swift */,
 				9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */,
 				12480C47B0D18B83C820E179 /* HistoryBrowserView.swift */,
 				CAC3454A6A688FE2B0DF6845 /* HistoryGridView.swift */,
+				3FA5E3A1BDE7881C5A191BB4 /* ImportSheetView.swift */,
 				31E69FA6363380EEB64EF71E /* LabelSettingsView.swift */,
 				00D664297F1ED550FBA3FC3E /* PrivacySettingsView.swift */,
 				A48C40766989658A71731EFD /* ScreenEdgePicker.swift */,
@@ -426,7 +432,6 @@
 				B8552B06DA78E00BFB0CFA7A /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 				140537C5759703954B8459CA /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -499,6 +504,7 @@
 				3442E2E6EDB5B2E9A747C631 /* EditItemView.swift in Sources */,
 				D6F7C0FF5984EC498B94BCC3 /* EmptyStateView.swift in Sources */,
 				CE6733C3046F0F2A6AB00505 /* ExpirationService.swift in Sources */,
+				C0DB041EF0AF499CDA7D663C /* ExportSheetView.swift in Sources */,
 				E42B5A361ECF65BE3C4B1EF2 /* FileCardView.swift in Sources */,
 				ADCA1F7529C01BBB2D46CAAA /* FilteredCardListView.swift in Sources */,
 				D629BC5C08282F4295FA0416 /* FocusableTextField.swift in Sources */,
@@ -508,6 +514,7 @@
 				6AF5D219C387B0CA3EF35ED8 /* ImageCardView.swift in Sources */,
 				B2B95FF2ABFFE29D25EAD8D0 /* ImageStorageService.swift in Sources */,
 				3AED169433F86C8E70EB00B7 /* ImportExportService.swift in Sources */,
+				D6DBC62B5BFAA514DE489339 /* ImportSheetView.swift in Sources */,
 				B5985155933EAAF6A59D0F45 /* Label.swift in Sources */,
 				56831EBF806DA04E646ED2E7 /* LabelChipView.swift in Sources */,
 				0718766F684C890B0D3CC008 /* LabelColor.swift in Sources */,
@@ -682,7 +689,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SPARKLE";
@@ -707,7 +714,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
@@ -731,7 +738,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) SPARKLE";
@@ -875,7 +882,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = app.pastel.Pastel;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;

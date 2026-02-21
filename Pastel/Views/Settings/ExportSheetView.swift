@@ -50,30 +50,21 @@ struct ExportSheetView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible()),
                 ], alignment: .leading, spacing: 6) {
-                    ForEach(ContentType.allCases, id: \.rawValue) { type in
-                        if type == .image {
-                            Toggle(isOn: .constant(false)) {
-                                Text(contentTypeName(type))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .toggleStyle(.checkbox)
-                            .disabled(true)
-                        } else {
-                            Toggle(
-                                contentTypeName(type),
-                                isOn: Binding(
-                                    get: { selectedTypes.contains(type) },
-                                    set: { selected in
-                                        if selected {
-                                            selectedTypes.insert(type)
-                                        } else {
-                                            selectedTypes.remove(type)
-                                        }
+                    ForEach(ContentType.allCases.filter { $0 != .image }, id: \.rawValue) { type in
+                        Toggle(
+                            contentTypeName(type),
+                            isOn: Binding(
+                                get: { selectedTypes.contains(type) },
+                                set: { selected in
+                                    if selected {
+                                        selectedTypes.insert(type)
+                                    } else {
+                                        selectedTypes.remove(type)
                                     }
-                                )
+                                }
                             )
-                            .toggleStyle(.checkbox)
-                        }
+                        )
+                        .toggleStyle(.checkbox)
                     }
                 }
 

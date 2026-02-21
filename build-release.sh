@@ -20,7 +20,7 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-DMG_NAME="Pastel-${VERSION}.dmg"
+DMG_NAME="Pastel.dmg"
 DMG_PATH="$BUILD_DIR/$DMG_NAME"
 TAG="v${VERSION}"
 
@@ -69,6 +69,19 @@ xcodebuild -scheme "$SCHEME" \
 
 # ─── Export with Developer ID signing ─────────────────────────────────────────
 echo "==> Exporting with Developer ID signing"
+cat > "$EXPORT_OPTIONS" << 'PLISTEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>developer-id</string>
+    <key>teamID</key>
+    <string>QLSJ39DRSH</string>
+</dict>
+</plist>
+PLISTEOF
+
 xcodebuild -exportArchive \
     -archivePath "$ARCHIVE_PATH" \
     -exportPath "$EXPORT_PATH" \
