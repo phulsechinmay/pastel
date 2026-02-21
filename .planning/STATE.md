@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 28 of 28 (Fix Panel Item Activation)
 Plan: 1 of 1 complete
 Status: Complete
-Last activity: 2026-02-21 - Phase 28-01 executed and verified (keyboard activation working)
+Last activity: 2026-02-21 - Completed quick task 29: Fix settings disappearing on panel dismiss and panel not refreshing on deletion
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
