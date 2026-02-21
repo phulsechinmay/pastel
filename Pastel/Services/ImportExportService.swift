@@ -127,7 +127,25 @@ final class ImportExportService {
     var progressMessage = ""
     var lastExportCount = 0
 
+    /// Convenience: export all non-concealed, non-image items (legacy signature).
     func exportHistory(modelContext: ModelContext) throws -> Data {
+        var allTypes = Set(ContentType.allCases)
+        allTypes.remove(.image)
+        return try exportHistory(
+            modelContext: modelContext,
+            contentTypes: allTypes,
+            labelNames: [],
+            sinceDate: nil
+        )
+    }
+
+    /// Export with filters: content types, label names, and optional date cutoff.
+    func exportHistory(
+        modelContext: ModelContext,
+        contentTypes: Set<ContentType>,
+        labelNames: Set<String>,
+        sinceDate: Date?
+    ) throws -> Data {
         isProcessing = true
         progress = 0.0
         progressMessage = "Preparing export..."
@@ -136,14 +154,36 @@ final class ImportExportService {
             isProcessing = false
         }
 
-        // Fetch non-concealed, non-image items
-        let itemDescriptor = FetchDescriptor<ClipboardItem>(
-            predicate: #Predicate<ClipboardItem> { item in
-                item.isConcealed == false && item.contentType != "image"
-            },
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-        )
-        let items = try modelContext.fetch(itemDescriptor)
+        // Fetch non-concealed items with optional date filter
+        let itemDescriptor: FetchDescriptor<ClipboardItem>
+        if let sinceDate {
+            itemDescriptor = FetchDescriptor<ClipboardItem>(
+                predicate: #Predicate<ClipboardItem> { item in
+                    item.isConcealed == false && item.timestamp >= sinceDate
+                },
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+        } else {
+            itemDescriptor = FetchDescriptor<ClipboardItem>(
+                predicate: #Predicate<ClipboardItem> { item in
+                    item.isConcealed == false
+                },
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+        }
+        let allItems = try modelContext.fetch(itemDescriptor)
+
+        // In-memory filter by content type (always exclude images)
+        let contentTypeRawValues = Set(contentTypes.map(\.rawValue)).subtracting(["image"])
+        var items = allItems.filter { contentTypeRawValues.contains($0.contentType) }
+
+        // In-memory filter by label names (if any selected)
+        if !labelNames.isEmpty {
+            items = items.filter { item in
+                item.safeLabels.contains { labelNames.contains($0.name) }
+            }
+        }
+
         lastExportCount = items.count
 
         // Fetch all labels
