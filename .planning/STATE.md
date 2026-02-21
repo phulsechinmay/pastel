@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 25 OTA Updates with Sparkle -- Plan 01 Complete
+**Current focus:** Phase 25 OTA Updates with Sparkle -- Complete (2/2 plans)
 
 ## Current Position
 
 Phase: 25 of 25 (OTA Updates with Sparkle)
-Plan: 1 of 2 complete
-Status: In Progress
-Last activity: 2026-02-20 - Completed 25-01: Dual-distribution build system with Sparkle SPM, configVariants, and separate entitlements
+Plan: 2 of 2 complete
+Status: Complete
+Last activity: 2026-02-20 - Completed 25-02: Sparkle integration layer (UpdaterService, CheckForUpdatesView, DMG build script)
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -111,6 +111,11 @@ Key decisions from Phase 25 Plan 01 (Build System Configuration):
 - [25-01]: SUPublicEDKey placeholder in Info.plist -- user replaces after running generate_keys
 - [25-01]: SUFeedURL points to GitHub raw appcast.xml (placeholder repo URL)
 
+Key decisions from Phase 25 Plan 02 (Sparkle Integration Layer):
+
+- [25-02]: UpdaterService auto-starts in init via DispatchQueue.main.async (avoids struct init escaping closure issue)
+- [25-02]: @StateObject for UpdaterService (not @State) to propagate @Published changes to @ObservedObject consumers
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -151,5 +156,5 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 25-01-PLAN.md (dual-distribution build system with Sparkle)
+Stopped at: Completed 25-02-PLAN.md (Sparkle integration layer -- phase 25 complete)
 Resume file: None
