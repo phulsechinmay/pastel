@@ -176,9 +176,10 @@ None currently.
 | 025 | Fix panel dismissal when clicking edit modal/settings/color picker | 2026-02-19 | 3fe078c | [25-fix-panel-dismissal-when-clicking-edit-m](./quick/25-fix-panel-dismissal-when-clicking-edit-m/) |
 | 027 | Add color format copy options (Hex/RGB/HSL/CMYK) to right-click menu | 2026-02-20 | 49409ed | [27-add-color-format-copy-options-to-right-c](./quick/27-add-color-format-copy-options-to-right-c/) |
 | 028 | Improve export/import UI with type filters, label select, date range | 2026-02-21 | 0d1833c | [28-improve-export-import-ui-with-type-filte](./quick/28-improve-export-import-ui-with-type-filte/) |
+| 029 | Fix Settings disappearing on panel dismiss + panel refresh on delete | 2026-02-21 | 28d42e9 | [29-fix-settings-disappearing-on-panel-dismi](./quick/29-fix-settings-disappearing-on-panel-dismi/) |
 
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 28-01-PLAN.md
+Stopped at: Completed quick task 29
 Resume file: None
