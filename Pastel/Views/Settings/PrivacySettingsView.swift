@@ -114,7 +114,7 @@ struct PrivacySettingsView: View {
                 Table(filteredApps, selection: $selectedApp, sortOrder: $sortOrder) {
                     TableColumn("Name", sortUsing: KeyPathComparator(\IgnoredApp.name)) { app in
                         HStack(spacing: 8) {
-                            if let icon = NSWorkspace.shared.appIcon(forBundleIdentifier: app.bundleID) {
+                            if let icon = AppIconCache.shared.icon(forBundleID: app.bundleID) {
                                 Image(nsImage: icon)
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)

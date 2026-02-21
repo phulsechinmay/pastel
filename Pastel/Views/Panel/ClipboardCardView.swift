@@ -341,7 +341,7 @@ struct ClipboardCardView: View {
     @ViewBuilder
     private var sourceAppIcon: some View {
         if let bundleID = item.sourceAppBundleID,
-           let icon = NSWorkspace.shared.appIcon(forBundleIdentifier: bundleID) {
+           let icon = AppIconCache.shared.icon(forBundleID: bundleID) {
             Image(nsImage: icon)
                 .resizable()
                 .frame(width: 24, height: 24)

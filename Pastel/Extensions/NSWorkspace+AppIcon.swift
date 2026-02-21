@@ -1,18 +1,32 @@
 import AppKit
 
-extension NSWorkspace {
+/// In-memory cache for application icons keyed by bundle identifier.
+///
+/// Eliminates redundant `urlForApplication` + `icon(forFile:)` disk I/O
+/// when rendering clipboard cards for previously-seen source apps.
+/// All access is from @MainActor (SwiftUI views, ClipboardMonitor pre-warming).
+@MainActor
+final class AppIconCache {
 
-    /// Resolve a bundle identifier to the application's icon.
-    ///
-    /// Uses `urlForApplication(withBundleIdentifier:)` to locate the app,
-    /// then returns its icon via `icon(forFile:)`.
-    ///
-    /// - Parameter bundleID: The bundle identifier (e.g., "com.apple.Safari").
-    /// - Returns: The app icon, or nil if the bundle ID cannot be resolved.
-    func appIcon(forBundleIdentifier bundleID: String) -> NSImage? {
-        guard let appURL = urlForApplication(withBundleIdentifier: bundleID) else {
+    static let shared = AppIconCache()
+
+    private var cache: [String: NSImage] = [:]
+
+    private init() {}
+
+    /// Returns the cached app icon for the given bundle identifier,
+    /// performing the lookup and caching on first access.
+    func icon(forBundleID bundleID: String) -> NSImage? {
+        if let cached = cache[bundleID] {
+            return cached
+        }
+
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return nil
         }
-        return icon(forFile: appURL.path)
+
+        let image = NSWorkspace.shared.icon(forFile: appURL.path)
+        cache[bundleID] = image
+        return image
     }
 }

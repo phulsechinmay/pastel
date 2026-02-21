@@ -112,10 +112,12 @@ struct PanelContentView: View {
                 }
             )
             .focused($panelFocus, equals: .cardList)
-            // .id() triggers full view recreation when filters or item count change.
-            // appState.itemCount is included because @Query inside NSHostingView/NSPanel does not
-            // reliably auto-observe new insertions -- recreation is required to pick up new items.
-            .id("\(appState.itemCount)\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
+            // .id() triggers full view recreation when filters or show count change.
+            // Uses showCount (not itemCount) so recreation only happens when the panel opens,
+            // not on every clipboard capture while hidden. @Query re-fetches on panel open
+            // via showCount change. Items captured while panel is open won't appear until
+            // next toggle (acceptable -- users open to paste, not to watch new items arrive).
+            .id("\(panelActions.showCount)\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)
