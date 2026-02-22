@@ -184,9 +184,9 @@ struct FilteredCardListView: View {
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     .onChange(of: selectedIndex) { _, newValue in
-                        if let newValue {
+                        if let newValue, newValue < visibleItems.count {
                             withAnimation(.easeInOut(duration: 0.15)) {
-                                proxy.scrollTo(newValue, anchor: .center)
+                                proxy.scrollTo(visibleItems[newValue].persistentModelID, anchor: .center)
                             }
                         }
                     }
@@ -202,9 +202,9 @@ struct FilteredCardListView: View {
                         }
                     }
                     .onChange(of: selectedIndex) { _, newValue in
-                        if let newValue {
+                        if let newValue, newValue < visibleItems.count {
                             withAnimation(.easeInOut(duration: 0.15)) {
-                                proxy.scrollTo(newValue, anchor: .center)
+                                proxy.scrollTo(visibleItems[newValue].persistentModelID, anchor: .center)
                             }
                         }
                     }
@@ -236,7 +236,12 @@ struct FilteredCardListView: View {
         }
         .onChange(of: appState.deletionManager.softDeletedIDs) { _, _ in
             // Recompute after soft-delete or undo without view recreation (preserves scroll position).
-            filteredItems = computeFilteredItems(from: items)
+            // Wrap in withAnimation to ensure the slide-left removal transition plays correctly,
+            // since the animation context from the original withAnimation in deleteItem() may not
+            // propagate through the onChange handler.
+            withAnimation(.easeOut(duration: 0.2)) {
+                filteredItems = computeFilteredItems(from: items)
+            }
             // Advance selection after deletion: if deleted item was last, select new last;
             // if in middle, same index now points to next item (shifted up).
             if let idx = selectedIndex, idx >= visibleItems.count {
@@ -313,7 +318,7 @@ struct FilteredCardListView: View {
                 displayLimit += pageSize
             }
         }
-        .id(index)
+        .id(item.persistentModelID)
     }
 
     /// Install NSEvent local monitor for keyboard handling (arrows, Enter, Cmd+digit activation).
@@ -368,6 +373,18 @@ struct FilteredCardListView: View {
                         appState.deletionManager.undo(in: modelContext)
                     }
                     return nil // consumed
+                }
+                return event
+            case 0x33: // kVK_Delete (Backspace) — Cmd+Delete soft-deletes selected item
+                if event.modifierFlags.contains(.command) {
+                    if let index = selectedIndex, index < visibleItems.count {
+                        let item = visibleItems[index]
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            appState.deletionManager.softDelete(item, in: modelContext)
+                        }
+                        appState.itemCount -= 1
+                        return nil // consumed
+                    }
                 }
                 return event
             default:
