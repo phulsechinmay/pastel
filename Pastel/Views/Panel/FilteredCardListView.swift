@@ -34,6 +34,9 @@ struct FilteredCardListView: View {
     let allLabels: [Label]
     @Binding var selectedIndex: Int?
     var isShiftHeld: Bool
+    /// Incremented after each item deletion; triggers filteredItems recomputation
+    /// without view recreation (preserves scroll position).
+    var deletionCount: Int
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
     var onTypeToSearch: ((Character) -> Void)?
@@ -103,6 +106,7 @@ struct FilteredCardListView: View {
         allLabels: [Label] = [],
         selectedIndex: Binding<Int?>,
         isShiftHeld: Bool = false,
+        deletionCount: Int = 0,
         onPaste: @escaping (ClipboardItem) -> Void,
         onPastePlainText: @escaping (ClipboardItem) -> Void,
         onTypeToSearch: ((Character) -> Void)? = nil,
@@ -111,6 +115,7 @@ struct FilteredCardListView: View {
     ) {
         self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
+        self.deletionCount = deletionCount
 
         // Text-only predicate. Label filtering AND sync filtering are done in-memory
         // via filteredItems because:
@@ -220,6 +225,16 @@ struct FilteredCardListView: View {
         }
         .onChange(of: items) { _, newItems in
             filteredItems = computeFilteredItems(from: newItems)
+        }
+        .onChange(of: deletionCount) { _, _ in
+            // Recompute after deletion without view recreation (preserves scroll position).
+            // Deferred to let @Query settle after the modelContext save.
+            DispatchQueue.main.async {
+                filteredItems = computeFilteredItems(from: items)
+                if let idx = selectedIndex, idx >= visibleItems.count {
+                    selectedIndex = visibleItems.isEmpty ? nil : visibleItems.count - 1
+                }
+            }
         }
         .onDisappear {
             if let monitor = keyMonitor {

@@ -225,6 +225,12 @@ final class PanelController {
     func hide(reactivatePreviousApp: Bool = true) {
         guard let panel, panel.isVisible else { return }
 
+        // Commit any pending soft-deletion before hiding the panel.
+        // This permanently deletes the item, clearing the undo buffer.
+        if let modelContext = appState?.modelContainer?.mainContext {
+            appState?.deletionManager.commitPendingDeletion(in: modelContext)
+        }
+
         let edge = currentEdge
 
         // Compute expanded frame covering dock but not menu bar (mirrors show())

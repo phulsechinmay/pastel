@@ -263,16 +263,19 @@ struct ClipboardCardView: View {
         return variants.contains(text)
     }
 
-    /// Delete the clipboard item with full cleanup:
-    /// 1. Remove image and thumbnail files from disk (if any)
-    /// 2. Delete the SwiftData model
+    /// Soft-delete the clipboard item: hide from display immediately with animation,
+    /// play trash sound, and schedule deferred image cleanup.
+    ///
+    /// The item remains in SwiftData until the panel hides (commitPendingDeletion)
+    /// or a new deletion replaces it. Undo via Cmd+Z restores the item.
     ///
     /// Pending expiration timers for concealed items are handled gracefully --
     /// ExpirationService.performExpiration checks if the item still exists
     /// via `modelContext.model(for:)` and no-ops if already deleted.
     private func deleteItem() {
-        deleteClipboardItemWithCleanup(item, from: modelContext)
-        saveWithLogging(modelContext, operation: "delete item")
+        withAnimation(.easeOut(duration: 0.2)) {
+            appState.deletionManager.softDelete(item, in: modelContext)
+        }
         appState.itemCount -= 1
         panelActions.deletionCount += 1
     }

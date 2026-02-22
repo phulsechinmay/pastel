@@ -35,6 +35,7 @@
 		6102E3A79BDED41747B1CA1B /* CodeDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72D7644ACF10CD4DC890BE9E /* CodeDetectionService.swift */; };
 		61787566D6E9AF8D7887C7A4 /* SlidingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D83722A01CB31BC92398C942 /* SlidingPanel.swift */; };
 		61FC3644E015576CBEB288A7 /* StatusPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71138AD30E90615916853DD4 /* StatusPopoverView.swift */; };
+		67F8F8668E97A51739D6D69E /* DeletionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED84180D08969FF0AFA614DF /* DeletionManager.swift */; };
 		69779D6C716BFFD410BA8F34 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E8102D1B1A6E4F5BCCF0A6 /* OnboardingWindowController.swift */; };
 		6AF5D219C387B0CA3EF35ED8 /* ImageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F339BF74219A6B2629B2C42 /* ImageCardView.swift */; };
 		77A34F0C407E0CDC0D03AD39 /* PasteBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D583EE522FF0443CE93DFE6 /* PasteBehavior.swift */; };
@@ -159,6 +160,7 @@
 		E7628FEB0B879CD6BCCD59F6 /* TextCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCardView.swift; sourceTree = "<group>"; };
 		E7A89B1626914331B041874D /* PanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelController.swift; sourceTree = "<group>"; };
 		E931197AB3A47AD6193B9FF1 /* URLCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLCardView.swift; sourceTree = "<group>"; };
+		ED84180D08969FF0AFA614DF /* DeletionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeletionManager.swift; sourceTree = "<group>"; };
 		F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		F774B6CD032B1A682BACC9D7 /* ColorCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorCardView.swift; sourceTree = "<group>"; };
 		FA88123A30157392A4055111 /* SyncMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMonitor.swift; sourceTree = "<group>"; };
@@ -279,6 +281,7 @@
 				338F16EE8766601609575DB2 /* ColorFormatService.swift */,
 				8E4FC404F56DB93E075FCDEB /* ColorToolController.swift */,
 				DB102C1DD1C2714F0204D4E7 /* DeduplicationService.swift */,
+				ED84180D08969FF0AFA614DF /* DeletionManager.swift */,
 				311A67E5A6FA0C55F53F34D2 /* DragItemProviderService.swift */,
 				5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */,
 				C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */,
@@ -500,6 +503,7 @@
 				93896FFED1F319E354A4940A /* ColorToolController.swift in Sources */,
 				B0CFC974AD1AC32A0A15644C /* ContentType.swift in Sources */,
 				4DED4706DEA246882DE6D749 /* DeduplicationService.swift in Sources */,
+				67F8F8668E97A51739D6D69E /* DeletionManager.swift in Sources */,
 				311D38AA5AD215646217479E /* DeviceIdentifier.swift in Sources */,
 				0705E8D7C6E0B9DFD944D17A /* DragItemProviderService.swift in Sources */,
 				3442E2E6EDB5B2E9A747C631 /* EditItemView.swift in Sources */,

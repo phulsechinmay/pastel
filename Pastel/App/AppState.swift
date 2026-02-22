@@ -22,6 +22,9 @@ final class AppState {
     /// Service for writing to pasteboard and simulating Cmd+V paste
     let pasteService = PasteService()
 
+    /// Deletion manager for soft-delete with undo support
+    let deletionManager = DeletionManager()
+
     /// History auto-purge service based on user-configured retention period
     var retentionService: RetentionService?
 
