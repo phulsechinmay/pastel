@@ -97,7 +97,7 @@ struct PanelContentView: View {
                 allLabels: labels,
                 selectedIndex: $selectedIndex,
                 isShiftHeld: isShiftHeld,
-                deletionCount: panelActions.deletionCount,
+                showCount: panelActions.showCount,
                 onPaste: { item in pasteItem(item) },
                 onPastePlainText: { item in pastePlainTextItem(item) },
                 onTypeToSearch: { char in

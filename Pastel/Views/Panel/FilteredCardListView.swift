@@ -25,6 +25,7 @@ struct FilteredCardListView: View {
     @AppStorage("quickPasteEnabled") private var quickPasteEnabled: Bool = true
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
     @State private var dropTargetIndex: Int? = nil
     @State private var keyMonitor: Any? = nil
     @State private var filteredItems: [ClipboardItem] = []
@@ -34,9 +35,9 @@ struct FilteredCardListView: View {
     let allLabels: [Label]
     @Binding var selectedIndex: Int?
     var isShiftHeld: Bool
-    /// Incremented after each item deletion; triggers filteredItems recomputation
-    /// without view recreation (preserves scroll position).
-    var deletionCount: Int
+    /// Incremented each time the panel is shown; triggers filteredItems recomputation
+    /// without view recreation (preserves scroll position across dismiss/reopen).
+    var showCount: Int
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
     var onTypeToSearch: ((Character) -> Void)?
@@ -52,18 +53,25 @@ struct FilteredCardListView: View {
         Array(filteredItems.prefix(displayLimit))
     }
 
-    /// Compute items filtered by sync rules and selected labels (in-memory).
+    /// Compute items filtered by soft-delete exclusion, sync rules, and selected labels (in-memory).
     ///
-    /// Sync filtering (applied first):
+    /// Soft-delete exclusion (applied first):
+    /// - Items in DeletionManager's softDeletedIDs are hidden (pending undo or permanent deletion)
+    ///
+    /// Sync filtering (applied second):
     /// - Concealed items excluded (passwords never appear in browseable panel)
     /// - Remote image/file items excluded (no displayable content on receiving device)
     /// - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
     ///
-    /// Label filtering (applied second, OR logic):
+    /// Label filtering (applied third, OR logic):
     /// If no labels selected, returns all sync-filtered items.
     private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
+        // Exclude soft-deleted items (hidden but not yet permanently deleted, undoable via Cmd+Z)
+        let softDeleted = appState.deletionManager.softDeletedIDs
+        let nonDeleted = items.filter { !softDeleted.contains($0.persistentModelID) }
+
         let localDeviceID = DeviceIdentifier.current
-        let syncFiltered = items.filter { item in
+        let syncFiltered = nonDeleted.filter { item in
             // Exclude concealed items (passwords should never appear in browseable history)
             guard !item.isConcealed else { return false }
             // Allow local items and pre-v1.5 legacy items (empty originDeviceID)
@@ -106,7 +114,7 @@ struct FilteredCardListView: View {
         allLabels: [Label] = [],
         selectedIndex: Binding<Int?>,
         isShiftHeld: Bool = false,
-        deletionCount: Int = 0,
+        showCount: Int = 0,
         onPaste: @escaping (ClipboardItem) -> Void,
         onPastePlainText: @escaping (ClipboardItem) -> Void,
         onTypeToSearch: ((Character) -> Void)? = nil,
@@ -115,7 +123,7 @@ struct FilteredCardListView: View {
     ) {
         self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
-        self.deletionCount = deletionCount
+        self.showCount = showCount
 
         // Text-only predicate. Label filtering AND sync filtering are done in-memory
         // via filteredItems because:
@@ -226,15 +234,20 @@ struct FilteredCardListView: View {
         .onChange(of: items) { _, newItems in
             filteredItems = computeFilteredItems(from: newItems)
         }
-        .onChange(of: deletionCount) { _, _ in
-            // Recompute after deletion without view recreation (preserves scroll position).
-            // Deferred to let @Query settle after the modelContext save.
-            DispatchQueue.main.async {
-                filteredItems = computeFilteredItems(from: items)
-                if let idx = selectedIndex, idx >= visibleItems.count {
-                    selectedIndex = visibleItems.isEmpty ? nil : visibleItems.count - 1
-                }
+        .onChange(of: appState.deletionManager.softDeletedIDs) { _, _ in
+            // Recompute after soft-delete or undo without view recreation (preserves scroll position).
+            filteredItems = computeFilteredItems(from: items)
+            // Advance selection after deletion: if deleted item was last, select new last;
+            // if in middle, same index now points to next item (shifted up).
+            if let idx = selectedIndex, idx >= visibleItems.count {
+                selectedIndex = visibleItems.isEmpty ? nil : visibleItems.count - 1
             }
+        }
+        .onChange(of: showCount) { _, _ in
+            // Refresh data on panel reopen without view recreation (preserves scroll position).
+            displayLimit = pageSize
+            filteredItems = computeFilteredItems(from: items)
+            selectedIndex = nil
         }
         .onDisappear {
             if let monitor = keyMonitor {
@@ -291,6 +304,10 @@ struct FilteredCardListView: View {
                 dropTargetIndex = targeted ? index : nil
             }
         }
+        .transition(.asymmetric(
+            insertion: .opacity,
+            removal: .move(edge: .leading).combined(with: .opacity)
+        ))
         .onAppear {
             if index >= displayLimit - 10 && displayLimit < filteredItems.count {
                 displayLimit += pageSize
@@ -345,6 +362,14 @@ struct FilteredCardListView: View {
                     return nil // consumed
                 }
                 return event // no valid selection, pass through
+            case 0x06: // kVK_ANSI_Z — Cmd+Z undo last deletion
+                if event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.shift) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        appState.deletionManager.undo(in: modelContext)
+                    }
+                    return nil // consumed
+                }
+                return event
             default:
                 // Cmd+1-9 / Cmd+Shift+1-9 quick paste activation
                 if event.modifierFlags.contains(.command),
