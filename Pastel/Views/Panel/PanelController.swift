@@ -13,10 +13,9 @@ final class PanelActions {
     var pastePlainTextItem: ((ClipboardItem) -> Void)?
     var copyOnlyItem: ((ClipboardItem) -> Void)?
     var onDragStarted: (() -> Void)?
-    /// Incremented each time the panel is shown; observed by PanelContentView to reset focus.
+    /// Incremented each time the panel is shown; observed by PanelContentView to reset focus
+    /// and by FilteredCardListView to refresh data without view recreation.
     var showCount = 0
-    /// Incremented after each item deletion to force FilteredCardListView recreation.
-    var deletionCount = 0
 }
 
 /// Manages the lifecycle of the sliding clipboard panel: creation, show/hide

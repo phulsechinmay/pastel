@@ -277,7 +277,6 @@ struct ClipboardCardView: View {
             appState.deletionManager.softDelete(item, in: modelContext)
         }
         appState.itemCount -= 1
-        panelActions.deletionCount += 1
     }
 
     /// Pre-rendered menu icon for context menu labels.

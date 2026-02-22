@@ -113,12 +113,10 @@ struct PanelContentView: View {
                 }
             )
             .focused($panelFocus, equals: .cardList)
-            // .id() triggers full view recreation when filters or show count change.
-            // Uses showCount (not itemCount) so recreation only happens when the panel opens,
-            // not on every clipboard capture while hidden. @Query re-fetches on panel open
-            // via showCount change. Items captured while panel is open won't appear until
-            // next toggle (acceptable -- users open to paste, not to watch new items arrive).
-            .id("\(panelActions.showCount)\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
+            // .id() triggers full view recreation when search text or label filters change.
+            // showCount is intentionally EXCLUDED so scroll position survives panel dismiss/reopen.
+            // Data refresh on panel reopen is handled by FilteredCardListView's onChange(of: showCount).
+            .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)
