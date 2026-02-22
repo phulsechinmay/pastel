@@ -274,6 +274,7 @@ struct ClipboardCardView: View {
         deleteClipboardItemWithCleanup(item, from: modelContext)
         saveWithLogging(modelContext, operation: "delete item")
         appState.itemCount -= 1
+        panelActions.deletionCount += 1
     }
 
     /// Pre-rendered menu icon for context menu labels.

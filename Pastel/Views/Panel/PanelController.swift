@@ -15,6 +15,8 @@ final class PanelActions {
     var onDragStarted: (() -> Void)?
     /// Incremented each time the panel is shown; observed by PanelContentView to reset focus.
     var showCount = 0
+    /// Incremented after each item deletion to force FilteredCardListView recreation.
+    var deletionCount = 0
 }
 
 /// Manages the lifecycle of the sliding clipboard panel: creation, show/hide
@@ -81,6 +83,12 @@ final class PanelController {
     /// Whether the panel is currently visible on screen.
     var isVisible: Bool {
         panel?.isVisible ?? false
+    }
+
+    /// Whether Pastel has visible windows other than the sliding panel.
+    /// Used to decide whether to re-activate the previous app on panel dismiss.
+    var hasOtherVisibleWindows: Bool {
+        NSApp.windows.contains { $0 !== panel && $0.isVisible && !($0 is SlidingPanel) }
     }
 
     /// The CGWindowID of the panel, used for `screencapture -l` during visual verification.
@@ -209,7 +217,12 @@ final class PanelController {
     }
 
     /// Slide the panel off-screen in the direction of the configured edge and order it out.
-    func hide() {
+    ///
+    /// - Parameter reactivatePreviousApp: Whether to re-activate the app that was frontmost
+    ///   before the panel was shown. Paste callers pass `true` (default) so CGEvent Cmd+V
+    ///   reaches the target app. Non-paste dismiss (Escape, click-outside) passes `false`
+    ///   when other Pastel windows (Settings, Edit) are visible to avoid covering them.
+    func hide(reactivatePreviousApp: Bool = true) {
         guard let panel, panel.isVisible else { return }
 
         let edge = currentEdge
@@ -234,8 +247,9 @@ final class PanelController {
         } completionHandler: { [weak self] in
             panel.orderOut(nil)
             self?.removeEventMonitors()
-            // Return focus to the app that was frontmost before the panel was shown.
-            self?.previousApp?.activate()
+            if reactivatePreviousApp {
+                self?.previousApp?.activate()
+            }
             self?.previousApp = nil
         }
 
@@ -296,7 +310,7 @@ final class PanelController {
                 window.isVisible && window.frame.contains(clickLocation)
             }
             if !clickedInsideApp {
-                self?.hide()
+                self?.hide(reactivatePreviousApp: !(self?.hasOtherVisibleWindows ?? false))
             }
         }
 
@@ -319,7 +333,7 @@ final class PanelController {
             matching: .keyDown
         ) { [weak self] event in
             if event.keyCode == 53 { // Escape
-                self?.hide()
+                self?.hide(reactivatePreviousApp: !(self?.hasOtherVisibleWindows ?? false))
                 return nil // consume the event
             }
             return event
@@ -338,7 +352,7 @@ final class PanelController {
                 guard let self, self.isVisible else { return }
                 // If the app re-activated (focus returned to panel), don't dismiss
                 if !NSApp.isActive {
-                    self.hide()
+                    self.hide(reactivatePreviousApp: !self.hasOtherVisibleWindows)
                 }
             }
         }

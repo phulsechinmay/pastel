@@ -117,7 +117,7 @@ struct PanelContentView: View {
             // not on every clipboard capture while hidden. @Query re-fetches on panel open
             // via showCount change. Items captured while panel is open won't appear until
             // next toggle (acceptable -- users open to paste, not to watch new items arrive).
-            .id("\(panelActions.showCount)\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
+            .id("\(panelActions.showCount)\(panelActions.deletionCount)\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)
