@@ -400,16 +400,20 @@ final class ClipboardMonitor {
     // MARK: - Deduplication
 
     /// Check if ANY item in history has the same content hash (non-consecutive dedup).
-    /// Replaces @Attribute(.unique) constraint behavior removed for CloudKit compatibility.
+    /// When a duplicate is found, bumps its timestamp to now (moving it to the top)
+    /// instead of silently discarding the new copy.
     private func isDuplicateByHash(_ contentHash: String) -> Bool {
         let hashToCheck = contentHash
-        let descriptor = FetchDescriptor<ClipboardItem>(
+        var descriptor = FetchDescriptor<ClipboardItem>(
             predicate: #Predicate<ClipboardItem> { $0.contentHash == hashToCheck }
         )
+        descriptor.fetchLimit = 1
         do {
-            let count = try modelContext.fetchCount(descriptor)
-            if count > 0 {
-                Self.logger.debug("Non-consecutive duplicate detected by hash, skipping")
+            let matches = try modelContext.fetch(descriptor)
+            if let existing = matches.first {
+                existing.timestamp = .now
+                try modelContext.save()
+                Self.logger.debug("Non-consecutive duplicate detected — bumped to top")
                 return true
             }
         } catch {

@@ -165,9 +165,6 @@ struct ClipboardCardView: View {
             Button("Paste") {
                 panelActions.pasteItem?(item)
             }
-            Button("Copy + Paste") {
-                panelActions.pasteItem?(item)
-            }
             Button("Paste as Plain Text") {
                 panelActions.pastePlainTextItem?(item)
             }
@@ -308,25 +305,17 @@ struct ClipboardCardView: View {
 
     // MARK: - Helpers
 
-    /// Abbreviated relative time: "now", "X secs ago", "X mins ago", "X hours ago", "X days ago".
+    /// Localized relative time using Apple's RelativeDateTimeFormatter.
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
+
     private func relativeTimeString(for date: Date) -> String {
         let interval = Date.now.timeIntervalSince(date)
-        switch interval {
-        case ..<2:
-            return "now"
-        case ..<60:
-            let secs = Int(interval)
-            return secs == 1 ? "1 sec ago" : "\(secs) secs ago"
-        case ..<3600:
-            let mins = Int(interval / 60)
-            return mins == 1 ? "1 min ago" : "\(mins) mins ago"
-        case ..<86400:
-            let hours = Int(interval / 3600)
-            return hours == 1 ? "1 hour ago" : "\(hours) hours ago"
-        default:
-            let days = Int(interval / 86400)
-            return days == 1 ? "1 day ago" : "\(days) days ago"
-        }
+        if interval < 2 { return "now" }
+        return Self.relativeFormatter.localizedString(for: date, relativeTo: .now)
     }
 
     // MARK: - Private Views
