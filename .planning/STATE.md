@@ -25,6 +25,7 @@ Last activity: 2026-02-21 - Completed quick task 29: Fix settings disappearing o
 - Phase 26 added: Panel Performance Optimization (first-open lag, scroll jank, filter switch latency)
 - Phase 27 added: Service layer audit — refactor, combine, or remove redundant services to reduce app bloat and improve performance
 - Phase 28 added: Fix panel item activation — unify hotkey, keyboard Enter, click, and drag activation into a durable shared method
+- Phase 29 added: Robust item deletion with undo, scroll preservation, and panel refresh
 
 ## Previous Milestones
 
