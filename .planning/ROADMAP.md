@@ -461,7 +461,7 @@ Plans:
 **Goal:** Item deletion in the panel is reliable and user-friendly: single-item deletes use soft-delete with Cmd+Z undo, slide-left animation, and macOS trash sound; scroll position is preserved during deletion and across panel dismiss/reopen; bulk delete retains confirmation dialog; the old deletionCount mechanism is replaced by DeletionManager observation
 **Depends on:** Phase 28
 **Requirements:** DEL-01, DEL-02, DEL-03, DEL-04, DEL-05, DEL-06, DEL-07, DEL-08, DEL-09, DEL-10, DEL-11, DEL-12
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 29-01-PLAN.md -- DeletionManager service with soft-delete, undo, trash sound, deferred image cleanup; wire into AppState, PanelController, ClipboardCardView
