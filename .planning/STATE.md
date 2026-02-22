@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 29 Robust Item Deletion with Undo -- In Progress (1/2 plans)
+**Current focus:** Phase 29 Robust Item Deletion with Undo -- Complete (2/2 plans)
 
 ## Current Position
 
 Phase: 29 of 29 (Robust Item Deletion with Undo, Scroll Preservation, and Panel Refresh)
-Plan: 1 of 2 complete
-Status: In Progress
-Last activity: 2026-02-22 - Completed 29-01: DeletionManager service with soft-delete, undo, sound, and deferred cleanup
+Plan: 2 of 2 complete
+Status: Complete
+Last activity: 2026-02-22 - Completed 29-02: Panel view integration with soft-delete exclusion, slide-left animations, Cmd+Z undo, scroll preservation
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -147,6 +147,12 @@ Key decisions from Phase 29 Plan 01 (DeletionManager Service):
 - [29-01]: 10-second deferred image cleanup via DispatchWorkItem -- cancellable on undo
 - [29-01]: Restored item timestamp set to .now -- sorts to top of list per locked decision
 
+Key decisions from Phase 29 Plan 02 (Panel View Integration):
+
+- [29-02]: showCount replaces deletionCount -- single parameter for panel reopen refresh, not deletion trigger
+- [29-02]: showCount excluded from .id() so scroll position survives dismiss/reopen -- data refresh via onChange handler
+- [29-02]: softDeletedIDs observed via onChange (not .id()) to avoid view recreation on delete
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -189,5 +195,4 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 29-01-PLAN.md (DeletionManager service)
-Resume file: .planning/phases/29-robust-item-deletion-with-undo-scroll-preservation-and-panel-refresh/29-02-PLAN.md
+Stopped at: Completed 29-02-PLAN.md (Panel view integration -- Phase 29 complete)
