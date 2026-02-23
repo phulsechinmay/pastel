@@ -96,6 +96,7 @@ struct PastelApp: App {
         // Initialize sync services when iCloud sync is enabled
         if syncEnabled {
             let monitor = SyncMonitor()
+            monitor.configure(modelContext: container.mainContext)
             monitor.startMonitoring()
             SettingsWindowController.shared.syncMonitor = monitor
             self._syncMonitor = State(initialValue: monitor)
