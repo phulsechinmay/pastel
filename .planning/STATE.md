@@ -26,6 +26,7 @@ Last activity: 2026-02-22 - Completed 29-02: Panel view integration with soft-de
 - Phase 27 added: Service layer audit — refactor, combine, or remove redundant services to reduce app bloat and improve performance
 - Phase 28 added: Fix panel item activation — unify hotkey, keyboard Enter, click, and drag activation into a durable shared method
 - Phase 29 added: Robust item deletion with undo, scroll preservation, and panel refresh
+- Phase 30 added: Enhanced iCloud Sync Status
 
 ## Previous Milestones
 
@@ -195,4 +196,4 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 29-02-PLAN.md (Panel view integration -- Phase 29 complete)
+Stopped at: Phase 30 context gathered
