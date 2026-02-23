@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Clipboard history is always one hotkey away, with instant paste-back into any app.
-**Current focus:** Phase 29 Robust Item Deletion with Undo -- Complete (2/2 plans)
+**Current focus:** Phase 30 Enhanced iCloud Sync Status -- Complete (2/2 plans)
 
 ## Current Position
 
-Phase: 29 of 29 (Robust Item Deletion with Undo, Scroll Preservation, and Panel Refresh)
+Phase: 30 of 30 (Enhanced iCloud Sync Status)
 Plan: 2 of 2 complete
 Status: Complete
-Last activity: 2026-02-22 - Completed 29-02: Panel view integration with soft-delete exclusion, slide-left animations, Cmd+Z undo, scroll preservation
+Last activity: 2026-02-22 - Completed 30-02: Rich sync status display with typed phases, counts, relative time, and ModelContext wiring
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -154,6 +154,19 @@ Key decisions from Phase 29 Plan 02 (Panel View Integration):
 - [29-02]: showCount excluded from .id() so scroll position survives dismiss/reopen -- data refresh via onChange handler
 - [29-02]: softDeletedIDs observed via onChange (not .id()) to avoid view recreation on delete
 
+Key decisions from Phase 30 Plan 01 (SyncMonitor Enrichment):
+
+- [30-01]: SyncState.synced has NO associated values -- lastSyncDate/counts are separate @Observable properties
+- [30-01]: Import counts via pre/post item count diffing using FetchDescriptor
+- [30-01]: Setup events suppressed for < 2 seconds via delayed DispatchWorkItem
+
+Key decisions from Phase 30 Plan 02 (Rich Sync Status Display):
+
+- [30-02]: Static RelativeDateTimeFormatter with .full unitsStyle reused from ClipboardCardView pattern
+- [30-02]: Relative time computed on .onAppear only (no Timer/TimelineView per CONTEXT.md)
+- [30-02]: Arrow indicators (down-arrow/up-arrow) for import/export counts in status text
+- [30-02]: Error messages prefixed with "Sync error:" per CONTEXT.md decision
+
 Key architecture decisions for v1.5 (from research):
 
 - SwiftData built-in CloudKit sync (ModelConfiguration cloudKitDatabase: .automatic), NOT CKSyncEngine
@@ -196,4 +209,4 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Phase 30 context gathered
+Stopped at: Completed 30-02-PLAN.md (Phase 30 complete, 2/2 plans)

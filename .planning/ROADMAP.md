@@ -472,8 +472,8 @@ Plans:
 **Goal:** Sync status display in Settings shows meaningful, actionable information: distinguishes import/export/setup phases, shows import/export counts with arrow indicators, displays relative "Last synced" time, maps CloudKit errors to user-friendly messages, and detects initial sync for long-duration feedback
 **Depends on:** Phase 29
 **Requirements:** SYNC-13, SYNC-14
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 30-01-PLAN.md -- SyncMonitor enhancements: enriched SyncState enum with SyncPhase, item count diffing, export counting, CKError mapping, initial sync detection
-- [ ] 30-02-PLAN.md -- SyncSettingsView rich status display: typed phase text, arrow counts, RelativeDateTimeFormatter, error prefix, PastelApp modelContext wiring
+- [x] 30-01-PLAN.md -- SyncMonitor enhancements: enriched SyncState enum with SyncPhase, item count diffing, export counting, CKError mapping, initial sync detection
+- [x] 30-02-PLAN.md -- SyncSettingsView rich status display: typed phase text, arrow counts, RelativeDateTimeFormatter, error prefix, PastelApp modelContext wiring
