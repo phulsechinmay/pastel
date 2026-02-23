@@ -466,3 +466,14 @@ Plans:
 Plans:
 - [ ] 29-01-PLAN.md -- DeletionManager service with soft-delete, undo, trash sound, deferred image cleanup; wire into AppState, PanelController, ClipboardCardView
 - [ ] 29-02-PLAN.md -- Panel view integration: soft-delete exclusion, slide-left animations, Cmd+Z handler, scroll preservation, selection advancement, deletionCount removal
+
+### Phase 30: Enhanced iCloud Sync Status
+
+**Goal:** Sync status display in Settings shows meaningful, actionable information: distinguishes import/export/setup phases, shows import/export counts with arrow indicators, displays relative "Last synced" time, maps CloudKit errors to user-friendly messages, and detects initial sync for long-duration feedback
+**Depends on:** Phase 29
+**Requirements:** SYNC-13, SYNC-14
+**Plans:** 2 plans
+
+Plans:
+- [ ] 30-01-PLAN.md -- SyncMonitor enhancements: enriched SyncState enum with SyncPhase, item count diffing, export counting, CKError mapping, initial sync detection
+- [ ] 30-02-PLAN.md -- SyncSettingsView rich status display: typed phase text, arrow counts, RelativeDateTimeFormatter, error prefix, PastelApp modelContext wiring
