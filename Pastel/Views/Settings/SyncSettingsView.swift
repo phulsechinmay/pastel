@@ -13,6 +13,13 @@ struct SyncSettingsView: View {
     @State private var showingRestartAlert = false
     @State private var showingHelpPopover = false
     @State private var isPulsing = false
+    @State private var lastSyncedText: String?
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return f
+    }()
 
     var body: some View {
         ScrollView {
@@ -88,6 +95,13 @@ struct SyncSettingsView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onAppear {
+            if let date = syncMonitor?.lastSyncDate {
+                lastSyncedText = Self.relativeFormatter.localizedString(for: date, relativeTo: .now)
+            } else {
+                lastSyncedText = nil
+            }
+        }
         .alert("Restart Required", isPresented: $showingRestartAlert) {
             Button("Restart Now") {
                 AppRelaunchService.relaunch()
@@ -139,15 +153,23 @@ struct SyncSettingsView: View {
         if let monitor = syncMonitor {
             switch monitor.state {
             case .synced:
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 8, height: 8)
-                    Text("Synced")
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 8, height: 8)
+                        Text(syncedStatusText(monitor: monitor))
+                            .foregroundStyle(.secondary)
+                    }
+                    if let lastSyncedText {
+                        Text("Last synced: \(lastSyncedText)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .padding(.leading, 16)
+                    }
                 }
 
-            case .syncing(_):
+            case .syncing(let phase):
                 HStack(spacing: 8) {
                     Circle()
                         .fill(.orange)
@@ -164,7 +186,15 @@ struct SyncSettingsView: View {
                         .onDisappear {
                             isPulsing = false
                         }
-                    Text("Syncing…")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(syncingText(for: phase))
+                            .foregroundStyle(.secondary)
+                        if monitor.lastImportedCount > 0 || monitor.lastExportedCount > 0 {
+                            Text(activeSyncCountsText(monitor: monitor))
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                 }
 
             case .error(let message):
@@ -172,7 +202,7 @@ struct SyncSettingsView: View {
                     Circle()
                         .fill(.red)
                         .frame(width: 8, height: 8)
-                    Text(message)
+                    Text("Sync error: \(message)")
                         .foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -204,6 +234,41 @@ struct SyncSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    // MARK: - Status Text Helpers
+
+    private func syncedStatusText(monitor: SyncMonitor) -> String {
+        let importCount = monitor.lastImportedCount
+        let exportCount = monitor.lastExportedCount
+
+        if importCount > 0 || exportCount > 0 {
+            var parts: [String] = []
+            if importCount > 0 { parts.append("↓\(importCount)") }
+            if exportCount > 0 { parts.append("↑\(exportCount)") }
+            return "Fully up to date (\(parts.joined(separator: " ")) last sync)"
+        }
+        return "Fully up to date"
+    }
+
+    private func syncingText(for phase: SyncMonitor.SyncPhase) -> String {
+        switch phase {
+        case .setup:
+            return "Setting up..."
+        case .importing(isInitial: true):
+            return "Initial sync: Importing..."
+        case .importing(isInitial: false):
+            return "Importing..."
+        case .exporting:
+            return "Exporting..."
+        }
+    }
+
+    private func activeSyncCountsText(monitor: SyncMonitor) -> String {
+        var parts: [String] = []
+        if monitor.lastImportedCount > 0 { parts.append("↓\(monitor.lastImportedCount)") }
+        if monitor.lastExportedCount > 0 { parts.append("↑\(monitor.lastExportedCount)") }
+        return parts.joined(separator: " ")
     }
 
     // MARK: - Help Popover
