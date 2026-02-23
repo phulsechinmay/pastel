@@ -173,7 +173,7 @@ Requirements for v1.5 milestone: iCloud Sync (minimal core).
 ### Sync Reliability
 
 - [ ] **SYNC-12**: Cross-device duplicate items are detected and merged by contentHash (keep earliest, merge labels)
-- [ ] **SYNC-13**: Lightweight sync monitor observes NSPersistentCloudKitContainer events and exposes sync state
+- [x] **SYNC-13**: Lightweight sync monitor observes NSPersistentCloudKitContainer events and exposes sync state
 - [x] **SYNC-14**: Sync status indicator in Settings shows current state (synced/syncing/error/offline/disabled)
 
 ## Future Requirements
@@ -327,7 +327,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYNC-10 | Phase 20 | Pending |
 | SYNC-11 | Phase 20 | Pending |
 | SYNC-12 | Phase 21 | Pending |
-| SYNC-13 | Phase 21 | Pending |
+| SYNC-13 | Phase 21 | Complete |
 | SYNC-14 | Phase 21 | Complete |
 
 **v1.0 Coverage:**
