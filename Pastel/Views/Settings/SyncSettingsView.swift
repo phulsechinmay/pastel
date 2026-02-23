@@ -147,7 +147,7 @@ struct SyncSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-            case .syncing:
+            case .syncing(_):
                 HStack(spacing: 8) {
                     Circle()
                         .fill(.orange)
@@ -164,7 +164,7 @@ struct SyncSettingsView: View {
                         .onDisappear {
                             isPulsing = false
                         }
-                    Text("Syncing...")
+                    Text("Syncing…")
                 }
 
             case .error(let message):

@@ -1,14 +1,21 @@
 import CloudKit
 import CoreData
 import OSLog
+import SwiftData
 
 @MainActor
 @Observable
 final class SyncMonitor {
+    enum SyncPhase: Equatable {
+        case setup
+        case importing(isInitial: Bool)
+        case exporting
+    }
+
     enum SyncState: Equatable {
         case disabled
         case synced
-        case syncing
+        case syncing(phase: SyncPhase)
         case error(String)
         case accountUnavailable
 
@@ -16,9 +23,10 @@ final class SyncMonitor {
             switch (lhs, rhs) {
             case (.disabled, .disabled),
                  (.synced, .synced),
-                 (.syncing, .syncing),
                  (.accountUnavailable, .accountUnavailable):
                 return true
+            case let (.syncing(a), .syncing(b)):
+                return a == b
             case let (.error(a), .error(b)):
                 return a == b
             default:
@@ -30,14 +38,47 @@ final class SyncMonitor {
     var state: SyncState = .disabled
     var iCloudAccountName: String?
 
+    /// Last successful sync completion date (for "Last synced: X ago" display)
+    var lastSyncDate: Date?
+
+    /// Number of items imported during the last sync cycle
+    var lastImportedCount: Int = 0
+
+    /// Number of items exported during the last sync cycle
+    var lastExportedCount: Int = 0
+
     private var eventObserver: Any?
     private var accountObserver: Any?
     private var syncedWorkItem: DispatchWorkItem?
+
+    /// Whether the first import has completed since app launch (for initial sync detection)
+    private var hasCompletedFirstImport = false
+
+    /// Item count snapshot taken before an import event starts
+    private var preImportItemCount: Int = 0
+
+    /// Timestamp of the last successful export end (for counting local items since)
+    private var lastExportEndDate: Date?
+
+    /// ModelContext for item count queries (set via configure(modelContext:))
+    private var modelContext: ModelContext?
+
+    /// Start time of a setup event (for suppressing short setup displays)
+    private var setupStartDate: Date?
+
+    /// Work item for delayed setup state transition
+    private var setupDelayWorkItem: DispatchWorkItem?
 
     private let logger = Logger(
         subsystem: "app.pastel.Pastel",
         category: "SyncMonitor"
     )
+
+    /// Configure the SyncMonitor with a ModelContext for item count queries.
+    /// Call this from PastelApp lifecycle after creating the SyncMonitor.
+    func configure(modelContext: ModelContext) {
+        self.modelContext = modelContext
+    }
 
     func startMonitoring() {
         // Subscribe to CloudKit sync events
@@ -46,14 +87,15 @@ final class SyncMonitor {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            // Extract sendable data from event before crossing to MainActor
-            let event = notification.userInfo?[
+            guard let event = notification.userInfo?[
                 NSPersistentCloudKitContainer.eventNotificationUserInfoKey
-            ] as? NSPersistentCloudKitContainer.Event
-            let hasEnded = event?.endDate != nil
-            let errorMessage = event?.error?.localizedDescription
+            ] as? NSPersistentCloudKitContainer.Event else { return }
+            // Extract sendable values before crossing to MainActor
+            let eventType = event.type
+            let endDate = event.endDate
+            let error = event.error
             MainActor.assumeIsolated {
-                self?.handleSyncChange(hasEnded: hasEnded, errorMessage: errorMessage)
+                self?.handleSyncEvent(type: eventType, endDate: endDate, error: error)
             }
         }
 
@@ -72,20 +114,82 @@ final class SyncMonitor {
         Task { await checkAccountStatus() }
     }
 
-    private func handleSyncChange(hasEnded: Bool, errorMessage: String?) {
-        if !hasEnded {
-            // Event in progress -- cancel any pending synced transition
+    private func handleSyncEvent(
+        type: NSPersistentCloudKitContainer.EventType,
+        endDate: Date?,
+        error: (any Error)?
+    ) {
+        if endDate == nil {
+            // Event started — cancel any pending synced transition
             syncedWorkItem?.cancel()
             syncedWorkItem = nil
-            state = .syncing
-        } else if let errorMessage {
+
+            // Reset counts when transitioning from non-syncing to syncing
+            if case .syncing = state {} else {
+                lastImportedCount = 0
+                lastExportedCount = 0
+            }
+
+            switch type {
+            case .setup:
+                // Only show "Setting up..." if setup takes > 2 seconds
+                setupStartDate = Date()
+                setupDelayWorkItem?.cancel()
+                let workItem = DispatchWorkItem { [weak self] in
+                    guard let self else { return }
+                    self.state = .syncing(phase: .setup)
+                }
+                setupDelayWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
+
+            case .import:
+                setupDelayWorkItem?.cancel()
+                if preImportItemCount == 0 {
+                    preImportItemCount = currentItemCount()
+                }
+                state = .syncing(phase: .importing(isInitial: !hasCompletedFirstImport))
+
+            case .export:
+                setupDelayWorkItem?.cancel()
+                state = .syncing(phase: .exporting)
+
+            @unknown default:
+                setupDelayWorkItem?.cancel()
+                state = .syncing(phase: .importing(isInitial: false))
+            }
+        } else if let error {
+            // Event failed
             syncedWorkItem?.cancel()
             syncedWorkItem = nil
-            state = .error(errorMessage)
-            logger.warning("Sync error: \(errorMessage)")
+            setupDelayWorkItem?.cancel()
+            let message = friendlyErrorMessage(from: error)
+            state = .error(message)
+            logger.warning("Sync error (\(String(describing: type))): \(message)")
         } else {
-            // Event completed -- debounce the transition to .synced (1s)
-            // to avoid flickering when multiple events complete in sequence
+            // Event succeeded
+            setupDelayWorkItem?.cancel()
+
+            switch type {
+            case .import:
+                let postCount = currentItemCount()
+                lastImportedCount += max(0, postCount - preImportItemCount)
+                preImportItemCount = 0
+                hasCompletedFirstImport = true
+
+            case .export:
+                lastExportedCount = countLocalItemsSince(lastExportEndDate)
+                lastExportEndDate = endDate
+
+            case .setup:
+                break
+
+            @unknown default:
+                break
+            }
+
+            lastSyncDate = endDate
+
+            // Debounce the transition to .synced (1s) to avoid flickering
             syncedWorkItem?.cancel()
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self else { return }
@@ -93,6 +197,52 @@ final class SyncMonitor {
             }
             syncedWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: workItem)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func currentItemCount() -> Int {
+        guard let modelContext else { return 0 }
+        return (try? modelContext.fetchCount(FetchDescriptor<ClipboardItem>())) ?? 0
+    }
+
+    private func countLocalItemsSince(_ date: Date?) -> Int {
+        guard let modelContext else { return 0 }
+        let deviceID = DeviceIdentifier.current
+        let sinceDate = date ?? .distantPast
+        let descriptor = FetchDescriptor<ClipboardItem>(
+            predicate: #Predicate { item in
+                item.originDeviceID == deviceID && item.timestamp > sinceDate
+            }
+        )
+        return (try? modelContext.fetchCount(descriptor)) ?? 0
+    }
+
+    private func friendlyErrorMessage(from error: any Error) -> String {
+        guard let ckError = error as? CKError else {
+            return error.localizedDescription
+        }
+        switch ckError.code {
+        case .networkUnavailable, .networkFailure:
+            return "No internet connection"
+        case .notAuthenticated:
+            return "Not signed in to iCloud"
+        case .quotaExceeded:
+            return "iCloud storage full"
+        case .serviceUnavailable, .serverResponseLost:
+            return "iCloud temporarily unavailable"
+        case .requestRateLimited, .zoneBusy:
+            return "iCloud busy — will retry"
+        case .partialFailure:
+            if let partialErrors = ckError.userInfo[CKPartialErrorsByItemIDKey] as? [AnyHashable: any Error] {
+                let hasQuota = partialErrors.values.contains { ($0 as? CKError)?.code == .quotaExceeded }
+                if hasQuota { return "iCloud storage full" }
+            }
+            return "Partial sync failure — will retry"
+        default:
+            let desc = ckError.localizedDescription
+            return desc.count > 60 ? String(desc.prefix(57)) + "..." : desc
         }
     }
 
