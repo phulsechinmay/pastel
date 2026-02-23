@@ -472,7 +472,7 @@ Plans:
 **Goal:** Sync status display in Settings shows meaningful, actionable information: distinguishes import/export/setup phases, shows import/export counts with arrow indicators, displays relative "Last synced" time, maps CloudKit errors to user-friendly messages, and detects initial sync for long-duration feedback
 **Depends on:** Phase 29
 **Requirements:** SYNC-13, SYNC-14
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 30-01-PLAN.md -- SyncMonitor enhancements: enriched SyncState enum with SyncPhase, item count diffing, export counting, CKError mapping, initial sync detection
