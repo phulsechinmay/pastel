@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Onboarding view that explains why PostEvent permission is needed
-/// and provides buttons to grant it.
+/// Contextual permission prompt shown when the user attempts to paste without accessibility.
 ///
-/// Shown as a standalone NSWindow at app launch when permission is not granted.
-/// Polls `CGPreflightPostEventAccess()` every second and auto-dismisses when granted.
-struct AccessibilityPromptView: View {
+/// Shown as a standalone NSWindow. Polls `AccessibilityService.isGranted` every second
+/// and auto-dismisses when granted. The item has already been copied to the clipboard
+/// before this view appears, so the user's action is never lost.
+struct AccessibilityRequiredView: View {
     var onDismiss: () -> Void = {}
     @State private var isChecking = false
 
@@ -13,24 +13,20 @@ struct AccessibilityPromptView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            // Icon
             Image(systemName: "accessibility")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
 
-            // Title
-            Text("Accessibility Permission Required")
+            Text("Accessibility Permission Needed")
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            // Explanation
-            Text("Pastel needs Accessibility permission to paste clipboard items into other apps. Without it, you can browse your clipboard history but cannot paste directly.")
+            Text("Pastel needs Accessibility permission to paste items directly into apps.\n\nThe item has been copied to your clipboard \u{2014} you can paste it manually with \u{2318}V.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Buttons
             VStack(spacing: 12) {
                 Button {
                     AccessibilityService.requestPermission()
@@ -52,16 +48,16 @@ struct AccessibilityPromptView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
 
-                Button("Skip for Now") {
+                Button("OK") {
                     onDismiss()
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .font(.caption)
             }
         }
         .padding(32)
-        .frame(width: 360)
+        .frame(width: 380)
+        .fontDesign(.rounded)
         .onReceive(pollTimer) { _ in
             guard isChecking else { return }
             if AccessibilityService.isGranted {

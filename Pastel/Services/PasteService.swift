@@ -29,6 +29,10 @@ final class PasteService {
         category: "PasteService"
     )
 
+    /// Callback invoked when a paste action requires accessibility but it is not granted.
+    /// The item has already been copied to the clipboard before this fires.
+    var onAccessibilityRequired: (() -> Void)?
+
     /// Paste a clipboard item into the frontmost app.
     ///
     /// - Parameters:
@@ -57,7 +61,12 @@ final class PasteService {
 
         // 1. Check Accessibility permission (never cache -- can be revoked at any time)
         guard AccessibilityService.isGranted else {
-            logger.warning("Accessibility permission not granted -- paste blocked")
+            // Copy item to clipboard so the action is not lost
+            writeToPasteboard(item: item)
+            clipboardMonitor.skipNextChange = true
+            panelController.hide()
+            logger.info("Accessibility not granted -- copied to clipboard, showing permission prompt")
+            onAccessibilityRequired?()
             return
         }
 
@@ -121,7 +130,11 @@ final class PasteService {
         }
 
         guard AccessibilityService.isGranted else {
-            logger.warning("Accessibility permission not granted -- plain text paste blocked")
+            writeToPasteboardPlainText(item: item)
+            clipboardMonitor.skipNextChange = true
+            panelController.hide()
+            logger.info("Accessibility not granted -- copied plain text to clipboard, showing permission prompt")
+            onAccessibilityRequired?()
             return
         }
 

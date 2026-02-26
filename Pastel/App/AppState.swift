@@ -83,6 +83,11 @@ final class AppState {
             self?.clipboardMonitor?.skipNextChange = true
         }
 
+        // Wire accessibility permission prompt: PasteService -> AppState
+        pasteService.onAccessibilityRequired = { [weak self] in
+            self?.showAccessibilityRequired()
+        }
+
         // Register global hotkey for panel toggle.
         // Defer to next run loop iteration so NSApp.activate() works correctly —
         // Carbon event handler context blocks activation if called synchronously.
@@ -104,28 +109,31 @@ final class AppState {
     /// Controller for the first-launch onboarding window.
     private var onboardingController = OnboardingWindowController.shared
 
-    /// NSWindow for the accessibility permission onboarding prompt.
-    private var accessibilityWindow: NSWindow?
+    /// NSWindow for the contextual accessibility permission prompt.
+    private var permissionPromptWindow: NSWindow?
 
-    /// Show accessibility permission onboarding if not already granted.
+    /// Show the contextual accessibility permission prompt.
     ///
-    /// Called once at app launch. If the user already granted permission,
-    /// this is a no-op. Otherwise, a centered dark-themed window explains
-    /// why the permission is needed and offers buttons to grant it.
-    func checkAccessibilityOnLaunch() {
-        guard !AccessibilityService.isGranted else { return }
+    /// Called when the user attempts a paste action but accessibility is not granted.
+    /// The item has already been copied to the clipboard by PasteService.
+    func showAccessibilityRequired() {
+        // Don't stack multiple prompts
+        if let existing = permissionPromptWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
 
-        let promptView = AccessibilityPromptView(onDismiss: { [weak self] in
-            self?.accessibilityWindow?.close()
-            self?.accessibilityWindow = nil
+        let promptView = AccessibilityRequiredView(onDismiss: { [weak self] in
+            self?.permissionPromptWindow?.close()
+            self?.permissionPromptWindow = nil
         })
-        .preferredColorScheme(.dark)
 
         let hostingView = NSHostingView(rootView: promptView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 400),
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 420),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: true
@@ -137,23 +145,19 @@ final class AppState {
         window.appearance = NSAppearance(named: .darkAqua)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        self.accessibilityWindow = window
+        self.permissionPromptWindow = window
     }
 
-    /// Handle first-launch onboarding or subsequent accessibility check.
+    /// Handle first-launch onboarding.
     ///
     /// On first launch (hasCompletedOnboarding is false): show full onboarding.
-    /// On subsequent launches: if accessibility not granted, show the simple AccessibilityPromptView.
-    /// If accessibility is already granted on subsequent launches: no-op.
+    /// On subsequent launches: no-op. Accessibility is prompted contextually when the user
+    /// tries to paste without permission (via PasteService.onAccessibilityRequired callback).
     func handleFirstLaunch() {
         let hasCompleted = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
 
         if !hasCompleted {
-            // First launch: show full onboarding
             onboardingController.showOnboarding(appState: self)
-        } else {
-            // Subsequent launch: just check accessibility
-            checkAccessibilityOnLaunch()
         }
     }
 

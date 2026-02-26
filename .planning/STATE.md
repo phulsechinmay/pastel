@@ -27,6 +27,7 @@ Last activity: 2026-02-26 - Completed quick task 32: Add right-click context men
 - Phase 28 added: Fix panel item activation — unify hotkey, keyboard Enter, click, and drag activation into a durable shared method
 - Phase 29 added: Robust item deletion with undo, scroll preservation, and panel refresh
 - Phase 30 added: Enhanced iCloud Sync Status
+- Phase 31 added: Make accessibility permissions optional — copy-only default, paste permission prompt, onboarding reorder
 
 ## Previous Milestones
 

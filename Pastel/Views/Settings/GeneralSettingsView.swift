@@ -23,10 +23,13 @@ struct GeneralSettingsView: View {
 
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("historyRetention") private var retentionDays: Int = 90
-    @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.paste.rawValue
+    @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.copy.rawValue
     @AppStorage("fetchURLMetadata") private var fetchURLMetadata: Bool = true
     @AppStorage("quickPasteEnabled") private var quickPasteEnabled: Bool = true
     @AppStorage("dismissAfterDragPaste") private var dismissAfterDragPaste: Bool = true
+
+    @State private var accessibilityGranted = AccessibilityService.isGranted
+    let accessibilityPollTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ScrollView {
@@ -98,6 +101,33 @@ struct GeneralSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
+                    if !accessibilityGranted && pasteBehaviorRaw != PasteBehavior.copy.rawValue {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.yellow)
+                            Text("Accessibility permission is required for direct pasting. Items will be copied to clipboard until permission is granted.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(8)
+                        .background(Color.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+
+                        HStack(spacing: 12) {
+                            Button("Grant Permission") {
+                                AccessibilityService.requestPermission()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Button("Open System Settings") {
+                                AccessibilityService.openAccessibilitySettings()
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        }
+                    }
+
                     Toggle("Dismiss panel after drag-to-paste", isOn: $dismissAfterDragPaste)
                         .toggleStyle(.switch)
                     Text("Automatically closes the panel after dropping an item into another app.")
@@ -153,6 +183,9 @@ struct GeneralSettingsView: View {
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .onReceive(accessibilityPollTimer) { _ in
+            accessibilityGranted = AccessibilityService.isGranted
         }
         .onChange(of: panelEdgeRaw) {
             appState.panelController.handleEdgeChange()

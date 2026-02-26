@@ -477,3 +477,12 @@ Plans:
 Plans:
 - [x] 30-01-PLAN.md -- SyncMonitor enhancements: enriched SyncState enum with SyncPhase, item count diffing, export counting, CKError mapping, initial sync detection
 - [x] 30-02-PLAN.md -- SyncSettingsView rich status display: typed phase text, arrow counts, RelativeDateTimeFormatter, error prefix, PastelApp modelContext wiring
+
+### Phase 31: Make accessibility permissions optional — copy-only default, paste permission prompt, onboarding reorder
+
+**Goal:** [To be planned]
+**Depends on:** Phase 30
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 31 to break down)
