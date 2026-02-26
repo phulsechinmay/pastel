@@ -18,21 +18,30 @@ final class SettingsWindowController {
     /// Stored here so every call site (panel gear button, menu bar popover) injects it automatically.
     var syncMonitor: SyncMonitor?
 
+    /// Notification posted to switch tabs when the Settings window is already visible.
+    static let switchTab = Notification.Name("SettingsWindowSwitchTab")
+
     /// Show the settings window, or bring it to front if already visible.
     ///
     /// - Parameters:
     ///   - modelContainer: The SwiftData model container so settings views
     ///     can access the database (e.g., for label management in Plan 02).
     ///   - appState: The app state so settings can trigger panel edge changes.
-    func showSettings(modelContainer: ModelContainer, appState: AppState) {
-        // If already visible, just bring to front
+    ///   - initialTab: The tab to display when opening (default: .general).
+    func showSettings(modelContainer: ModelContainer, appState: AppState, initialTab: SettingsTab = .general) {
+        // If already visible, just bring to front and switch tab via notification
         if let window, window.isVisible {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            NotificationCenter.default.post(
+                name: Self.switchTab,
+                object: nil,
+                userInfo: ["tab": initialTab.rawValue]
+            )
             return
         }
 
-        let settingsView = SettingsView()
+        let settingsView = SettingsView(initialTab: initialTab)
             .preferredColorScheme(.dark)
             .modelContainer(modelContainer)
             .environment(appState)

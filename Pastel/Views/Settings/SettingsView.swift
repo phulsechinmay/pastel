@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Tab identifiers for the settings window.
-private enum SettingsTab: String, CaseIterable {
+enum SettingsTab: String, CaseIterable {
     case general
     case labels
     case privacy
@@ -37,7 +37,11 @@ private enum SettingsTab: String, CaseIterable {
 /// On macOS 26+, uses GlassEffectContainer with glass button styles.
 struct SettingsView: View {
 
-    @State private var selectedTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab
+
+    init(initialTab: SettingsTab = .general) {
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     /// Shared tab label layout used by both glass and legacy tab bar paths.
     private func tabLabel(_ tab: SettingsTab) -> some View {
@@ -130,5 +134,11 @@ struct SettingsView: View {
             )
         }
         .fontDesign(.rounded)
+        .onReceive(NotificationCenter.default.publisher(for: SettingsWindowController.switchTab)) { notification in
+            if let rawValue = notification.userInfo?["tab"] as? String,
+               let tab = SettingsTab(rawValue: rawValue) {
+                selectedTab = tab
+            }
+        }
     }
 }
