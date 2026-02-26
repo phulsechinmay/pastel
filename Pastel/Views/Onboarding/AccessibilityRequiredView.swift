@@ -7,7 +7,7 @@ import SwiftUI
 /// before this view appears, so the user's action is never lost.
 struct AccessibilityRequiredView: View {
     var onDismiss: () -> Void = {}
-    @State private var isChecking = false
+    @State private var accessibilityGranted = false
 
     let pollTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
@@ -27,10 +27,17 @@ struct AccessibilityRequiredView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(accessibilityGranted ? .green : .red)
+                    .frame(width: 10, height: 10)
+                Text(accessibilityGranted ? "Permission granted" : "Not granted")
+                    .font(.body)
+            }
+
             VStack(spacing: 12) {
                 Button {
                     AccessibilityService.requestPermission()
-                    isChecking = true
                 } label: {
                     Text("Grant Permission")
                         .frame(maxWidth: .infinity)
@@ -40,7 +47,6 @@ struct AccessibilityRequiredView: View {
 
                 Button {
                     AccessibilityService.openAccessibilitySettings()
-                    isChecking = true
                 } label: {
                     Text("Open System Settings")
                         .frame(maxWidth: .infinity)
@@ -58,10 +64,15 @@ struct AccessibilityRequiredView: View {
         .padding(32)
         .frame(width: 380)
         .fontDesign(.rounded)
+        .onAppear {
+            accessibilityGranted = AccessibilityService.isGranted
+        }
         .onReceive(pollTimer) { _ in
-            guard isChecking else { return }
-            if AccessibilityService.isGranted {
-                onDismiss()
+            accessibilityGranted = AccessibilityService.isGranted
+            if accessibilityGranted {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    onDismiss()
+                }
             }
         }
         .preferredColorScheme(.dark)
