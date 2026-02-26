@@ -141,6 +141,12 @@ struct PanelContentView: View {
             isShiftHeld = false
         }
         .onChange(of: panelActions.showCount) { _, _ in
+            // Reset to "All History" — clear label filter
+            selectedLabelIDs.removeAll()
+            // Clear search text so panel opens fresh
+            searchText = ""
+            debouncedSearchText = ""
+            // Focus card list, not search
             isSearchFocused = false
             panelFocus = .cardList
         }
