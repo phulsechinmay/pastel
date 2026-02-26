@@ -47,7 +47,7 @@
 		</dict>
 	</array>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/pulsechinmay/pastel-updates/main/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/phulsechinmay/pastel/appcast/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>ZqnmBj9hcmSCS4K9INlcG+Ks5ICNo6k4ZHb/gWY9csQ=</string>
 	<key>SUEnableInstallerLauncherService</key>

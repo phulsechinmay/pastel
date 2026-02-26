@@ -102,7 +102,12 @@ private struct LabelRow: View {
     ]
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
+            // Drag handle
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+
             // Unified color + emoji palette button
             Button {
                 showingPalette.toggle()

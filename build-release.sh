@@ -53,6 +53,15 @@ if git tag -l "$TAG" | grep -q "$TAG"; then
     exit 1
 fi
 
+# ─── Auto-increment build number ─────────────────────────────────────────────
+echo "==> Incrementing CURRENT_PROJECT_VERSION"
+CURRENT_BUILD=$(grep 'CURRENT_PROJECT_VERSION:' project.yml | head -1 | sed 's/.*"\(.*\)"/\1/')
+NEW_BUILD=$((CURRENT_BUILD + 1))
+sed -i '' "s/CURRENT_PROJECT_VERSION: \"$CURRENT_BUILD\"/CURRENT_PROJECT_VERSION: \"$NEW_BUILD\"/" project.yml
+echo "    Build number: $CURRENT_BUILD -> $NEW_BUILD"
+git add project.yml
+git commit -m "build: bump CURRENT_PROJECT_VERSION to $NEW_BUILD"
+
 # ─── Clean previous build artifacts ──────────────────────────────────────────
 echo "==> Cleaning build directory"
 rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH" "$BUILD_DIR/dmg-staging" "$DMG_PATH"
@@ -65,6 +74,7 @@ xcodebuild -scheme "$SCHEME" \
     archive \
     DEVELOPMENT_TEAM="$TEAM_ID" \
     ENABLE_HARDENED_RUNTIME=YES \
+    CURRENT_PROJECT_VERSION="$NEW_BUILD" \
     | tail -3
 
 # ─── Export with Developer ID signing ─────────────────────────────────────────
@@ -158,6 +168,25 @@ gh release create "$TAG" "${RELEASE_ASSETS[@]}" \
 
 DMG_SIZE=$(du -h "$DMG_PATH" | awk '{print $1}')
 RELEASE_URL=$(gh release view "$TAG" --json url -q .url)
+
+# ─── Deploy Appcast to Feed Branch ───────────────────────────────────────────
+if [ -f "$BUILD_DIR/appcast.xml" ]; then
+    echo "==> Deploying appcast to appcast branch"
+    FEED_DIR="$BUILD_DIR/appcast-deploy"
+    rm -rf "$FEED_DIR"
+    git worktree add "$FEED_DIR" appcast 2>/dev/null || {
+        # Create orphan appcast branch if it doesn't exist
+        git worktree add --detach "$FEED_DIR"
+        git -C "$FEED_DIR" checkout --orphan appcast
+        git -C "$FEED_DIR" rm -rf . 2>/dev/null || true
+    }
+    cp "$BUILD_DIR/appcast.xml" "$FEED_DIR/appcast.xml"
+    git -C "$FEED_DIR" add appcast.xml
+    git -C "$FEED_DIR" commit -m "Update appcast for $TAG"
+    git -C "$FEED_DIR" push origin appcast
+    git worktree remove "$FEED_DIR" --force
+    echo "    Feed updated: https://raw.githubusercontent.com/phulsechinmay/pastel/appcast/appcast.xml"
+fi
 
 echo ""
 echo "==> Done!"
