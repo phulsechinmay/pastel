@@ -43,15 +43,13 @@ struct LabelSettingsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(labels) { label in
-                            LabelRow(label: label, onDelete: { deleteLabel(label) })
-                            Divider()
-                                .padding(.leading, 38)
-                        }
+                List {
+                    ForEach(labels) { label in
+                        LabelRow(label: label, onDelete: { deleteLabel(label) })
                     }
+                    .onMove(perform: moveLabels)
                 }
+                .listStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -69,6 +67,17 @@ struct LabelSettingsView: View {
     private func deleteLabel(_ label: Label) {
         modelContext.delete(label)
         saveWithLogging(modelContext, operation: "delete label")
+    }
+
+    private func moveLabels(from source: IndexSet, to destination: Int) {
+        var reordered = Array(labels)
+        reordered.move(fromOffsets: source, toOffset: destination)
+        for (index, label) in reordered.enumerated() {
+            if label.sortOrder != index {
+                label.sortOrder = index
+            }
+        }
+        saveWithLogging(modelContext, operation: "reorder labels")
     }
 }
 
