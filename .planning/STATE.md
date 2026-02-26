@@ -205,8 +205,9 @@ None currently.
 | 027 | Add color format copy options (Hex/RGB/HSL/CMYK) to right-click menu | 2026-02-20 | 49409ed | [27-add-color-format-copy-options-to-right-c](./quick/27-add-color-format-copy-options-to-right-c/) |
 | 028 | Improve export/import UI with type filters, label select, date range | 2026-02-21 | 0d1833c | [28-improve-export-import-ui-with-type-filte](./quick/28-improve-export-import-ui-with-type-filte/) |
 | 029 | Fix Settings disappearing on panel dismiss + panel refresh on delete | 2026-02-21 | 28d42e9 | [29-fix-settings-disappearing-on-panel-dismi](./quick/29-fix-settings-disappearing-on-panel-dismi/) |
+| 030 | Reset side panel to All History and scroll top on every open | 2026-02-25 | 9a3a358 | [30-reset-sidepanel-to-all-history-and-scrol](./quick/30-reset-sidepanel-to-all-history-and-scrol/) |
 
 ## Session Continuity
 
-Last session: 2026-02-22
-Stopped at: Completed 30-02-PLAN.md (Phase 30 complete, 2/2 plans)
+Last session: 2026-02-25
+Stopped at: Completed quick task 30 (reset panel to All History on every open)
