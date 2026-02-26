@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 30 of 30 (Enhanced iCloud Sync Status)
 Plan: 2 of 2 complete
 Status: Complete
-Last activity: 2026-02-26 - Completed quick task 32: Add right-click context menu on label chips
+Last activity: 2026-02-26 - Completed quick task 33: Fix accessibility permission state not refreshing
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -209,8 +209,9 @@ None currently.
 | 030 | Reset side panel to All History and scroll top on every open | 2026-02-25 | 9a3a358 | [30-reset-sidepanel-to-all-history-and-scrol](./quick/30-reset-sidepanel-to-all-history-and-scrol/) |
 | 031 | Allow user to rearrange labels in Settings | 2026-02-26 | ab4cb61 | [31-allow-user-to-rearrange-labels-in-settin](./quick/31-allow-user-to-rearrange-labels-in-settin/) |
 | 032 | Add right-click context menu on label chips | 2026-02-26 | 9d7ad45 | [32-add-right-click-context-menu-on-label-ch](./quick/32-add-right-click-context-menu-on-label-ch/) |
+| 033 | Fix accessibility permission state not refreshing | 2026-02-26 | a887c85 | [33-fix-accessibility-permission-state-not-r](./quick/33-fix-accessibility-permission-state-not-r/) |
 
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed quick task 32 (add right-click context menu on label chips)
+Stopped at: Completed quick task 33 (fix accessibility permission state not refreshing)
