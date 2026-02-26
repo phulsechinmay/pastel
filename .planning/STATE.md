@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 30 of 30 (Enhanced iCloud Sync Status)
 Plan: 2 of 2 complete
 Status: Complete
-Last activity: 2026-02-22 - Completed 30-02: Rich sync status display with typed phases, counts, relative time, and ModelContext wiring
+Last activity: 2026-02-26 - Completed quick task 30: Reset sidepanel to All History and scroll to top on every open
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
