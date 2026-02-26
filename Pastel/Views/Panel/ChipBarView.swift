@@ -14,6 +14,11 @@ struct ChipBarView: View {
     var onSelectAllHistory: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
+
+    // MARK: - Label Edit State
+
+    @State private var editingLabel: Label?
 
     // MARK: - Label Creation State
 
@@ -39,6 +44,9 @@ struct ChipBarView: View {
             createChip
         }
         .padding(.vertical, 4)
+        .sheet(item: $editingLabel) { label in
+            LabelEditPalette(label: label, onDismiss: { editingLabel = nil })
+        }
     }
 
     // MARK: - All History Chip
@@ -87,6 +95,31 @@ struct ChipBarView: View {
             }
             .draggable(label.persistentModelID.asTransferString ?? "") {
                 LabelChipView(label: label)
+            }
+            .contextMenu {
+                Button {
+                    editingLabel = label
+                } label: {
+                    SwiftUI.Label("Edit", systemImage: "pencil")
+                }
+
+                Button {
+                    SettingsWindowController.shared.showSettings(
+                        modelContainer: modelContext.container,
+                        appState: appState,
+                        initialTab: .labels
+                    )
+                } label: {
+                    SwiftUI.Label("Reorder", systemImage: "arrow.up.arrow.down")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    deleteLabel(label)
+                } label: {
+                    SwiftUI.Label("Delete", systemImage: "trash")
+                }
             }
     }
 
@@ -203,6 +236,96 @@ struct ChipBarView: View {
         modelContext.insert(newLabel)
         saveWithLogging(modelContext, operation: "label reorder")
         showingCreateLabel = false
+    }
+
+    private func deleteLabel(_ label: Label) {
+        selectedLabelIDs.remove(label.persistentModelID)
+        modelContext.delete(label)
+        saveWithLogging(modelContext, operation: "delete label from chip bar")
+    }
+}
+
+// MARK: - Label Edit Palette
+
+/// Inline edit palette for modifying a label's name, color, and emoji.
+private struct LabelEditPalette: View {
+    @Bindable var label: Label
+    @Environment(\.modelContext) private var modelContext
+    var onDismiss: () -> Void
+
+    private static let curatedEmojis: [String] = [
+        "📌", "📎", "📝", "📋", "📂", "💡",
+        "⭐", "❤️", "🔥", "🎯", "🏷️", "🔖",
+        "✅", "❌", "⚡", "🎨", "🔧", "🐛",
+        "💬", "📧", "🔒", "🌟", "💎", "🚀"
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Edit Label")
+                .font(.headline)
+
+            TextField("Label name", text: $label.name)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 180)
+                .onSubmit {
+                    saveWithLogging(modelContext, operation: "update label name")
+                }
+
+            // 6x2 color grid
+            let columns = Array(repeating: GridItem(.fixed(20), spacing: 6), count: 6)
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(LabelColor.allCases, id: \.self) { labelColor in
+                    Circle()
+                        .fill(labelColor.color)
+                        .frame(width: 20, height: 20)
+                        .overlay(
+                            Circle().strokeBorder(
+                                label.emoji == nil && label.colorName == labelColor.rawValue
+                                    ? Color.white : Color.clear,
+                                lineWidth: 2
+                            )
+                        )
+                        .onTapGesture {
+                            label.colorName = labelColor.rawValue
+                            label.emoji = nil
+                            saveWithLogging(modelContext, operation: "update label color")
+                        }
+                }
+            }
+
+            Divider()
+
+            Text("Emoji")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(Self.curatedEmojis, id: \.self) { emoji in
+                    Text(emoji)
+                        .font(.system(size: 16))
+                        .frame(width: 20, height: 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(label.emoji == emoji ? Color.white.opacity(0.2) : Color.clear)
+                        )
+                        .onTapGesture {
+                            label.emoji = emoji
+                            saveWithLogging(modelContext, operation: "update label emoji")
+                        }
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    saveWithLogging(modelContext, operation: "update label")
+                    onDismiss()
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 220)
     }
 }
 
