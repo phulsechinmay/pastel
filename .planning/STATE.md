@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 Phase: 30 of 30 (Enhanced iCloud Sync Status)
 Plan: 2 of 2 complete
 Status: Complete
-Last activity: 2026-02-26 - Completed quick task 30: Reset sidepanel to All History and scroll to top on every open
+Last activity: 2026-02-26 - Completed quick task 31: Allow user to rearrange labels in Settings
 
 ### Roadmap Evolution
 - Phase 17 added: Liquid Glass panel fix with iterative visual feedback loop
@@ -206,8 +206,9 @@ None currently.
 | 028 | Improve export/import UI with type filters, label select, date range | 2026-02-21 | 0d1833c | [28-improve-export-import-ui-with-type-filte](./quick/28-improve-export-import-ui-with-type-filte/) |
 | 029 | Fix Settings disappearing on panel dismiss + panel refresh on delete | 2026-02-21 | 28d42e9 | [29-fix-settings-disappearing-on-panel-dismi](./quick/29-fix-settings-disappearing-on-panel-dismi/) |
 | 030 | Reset side panel to All History and scroll top on every open | 2026-02-25 | 9a3a358 | [30-reset-sidepanel-to-all-history-and-scrol](./quick/30-reset-sidepanel-to-all-history-and-scrol/) |
+| 031 | Allow user to rearrange labels in Settings | 2026-02-26 | ab4cb61 | [31-allow-user-to-rearrange-labels-in-settin](./quick/31-allow-user-to-rearrange-labels-in-settin/) |
 
 ## Session Continuity
 
-Last session: 2026-02-25
-Stopped at: Completed quick task 30 (reset panel to All History on every open)
+Last session: 2026-02-26
+Stopped at: Completed quick task 31 (allow user to rearrange labels in Settings)
