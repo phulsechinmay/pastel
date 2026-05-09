@@ -14,7 +14,15 @@ struct OnboardingView: View {
 
     // Accessibility polling
     @State private var accessibilityGranted = AccessibilityService.isGranted
+    /// Set to `true` when a TCC distributed notification fires while the cached
+    /// probe is still `false`. macOS 26 caches the per-process TCC determination,
+    /// so when the user grants permission while Pastel is running, our probe stays
+    /// stuck at `false` until relaunch. The TCC broadcast tells us the grant
+    /// happened; we surface that as a yellow "needs restart" state.
+    @State private var permissionRequiresRestart = false
     let pollTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    private let tccBroadcastPublisher = DistributedNotificationCenter.default()
+        .publisher(for: Notification.Name("com.apple.accessibility.api"))
 
     // Settings bindings (same @AppStorage keys as GeneralSettingsView)
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
@@ -106,9 +114,9 @@ struct OnboardingView: View {
 
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(accessibilityGranted ? .green : .red)
+                            .fill(statusIndicatorColor)
                             .frame(width: 10, height: 10)
-                        Text(accessibilityGranted ? "Permission granted" : "Not granted")
+                        Text(statusIndicatorText)
                             .font(.body)
                     }
 
@@ -125,6 +133,13 @@ struct OnboardingView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                             Text("You're all set!")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if permissionRequiresRestart {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.yellow)
+                            Text("Use the button below to relaunch and finish setup.")
                                 .foregroundStyle(.secondary)
                         }
                     } else {
@@ -156,9 +171,15 @@ struct OnboardingView: View {
                 // MARK: - Footer
                 Button {
                     UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
-                    onDismiss()
+                    if permissionRequiresRestart {
+                        // Relaunch flushes the per-process TCC cache so the new
+                        // process sees the just-granted permission as `true`.
+                        AccessibilityService.relaunchToApplyPermission()
+                    } else {
+                        onDismiss()
+                    }
                 } label: {
-                    Text("Get Started")
+                    Text(permissionRequiresRestart ? "Restart & Get Started" : "Get Started")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -174,9 +195,44 @@ struct OnboardingView: View {
                 pasteBehaviorRaw = PasteBehavior.paste.rawValue
             }
             accessibilityGranted = granted
+            if granted {
+                permissionRequiresRestart = false
+            }
+        }
+        .onReceive(tccBroadcastPublisher) { _ in
+            // Re-probe; if cache flipped (rare on macOS 26) handle it normally,
+            // otherwise treat the broadcast as evidence that the user just
+            // granted and surface the "needs restart" UI.
+            let granted = AccessibilityService.isGranted
+            accessibilityGranted = granted
+            if granted {
+                permissionRequiresRestart = false
+                if pasteBehaviorRaw == PasteBehavior.copy.rawValue {
+                    pasteBehaviorRaw = PasteBehavior.paste.rawValue
+                }
+            } else {
+                permissionRequiresRestart = true
+                if pasteBehaviorRaw == PasteBehavior.copy.rawValue {
+                    pasteBehaviorRaw = PasteBehavior.paste.rawValue
+                }
+            }
         }
         .onChange(of: panelEdgeRaw) {
             appState.panelController.handleEdgeChange()
         }
+    }
+
+    // MARK: - Status indicator
+
+    private var statusIndicatorColor: Color {
+        if accessibilityGranted { return .green }
+        if permissionRequiresRestart { return .yellow }
+        return .red
+    }
+
+    private var statusIndicatorText: String {
+        if accessibilityGranted { return "Permission granted" }
+        if permissionRequiresRestart { return "Pastel needs a restart to apply permissions" }
+        return "Not granted"
     }
 }
