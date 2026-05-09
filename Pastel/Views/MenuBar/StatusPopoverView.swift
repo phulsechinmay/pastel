@@ -104,6 +104,13 @@ struct StatusPopoverView: View {
         .fontDesign(.rounded)
         .onAppear {
             panelShortcutDescription = KeyboardShortcuts.getShortcut(for: .togglePanel)?.description
+            #if SPARKLE
+            // Hand the Sparkle controller to the Settings window singleton so
+            // its General tab can bind to the same instance. Set on first
+            // popover appearance — by the time the user opens Settings, the
+            // singleton is already wired.
+            SettingsWindowController.shared.updaterService = updaterService
+            #endif
         }
     }
 }

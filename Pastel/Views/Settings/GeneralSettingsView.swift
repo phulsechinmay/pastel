@@ -16,6 +16,9 @@ struct GeneralSettingsView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
+    #if SPARKLE
+    @EnvironmentObject private var updaterService: UpdaterService
+    #endif
 
     @State private var showingClearConfirmation = false
     @State private var showingExportSheet = false
@@ -147,6 +150,40 @@ struct GeneralSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                #if SPARKLE
+                Divider()
+
+                // 6.5. Updates (Sparkle build only)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Updates")
+                        .font(.headline)
+                    Picker("Update behavior:", selection: Binding(
+                        get: { updaterService.updateMode },
+                        set: { updaterService.applyUpdateMode($0) }
+                    )) {
+                        ForEach(UpdateCheckMode.allCases) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 320)
+
+                    Text("Pastel uses Sparkle to deliver updates outside the App Store.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    HStack {
+                        Button("Check for Updates Now") {
+                            updaterService.checkForUpdates()
+                        }
+                        .disabled(!updaterService.canCheckForUpdates)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .padding(.top, 4)
+                }
+                #endif
 
                 Divider()
 

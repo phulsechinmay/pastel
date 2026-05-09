@@ -18,6 +18,12 @@ final class SettingsWindowController {
     /// Stored here so every call site (panel gear button, menu bar popover) injects it automatically.
     var syncMonitor: SyncMonitor?
 
+    #if SPARKLE
+    /// Set once when the menu bar popover first appears (in `StatusPopoverView`).
+    /// Lets the Settings window's `GeneralSettingsView` access the same Sparkle controller.
+    var updaterService: UpdaterService?
+    #endif
+
     /// Notification posted to switch tabs when the Settings window is already visible.
     static let switchTab = Notification.Name("SettingsWindowSwitchTab")
 
@@ -41,11 +47,24 @@ final class SettingsWindowController {
             return
         }
 
-        let settingsView = SettingsView(initialTab: initialTab)
+        let baseView = SettingsView(initialTab: initialTab)
             .preferredColorScheme(.dark)
             .modelContainer(modelContainer)
             .environment(appState)
             .environment(syncMonitor)
+
+        // Conditionally inject the Sparkle updater service so the General tab
+        // can bind to it. AppStore builds skip this block entirely.
+        let settingsView: AnyView
+        #if SPARKLE
+        if let updaterService {
+            settingsView = AnyView(baseView.environmentObject(updaterService))
+        } else {
+            settingsView = AnyView(baseView)
+        }
+        #else
+        settingsView = AnyView(baseView)
+        #endif
 
         let hostingView = NSHostingView(rootView: settingsView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
