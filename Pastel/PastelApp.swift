@@ -13,10 +13,21 @@ struct PastelApp: App {
     @State private var syncMonitor: SyncMonitor?
     @State private var deduplicationService: DeduplicationService?
     #if SPARKLE
-    @StateObject private var updaterService = UpdaterService()
+    @StateObject private var updaterService: UpdaterService
     #endif
 
     init() {
+        #if SPARKLE
+        // Build the Sparkle controller eagerly and hand it to the Settings
+        // window singleton up front. Settings can be opened from either the
+        // menu bar popover or the panel toolbar gear, so lazy wiring on
+        // popover-appearance left the panel path with a missing
+        // EnvironmentObject and crashed on Settings open.
+        let updater = UpdaterService()
+        self._updaterService = StateObject(wrappedValue: updater)
+        SettingsWindowController.shared.updaterService = updater
+        #endif
+
         // DEBUG-only: Push SwiftData schema to CloudKit Development environment
         // Run once after model changes by adding -initializeCloudKitSchema to launch arguments
         #if DEBUG
