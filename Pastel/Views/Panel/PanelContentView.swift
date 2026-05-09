@@ -182,7 +182,7 @@ struct PanelContentView: View {
             } label: {
                 Image(systemName: "eyedropper")
                     .font(.system(size: 14))
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
 
@@ -217,9 +217,9 @@ struct PanelContentView: View {
                     )
                 }
             } label: {
-                Image(systemName: "gearshape")
+                Image(systemName: "gearshape.fill")
                     .font(.system(size: 14))
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
         }
