@@ -44,6 +44,8 @@ struct FilteredCardListView: View {
     var onDragStarted: (() -> Void)?
     /// Callback for Cmd+Left/Right label cycling. Direction: -1 = previous, +1 = next.
     var onCycleLabelFilter: ((Int) -> Void)?
+    /// Callback for Cmd+F to focus the panel's search field.
+    var onFocusSearch: (() -> Void)?
 
     /// Selected label IDs for in-memory post-filtering (OR logic).
     private let selectedLabelIDs: Set<PersistentIdentifier>
@@ -119,7 +121,8 @@ struct FilteredCardListView: View {
         onPastePlainText: @escaping (ClipboardItem) -> Void,
         onTypeToSearch: ((Character) -> Void)? = nil,
         onDragStarted: (() -> Void)? = nil,
-        onCycleLabelFilter: ((Int) -> Void)? = nil
+        onCycleLabelFilter: ((Int) -> Void)? = nil,
+        onFocusSearch: (() -> Void)? = nil
     ) {
         self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
@@ -161,6 +164,7 @@ struct FilteredCardListView: View {
         self.onTypeToSearch = onTypeToSearch
         self.onDragStarted = onDragStarted
         self.onCycleLabelFilter = onCycleLabelFilter
+        self.onFocusSearch = onFocusSearch
     }
 
     var body: some View {
@@ -374,6 +378,14 @@ struct FilteredCardListView: View {
                     withAnimation(.easeOut(duration: 0.2)) {
                         appState.deletionManager.undo(in: modelContext)
                     }
+                    return nil // consumed
+                }
+                return event
+            case 0x03: // kVK_ANSI_F — Cmd+F focuses the search field
+                if event.modifierFlags.contains(.command),
+                   !event.modifierFlags.contains(.shift),
+                   !event.modifierFlags.contains(.option) {
+                    onFocusSearch?()
                     return nil // consumed
                 }
                 return event

@@ -7,7 +7,8 @@ import SwiftUI
 struct SearchFieldView: View {
 
     @Binding var searchText: String
-    var requestFocus: Bool = false
+    /// Monotonic focus request token. See `FocusableTextField.focusRequestID`.
+    var focusRequestID: Int = 0
 
     var body: some View {
         HStack(spacing: 6) {
@@ -18,7 +19,7 @@ struct SearchFieldView: View {
             FocusableTextField(
                 text: $searchText,
                 placeholder: "Search...",
-                requestFocus: requestFocus
+                focusRequestID: focusRequestID
             )
 
             if !searchText.isEmpty {

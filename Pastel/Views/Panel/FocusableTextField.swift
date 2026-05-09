@@ -10,7 +10,14 @@ struct FocusableTextField: NSViewRepresentable {
 
     @Binding var text: String
     var placeholder: String = ""
-    var requestFocus: Bool = false
+    /// Monotonically-increasing focus request token. Each time the caller wants
+    /// the field focused they increment this value; we observe the change in
+    /// `updateNSView` and call `makeFirstResponder`. A counter is used instead
+    /// of a `Bool` because once the caller's "please focus" Bool flips to true
+    /// it can't fire another `false → true` edge without an intervening reset,
+    /// which makes a second focus request invisible if focus was lost in the
+    /// meantime (e.g. SwiftUI moved first responder elsewhere).
+    var focusRequestID: Int = 0
 
     func makeNSView(context: Context) -> NSTextField {
         let tf = NSTextField()
@@ -28,6 +35,9 @@ struct FocusableTextField: NSViewRepresentable {
             ]
         )
         tf.delegate = context.coordinator
+        // Initialize so the first updateNSView (with focusRequestID == 0)
+        // does not steal focus on appear.
+        context.coordinator.lastSeenFocusRequestID = focusRequestID
         return tf
     }
 
@@ -36,8 +46,8 @@ struct FocusableTextField: NSViewRepresentable {
             tf.stringValue = text
         }
 
-        // Focus on false→true transition
-        if requestFocus, !context.coordinator.wasFocused {
+        if focusRequestID != context.coordinator.lastSeenFocusRequestID {
+            context.coordinator.lastSeenFocusRequestID = focusRequestID
             DispatchQueue.main.async {
                 tf.window?.makeFirstResponder(tf)
                 // Place cursor at end instead of selecting all text
@@ -46,7 +56,6 @@ struct FocusableTextField: NSViewRepresentable {
                 }
             }
         }
-        context.coordinator.wasFocused = requestFocus
     }
 
     func makeCoordinator() -> Coordinator {
@@ -55,7 +64,7 @@ struct FocusableTextField: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         @Binding var text: String
-        var wasFocused = false
+        var lastSeenFocusRequestID: Int = 0
 
         init(text: Binding<String>) {
             _text = text

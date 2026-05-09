@@ -28,7 +28,13 @@ struct PanelContentView: View {
     }
 
     @FocusState private var panelFocus: PanelFocus?
-    @State private var isSearchFocused = false
+    /// Monotonic counter — incremented by callers that want the search field to
+    /// take focus (Cmd+F, type-to-search). FocusableTextField observes the
+    /// change in `updateNSView` and calls `makeFirstResponder`. A Bool is
+    /// insufficient because once it's `true` it can't fire another false→true
+    /// edge if focus is later moved to the card list (e.g. by Cmd+Left/Right
+    /// label cycling), so a second Cmd+F would be invisible.
+    @State private var searchFocusRequestID = 0
 
     private var isHorizontal: Bool {
         let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
@@ -50,7 +56,7 @@ struct PanelContentView: View {
                         .scaledToFit()
                         .frame(height: 38)
 
-                    SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
+                    SearchFieldView(searchText: $searchText, focusRequestID: searchFocusRequestID)
                         .frame(maxWidth: 200)
 
                     ChipBarView(
@@ -79,7 +85,7 @@ struct PanelContentView: View {
 
                 Divider()
 
-                SearchFieldView(searchText: $searchText, requestFocus: isSearchFocused)
+                SearchFieldView(searchText: $searchText, focusRequestID: searchFocusRequestID)
                     .padding(.vertical, PanelLayout.sectionSpacing)
                 ChipBarView(
                     labels: labels,
@@ -103,13 +109,17 @@ struct PanelContentView: View {
                 onTypeToSearch: { char in
                     searchText.append(char)
                     panelFocus = nil
-                    isSearchFocused = true
+                    searchFocusRequestID &+= 1
                 },
                 onDragStarted: {
                     panelActions.onDragStarted?()
                 },
                 onCycleLabelFilter: { direction in
                     cycleLabelFilter(direction: direction)
+                },
+                onFocusSearch: {
+                    panelFocus = nil
+                    searchFocusRequestID &+= 1
                 }
             )
             .focused($panelFocus, equals: .cardList)
@@ -125,7 +135,6 @@ struct PanelContentView: View {
         .defaultFocus($panelFocus, .cardList)
         .onAppear {
             DispatchQueue.main.async {
-                isSearchFocused = false
                 panelFocus = .cardList
             }
             flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
@@ -147,7 +156,6 @@ struct PanelContentView: View {
             searchText = ""
             debouncedSearchText = ""
             // Focus card list, not search
-            isSearchFocused = false
             panelFocus = .cardList
         }
         .onChange(of: selectedLabelIDs) { _, _ in
