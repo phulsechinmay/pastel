@@ -75,6 +75,14 @@ struct AccessibilityRequiredView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: AccessibilityService.permissionChangedNotification)) { _ in
+            accessibilityGranted = AccessibilityService.isGranted
+            if accessibilityGranted {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    onDismiss()
+                }
+            }
+        }
         .preferredColorScheme(.dark)
     }
 }

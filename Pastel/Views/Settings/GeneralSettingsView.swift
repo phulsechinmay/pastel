@@ -187,6 +187,9 @@ struct GeneralSettingsView: View {
         .onReceive(accessibilityPollTimer) { _ in
             accessibilityGranted = AccessibilityService.isGranted
         }
+        .onReceive(NotificationCenter.default.publisher(for: AccessibilityService.permissionChangedNotification)) { _ in
+            accessibilityGranted = AccessibilityService.isGranted
+        }
         .onChange(of: panelEdgeRaw) {
             appState.panelController.handleEdgeChange()
         }

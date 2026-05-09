@@ -194,8 +194,12 @@ final class AppState {
     /// Delegates to PasteService which handles: accessibility check, pasteboard write,
     /// self-paste loop prevention, panel hide, and CGEvent Cmd+V simulation.
     func paste(item: ClipboardItem) {
-        guard let clipboardMonitor else { return }
-        pasteService.paste(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
+        guard let clipboardMonitor else {
+            pasteLog("[PASTE] AppState.paste: no clipboardMonitor, dropping")
+            return
+        }
+        pasteLog("[PASTE] AppState.paste relaying to PasteService")
+        pasteService.paste(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController, source: "AppState.paste")
     }
 
     /// Paste a clipboard item as plain text (RTF stripped) into the frontmost app.
@@ -203,8 +207,12 @@ final class AppState {
     /// Delegates to PasteService.pastePlainText which omits RTF data from the pasteboard,
     /// causing receiving apps to fall back to their default text styling.
     func pastePlainText(item: ClipboardItem) {
-        guard let clipboardMonitor else { return }
-        pasteService.pastePlainText(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
+        guard let clipboardMonitor else {
+            pasteLog("[PASTE] AppState.pastePlainText: no clipboardMonitor, dropping")
+            return
+        }
+        pasteLog("[PASTE] AppState.pastePlainText relaying to PasteService")
+        pasteService.pastePlainText(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController, source: "AppState.pastePlainText")
     }
 
     /// Copy a clipboard item to the pasteboard without simulating Cmd+V.

@@ -84,6 +84,10 @@ struct PastelApp: App {
         state.modelContainer = container
         state.handleFirstLaunch()
 
+        // Subscribe to TCC accessibility-permission changes so SwiftUI views
+        // observing permission state can auto-refresh without polling.
+        AccessibilityService.startListeningForPermissionChanges()
+
         // Auto-open panel on startup (skip on very first launch before onboarding)
         if UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

@@ -282,6 +282,7 @@ struct FilteredCardListView: View {
             return DragItemProviderService.createItemProvider(for: item)
         }
         .onTapGesture(count: 2) {
+            pasteLog("[PASTE] origin=double-click index=\(index) shift=\(NSEvent.modifierFlags.contains(.shift))")
             if NSEvent.modifierFlags.contains(.shift) {
                 onPastePlainText(item)
             } else {
@@ -359,6 +360,7 @@ struct FilteredCardListView: View {
                 return event
             case 0x24, 0x4C: // Return, Keypad Enter
                 if let index = selectedIndex, index < visibleItems.count {
+                    pasteLog("[PASTE] origin=Return-key index=\(index) shift=\(event.modifierFlags.contains(.shift))")
                     if event.modifierFlags.contains(.shift) {
                         onPastePlainText(visibleItems[index])
                     } else {
@@ -391,9 +393,16 @@ struct FilteredCardListView: View {
                 // Cmd+1-9 / Cmd+Shift+1-9 quick paste activation
                 if event.modifierFlags.contains(.command),
                    let digit = Self.digitKeyCodeMap[event.keyCode] {
-                    guard quickPasteEnabled else { return event }
+                    guard quickPasteEnabled else {
+                        pasteLog("[PASTE] origin=Cmd+digit blocked: quickPasteEnabled=false")
+                        return event
+                    }
                     let index = digit - 1
-                    guard index < visibleItems.count else { return event }
+                    guard index < visibleItems.count else {
+                        pasteLog("[PASTE] origin=Cmd+digit digit=\(digit) but only \(visibleItems.count) items")
+                        return event
+                    }
+                    pasteLog("[PASTE] origin=Cmd+digit digit=\(digit) index=\(index) shift=\(event.modifierFlags.contains(.shift))")
                     if event.modifierFlags.contains(.shift) {
                         onPastePlainText(visibleItems[index])
                     } else {

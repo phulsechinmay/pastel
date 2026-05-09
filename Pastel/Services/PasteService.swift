@@ -21,6 +21,14 @@ import OSLog
 /// 3. Hide the panel
 ///
 /// Handles all 5 content types: text, richText, url, image, file.
+/// Static helper logger so call sites in other files (and the static methods here)
+/// can write [PASTE]-tagged messages that are visible in `log stream --process Pastel`.
+let pasteDebugLogger = Logger(subsystem: "app.pastel.Pastel", category: "Paste")
+
+func pasteLog(_ message: String) {
+    pasteDebugLogger.notice("\(message, privacy: .public)")
+}
+
 @MainActor
 final class PasteService {
 
@@ -39,17 +47,21 @@ final class PasteService {
     ///   - item: The clipboard item to paste.
     ///   - clipboardMonitor: The monitor whose skipNextChange flag will be set.
     ///   - panelController: The panel to hide before simulating paste.
+    ///   - source: Free-form tag identifying which UI path triggered the paste (for logging).
     func paste(
         item: ClipboardItem,
         clipboardMonitor: ClipboardMonitor,
-        panelController: PanelController
+        panelController: PanelController,
+        source: String = "unknown"
     ) {
-        // Read user's paste behavior preference
         let behaviorRaw = UserDefaults.standard.string(forKey: "pasteBehavior") ?? PasteBehavior.paste.rawValue
         let behavior = PasteBehavior(rawValue: behaviorRaw) ?? .paste
 
+        Self.logEntry(method: "paste", source: source, item: item, behavior: behavior)
+
         // Copy-only mode: write to pasteboard and hide panel (no accessibility or CGEvent needed)
         if behavior == .copy {
+            pasteLog("[PASTE] behavior=copy -> write-only, no CGEvent")
             writeToPasteboard(item: item)
             clipboardMonitor.skipNextChange = true
             panelController.hide()
@@ -60,8 +72,13 @@ final class PasteService {
         // Paste / Copy+Paste mode: full flow with Cmd+V simulation
 
         // 1. Check Accessibility permission (never cache -- can be revoked at any time)
-        guard AccessibilityService.isGranted else {
-            // Copy item to clipboard so the action is not lost
+        let axTrusted = AXIsProcessTrusted()
+        let cgPreflight = CGPreflightPostEventAccess()
+        let granted = AccessibilityService.isGranted
+        pasteLog("[PASTE] permission probe: isGranted=\(granted) AXIsProcessTrusted=\(axTrusted) CGPreflightPostEventAccess=\(cgPreflight) sandboxed=\(Self.isSandboxed)")
+        guard granted else {
+            pasteLog("[PASTE] PERMISSION DENIED — copying to clipboard and showing permission prompt (source=\(source))")
+            AccessibilityService.notePasteDeniedDueToPermission()
             writeToPasteboard(item: item)
             clipboardMonitor.skipNextChange = true
             panelController.hide()
@@ -72,9 +89,15 @@ final class PasteService {
 
         // 2. Check secure input (password fields, banking apps)
         if IsSecureEventInputEnabled() {
+            pasteLog("[PASTE] BLOCKED: secure event input is active — copying only, user must Cmd+V manually")
             logger.warning("Secure input is active -- writing to pasteboard only (user must Cmd+V manually)")
             writeToPasteboard(item: item)
             clipboardMonitor.skipNextChange = true
+            panelController.hide()
+            Self.showFailureAlert(
+                title: "Paste Blocked by Secure Input",
+                message: "A password field or banking app has secure input enabled, which prevents Pastel from simulating ⌘V.\n\nThe item is on your clipboard — paste it manually with ⌘V."
+            )
             return
         }
 
@@ -86,10 +109,22 @@ final class PasteService {
 
         // 5. Hide panel
         panelController.hide()
+        pasteLog("[PASTE] panel.hide() called, scheduling CGEvent Cmd+V in 250ms (source=\(source))")
 
         // 6. Simulate Cmd+V after 250ms delay (must exceed panel hide animation + previous app re-activation)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            Self.simulatePaste()
+            let frontmost = NSWorkspace.shared.frontmostApplication
+            pasteLog("[PASTE] CGEvent firing now. frontmostApp=\(frontmost?.localizedName ?? "nil") bundle=\(frontmost?.bundleIdentifier ?? "nil") pid=\(frontmost?.processIdentifier ?? -1)")
+            let posted = Self.simulatePaste()
+            if !posted {
+                pasteLog("[PASTE] CGEvent post FAILED — keyboard event source or events were nil (likely permission revoked between probe and post)")
+                Self.showFailureAlert(
+                    title: "Paste Simulation Failed",
+                    message: "Pastel could not post the ⌘V keystroke. The event source returned nil — this usually means PostEvent / Accessibility permission was revoked.\n\nThe item is on your clipboard — paste it manually with ⌘V."
+                )
+            } else {
+                pasteLog("[PASTE] CGEvent posted successfully (source=\(source))")
+            }
         }
     }
 
@@ -102,6 +137,7 @@ final class PasteService {
         clipboardMonitor: ClipboardMonitor,
         panelController: PanelController
     ) {
+        pasteLog("[PASTE] copyOnly() entry itemType=\(item.type.rawValue)")
         writeToPasteboard(item: item)
         clipboardMonitor.skipNextChange = true
         panelController.hide()
@@ -116,12 +152,16 @@ final class PasteService {
     func pastePlainText(
         item: ClipboardItem,
         clipboardMonitor: ClipboardMonitor,
-        panelController: PanelController
+        panelController: PanelController,
+        source: String = "unknown"
     ) {
         let behaviorRaw = UserDefaults.standard.string(forKey: "pasteBehavior") ?? PasteBehavior.paste.rawValue
         let behavior = PasteBehavior(rawValue: behaviorRaw) ?? .paste
 
+        Self.logEntry(method: "pastePlainText", source: source, item: item, behavior: behavior)
+
         if behavior == .copy {
+            pasteLog("[PASTE] behavior=copy (plain) -> write-only, no CGEvent")
             writeToPasteboardPlainText(item: item)
             clipboardMonitor.skipNextChange = true
             panelController.hide()
@@ -129,7 +169,13 @@ final class PasteService {
             return
         }
 
-        guard AccessibilityService.isGranted else {
+        let axTrustedPT = AXIsProcessTrusted()
+        let cgPreflightPT = CGPreflightPostEventAccess()
+        let grantedPT = AccessibilityService.isGranted
+        pasteLog("[PASTE] (plain) permission probe: isGranted=\(grantedPT) AXIsProcessTrusted=\(axTrustedPT) CGPreflightPostEventAccess=\(cgPreflightPT)")
+        guard grantedPT else {
+            pasteLog("[PASTE] (plain) PERMISSION DENIED — copying plain text to clipboard and showing permission prompt (source=\(source))")
+            AccessibilityService.notePasteDeniedDueToPermission()
             writeToPasteboardPlainText(item: item)
             clipboardMonitor.skipNextChange = true
             panelController.hide()
@@ -139,18 +185,36 @@ final class PasteService {
         }
 
         if IsSecureEventInputEnabled() {
+            pasteLog("[PASTE] (plain) BLOCKED: secure event input is active")
             logger.warning("Secure input is active -- writing plain text to pasteboard only (user must Cmd+V manually)")
             writeToPasteboardPlainText(item: item)
             clipboardMonitor.skipNextChange = true
+            panelController.hide()
+            Self.showFailureAlert(
+                title: "Paste Blocked by Secure Input",
+                message: "A password field or banking app has secure input enabled, which prevents Pastel from simulating ⌘V.\n\nThe item is on your clipboard — paste it manually with ⌘V."
+            )
             return
         }
 
         writeToPasteboardPlainText(item: item)
         clipboardMonitor.skipNextChange = true
         panelController.hide()
+        pasteLog("[PASTE] (plain) panel.hide() called, scheduling CGEvent Cmd+V in 250ms (source=\(source))")
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            Self.simulatePaste()
+            let frontmost = NSWorkspace.shared.frontmostApplication
+            pasteLog("[PASTE] (plain) CGEvent firing now. frontmostApp=\(frontmost?.localizedName ?? "nil") bundle=\(frontmost?.bundleIdentifier ?? "nil")")
+            let posted = Self.simulatePaste()
+            if !posted {
+                pasteLog("[PASTE] (plain) CGEvent post FAILED")
+                Self.showFailureAlert(
+                    title: "Paste Simulation Failed",
+                    message: "Pastel could not post the ⌘V keystroke. The event source returned nil — this usually means PostEvent / Accessibility permission was revoked.\n\nThe item is on your clipboard — paste it manually with ⌘V."
+                )
+            } else {
+                pasteLog("[PASTE] (plain) CGEvent posted successfully (source=\(source))")
+            }
         }
     }
 
@@ -220,6 +284,7 @@ final class PasteService {
             }
         }
 
+        pasteLog("[PASTE] wrote \(item.type.rawValue) to pasteboard (changeCount=\(pasteboard.changeCount))")
         logger.info("Wrote \(item.type.rawValue) content to pasteboard")
     }
 
@@ -246,6 +311,7 @@ final class PasteService {
             pasteboard.setString(text, forType: .string)
         }
 
+        pasteLog("[PASTE] wrote \(item.type.rawValue) to pasteboard (plain text, changeCount=\(pasteboard.changeCount))")
         logger.info("Wrote \(item.type.rawValue) content to pasteboard (plain text, RTF and HTML stripped)")
     }
 
@@ -255,24 +321,60 @@ final class PasteService {
     ///
     /// Uses virtual key code 0x09 (kVK_ANSI_V) which is layout-independent.
     /// Posts to `.cgSessionEventTap` to reach the frontmost app.
-    static func simulatePaste() {
-        let source = CGEventSource(stateID: .combinedSessionState)
+    /// Returns `true` when both keyDown and keyUp events were created and posted,
+    /// `false` when the event source or events could not be created (permission issue).
+    @discardableResult
+    static func simulatePaste() -> Bool {
+        guard let source = CGEventSource(stateID: .combinedSessionState) else {
+            pasteLog("[PASTE] simulatePaste: CGEventSource(stateID:) returned nil")
+            return false
+        }
 
         // Suppress local keyboard events during paste to avoid interference
-        source?.setLocalEventsFilterDuringSuppressionState(
+        source.setLocalEventsFilterDuringSuppressionState(
             [.permitLocalMouseEvents, .permitSystemDefinedEvents],
             state: .eventSuppressionStateSuppressionInterval
         )
 
         let vKeyCode: CGKeyCode = 0x09 // kVK_ANSI_V
 
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true)
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false)
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) else {
+            pasteLog("[PASTE] simulatePaste: CGEvent(keyboardEventSource:) returned nil")
+            return false
+        }
 
-        keyDown?.flags = .maskCommand
-        keyUp?.flags = .maskCommand
+        keyDown.flags = .maskCommand
+        keyUp.flags = .maskCommand
 
-        keyDown?.post(tap: .cgSessionEventTap)
-        keyUp?.post(tap: .cgSessionEventTap)
+        keyDown.post(tap: .cgSessionEventTap)
+        keyUp.post(tap: .cgSessionEventTap)
+        return true
+    }
+
+    // MARK: - Logging & Alert helpers
+
+    private static let isSandboxed: Bool = {
+        ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+    }()
+
+    private static func logEntry(method: String, source: String, item: ClipboardItem, behavior: PasteBehavior) {
+        let preview = (item.textContent ?? "").prefix(40).replacingOccurrences(of: "\n", with: "⏎")
+        pasteLog("[PASTE] \(method)() ENTRY source=\(source) type=\(item.type.rawValue) behavior=\(behavior.rawValue) preview=\"\(preview)\"")
+    }
+
+    /// Display a non-blocking NSAlert so paste failures are user-visible.
+    /// Activates the app (so the panel hide doesn't leave the alert hidden behind
+    /// the previous frontmost app) and uses .informational style.
+    private static func showFailureAlert(title: String, message: String) {
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = title
+            alert.informativeText = message
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
 }
