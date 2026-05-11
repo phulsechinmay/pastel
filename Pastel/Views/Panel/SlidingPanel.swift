@@ -1,17 +1,18 @@
 import AppKit
 
-/// Borderless NSPanel subclass that slides in from the screen edge.
+/// Borderless, non-activating `NSPanel` subclass that slides in from the screen edge.
 ///
-/// Does NOT use `.nonactivatingPanel` — the panel activates Pastel when shown
-/// so it can receive keyboard events. PanelController re-activates the previous
-/// app on dismiss. Since the app uses `LSUIElement = true`, activation is invisible
-/// (no Dock icon or Cmd+Tab entry).
+/// Uses `.nonactivatingPanel` so the previous app keeps frontmost status — the panel
+/// becomes key (and receives keyboard input) without making Pastel the active app.
+/// That keeps Pastel's other windows (Settings, Edit) from being pushed behind
+/// another app when the panel dismisses, and makes paste-back simpler because the
+/// target app's focus is never disturbed in the first place.
 final class SlidingPanel: NSPanel {
 
     init() {
         super.init(
             contentRect: .zero,
-            styleMask: [.fullSizeContentView, .borderless],
+            styleMask: [.fullSizeContentView, .borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: true
         )
@@ -23,7 +24,8 @@ final class SlidingPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         hidesOnDeactivate = false
 
-        // Transparent background -- NSVisualEffectView in PanelController provides the material
+        // Transparent background -- NSVisualEffectView / NSGlassEffectView
+        // in PanelController provides the material.
         isOpaque = false
         backgroundColor = .clear
 
@@ -38,13 +40,12 @@ final class SlidingPanel: NSPanel {
 
     // MARK: - Key / Main Behavior
 
-    /// Allow key status so the panel can receive keyboard events
-    /// (forward-compatible for Phase 4 search field).
+    /// Allow key status so the panel can receive keyboard events even though
+    /// the app itself does not activate.
     override var canBecomeKey: Bool { true }
 
-    /// Never become main window -- the active app retains main status.
+    /// Never become main window -- the user's previous app retains main status.
     override var canBecomeMain: Bool { false }
-
 }
 
 // MARK: - First-Mouse Content View

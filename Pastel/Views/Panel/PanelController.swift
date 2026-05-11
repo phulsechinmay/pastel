@@ -20,6 +20,12 @@ final class PanelActions {
 
 /// Manages the lifecycle of the sliding clipboard panel: creation, show/hide
 /// animation, screen detection, and dismiss-on-click-outside / Escape monitors.
+///
+/// The panel is a non-activating `NSPanel`: it becomes the key window (so it
+/// receives keyboard events) but never activates Pastel as an app. The user's
+/// previously frontmost app keeps focus throughout, which makes paste-back
+/// trivial and means dismissing the panel doesn't push Settings/Edit windows
+/// behind some other app.
 @MainActor
 final class PanelController {
 
@@ -33,16 +39,11 @@ final class PanelController {
 
     private var panel: SlidingPanel?
     private var globalClickMonitor: Any?
-    private var localClickMonitor: Any?
     private var localKeyMonitor: Any?
     private var dragEndMonitor: Any?
-    private var deactivationObserver: Any?
+    private var screenChangeObserver: Any?
     private var modelContainer: ModelContainer?
     private var appState: AppState?
-
-    /// The app that was frontmost before the panel was shown.
-    /// Captured in show() so paste-back targets the correct app.
-    private var previousApp: NSRunningApplication?
 
     /// Observable actions bridge for SwiftUI views.
     let panelActions = PanelActions()
@@ -82,12 +83,6 @@ final class PanelController {
     /// Whether the panel is currently visible on screen.
     var isVisible: Bool {
         panel?.isVisible ?? false
-    }
-
-    /// Whether Pastel has visible windows other than the sliding panel.
-    /// Used to decide whether to re-activate the previous app on panel dismiss.
-    var hasOtherVisibleWindows: Bool {
-        NSApp.windows.contains { $0 !== panel && $0.isVisible && !($0 is SlidingPanel) }
     }
 
     /// The CGWindowID of the panel, used for `screencapture -l` during visual verification.
@@ -146,12 +141,10 @@ final class PanelController {
     // MARK: - Show / Hide
 
     /// Slide the panel in from the configured screen edge.
+    ///
+    /// Because the panel is non-activating, the previous app stays frontmost
+    /// throughout — no app switch happens, and no `previousApp` tracking is needed.
     func show() {
-        // Capture the frontmost app BEFORE showing the panel.
-        // After showing, we activate Pastel so the compositor renders full Liquid Glass.
-        // On hide, we re-activate this app to return focus seamlessly.
-        previousApp = NSWorkspace.shared.frontmostApplication
-
         let edge = currentEdge
         let screen = screenWithMouse()
 
@@ -198,12 +191,6 @@ final class PanelController {
         panel.orderFrontRegardless()
         panel.makeKey()
 
-        // Activate the app so the compositor renders full Liquid Glass.
-        // LSUIElement = true means no Dock icon or Cmd+Tab entry appears.
-        logger.info("Before activate: isActive=\(NSApp.isActive), isKey=\(panel.isKeyWindow)")
-        NSApp.activate()
-        logger.info("After activate: isActive=\(NSApp.isActive), isKey=\(panel.isKeyWindow)")
-
         NSAnimationContext.runAnimationGroup { context in
             context.duration = animationDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -217,11 +204,9 @@ final class PanelController {
 
     /// Slide the panel off-screen in the direction of the configured edge and order it out.
     ///
-    /// - Parameter reactivatePreviousApp: Whether to re-activate the app that was frontmost
-    ///   before the panel was shown. Paste callers pass `true` (default) so CGEvent Cmd+V
-    ///   reaches the target app. Non-paste dismiss (Escape, click-outside) passes `false`
-    ///   when other Pastel windows (Settings, Edit) are visible to avoid covering them.
-    func hide(reactivatePreviousApp: Bool = true) {
+    /// Because the panel never activated Pastel, focus is already with whichever
+    /// app the user was using before; nothing needs to be re-activated on dismiss.
+    func hide() {
         guard let panel, panel.isVisible else { return }
 
         // Commit any pending soft-deletion before hiding the panel.
@@ -250,12 +235,10 @@ final class PanelController {
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().setFrame(offScreen, display: true)
         } completionHandler: { [weak self] in
-            panel.orderOut(nil)
-            self?.removeEventMonitors()
-            if reactivatePreviousApp {
-                self?.previousApp?.activate()
+            MainActor.assumeIsolated {
+                panel.orderOut(nil)
+                self?.removeEventMonitors()
             }
-            self?.previousApp = nil
         }
 
         logger.info("Panel hidden from \(edge.rawValue) edge")
@@ -271,7 +254,6 @@ final class PanelController {
             // Quick hide without animation
             panel?.orderOut(nil)
             removeEventMonitors()
-            previousApp = nil
         }
         panel = nil
         let newEdge = currentEdge
@@ -297,67 +279,52 @@ final class PanelController {
 
     // MARK: - Event Monitors
 
-    /// Install monitors to dismiss the panel on click-outside or Escape key.
+    /// Install monitors to dismiss the panel on click-outside, Escape key, or
+    /// screen disconnect.
     private func installEventMonitors() {
         guard autoDismissEnabled else { return }
+
         // Dismiss on any mouse click outside the panel.
-        // Global monitors fire for events in OTHER apps, but with borderless
-        // NSPanel + LSUIElement, macOS can occasionally route panel clicks as global.
-        // Guard by checking click location against ALL visible app windows
-        // (panel, edit modal, settings, color picker) so secondary windows don't trigger dismiss.
+        // Global monitor fires for clicks in other apps; check against all visible
+        // Pastel windows so secondary windows (Settings, Edit, etc.) don't trigger dismiss.
         globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
-        ) { [weak self] event in
+        ) { [weak self] _ in
             guard self?.isDragging != true else { return }
             let clickLocation = NSEvent.mouseLocation
-            // Don't dismiss if clicking on ANY Pastel window (panel, edit modal, settings, color picker)
             let clickedInsideApp = NSApp.windows.contains { window in
                 window.isVisible && window.frame.contains(clickLocation)
             }
             if !clickedInsideApp {
-                self?.hide(reactivatePreviousApp: !(self?.hasOtherVisibleWindows ?? false))
+                self?.hide()
             }
         }
 
-        // Local click monitor: ensure the app stays active when clicking inside the panel.
-        // Belt-and-suspenders for borderless NSPanel where SwiftUI focus changes can
-        // cause momentary deactivation.
-        localClickMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown]
-        ) { [weak self] event in
-            if let panel = self?.panel, event.window == panel {
-                if !NSApp.isActive {
-                    NSApp.activate()
-                }
-            }
-            return event // pass through -- don't consume
-        }
-
-        // Dismiss on Escape key (local monitor so we can consume the event)
+        // Dismiss on Escape key (local monitor so we can consume the event).
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(
             matching: .keyDown
         ) { [weak self] event in
             if event.keyCode == 53 { // Escape
-                self?.hide(reactivatePreviousApp: !(self?.hasOtherVisibleWindows ?? false))
+                self?.hide()
                 return nil // consume the event
             }
             return event
         }
 
-        // Dismiss when the app loses active status (e.g. Cmd+Tab, Mission Control).
-        // Since we activate the app on show(), deactivation means the user switched away.
-        // Use a short delay to avoid false-positive dismissals from momentary deactivation
-        // during internal focus changes (e.g., clicking search field, label chips).
-        deactivationObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didResignActiveNotification,
+        // Dismiss when the panel's screen disconnects (hot-plug, sleep wake on
+        // a different monitor layout, etc.) so the panel doesn't end up stranded.
+        screenChangeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
-            guard self?.isDragging != true else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                guard let self, self.isVisible else { return }
-                // If the app re-activated (focus returned to panel), don't dismiss
-                if !NSApp.isActive {
-                    self.hide(reactivatePreviousApp: !self.hasOtherVisibleWindows)
+            MainActor.assumeIsolated {
+                guard let self, let panel = self.panel, panel.isVisible else { return }
+                // If the panel's screen is no longer in the screens list, dismiss.
+                let stillConnected = NSScreen.screens.contains { screen in
+                    screen.frame.intersects(panel.frame)
+                }
+                if !stillConnected {
+                    self.hide()
                 }
             }
         }
@@ -369,10 +336,6 @@ final class PanelController {
             NSEvent.removeMonitor(monitor)
             globalClickMonitor = nil
         }
-        if let monitor = localClickMonitor {
-            NSEvent.removeMonitor(monitor)
-            localClickMonitor = nil
-        }
         if let monitor = localKeyMonitor {
             NSEvent.removeMonitor(monitor)
             localKeyMonitor = nil
@@ -381,9 +344,9 @@ final class PanelController {
             NSEvent.removeMonitor(monitor)
             dragEndMonitor = nil
         }
-        if let observer = deactivationObserver {
+        if let observer = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
-            deactivationObserver = nil
+            screenChangeObserver = nil
         }
         isDragging = false
     }
@@ -454,8 +417,6 @@ final class PanelController {
         // Glass/blur treatment
         if #available(macOS 26, *) {
             // NSGlassEffectView renders Liquid Glass at the AppKit/compositor level.
-            // Full glass quality (lensing, refraction, specular highlights) requires
-            // the app to be active, which PanelController.show() ensures via NSApp.activate().
             let glassView = NSGlassEffectView()
             glassView.cornerRadius = PanelLayout.panelCornerRadius
             glassView.translatesAutoresizingMaskIntoConstraints = false
