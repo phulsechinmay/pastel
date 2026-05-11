@@ -70,8 +70,8 @@ final class SettingsWindowController {
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 550),
-            styleMask: [.titled, .closable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 620),
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: true
         )
@@ -79,9 +79,9 @@ final class SettingsWindowController {
         window.title = "Pastel Settings"
         window.center()
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 500, height: 480)
+        window.minSize = NSSize(width: 680, height: 500)
         window.appearance = NSAppearance(named: .darkAqua)
-        window.titlebarSeparatorStyle = .none
+        window.titlebarSeparatorStyle = .automatic
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.window = window

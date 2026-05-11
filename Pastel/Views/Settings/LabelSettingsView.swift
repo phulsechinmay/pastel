@@ -3,56 +3,63 @@ import SwiftData
 
 /// Label management view for the Settings Labels tab.
 ///
-/// Displays all labels in a scrollable list with inline editing.
-/// Supports create, rename, recolor, and delete operations.
+/// Native `List` with `.inset` style, an always-editable name `TextField` per row,
+/// a swatch button that opens a color + emoji popover, and a trailing trash button
+/// that requires confirmation. Reorder is supported via `.onMove` (drag any row).
+/// The `+` button lives in the window toolbar via `ToolbarItem`.
 struct LabelSettingsView: View {
 
     @Query(sort: \Label.sortOrder) private var labels: [Label]
     @Environment(\.modelContext) private var modelContext
 
+    @State private var labelPendingDeletion: Label?
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row
-            HStack {
-                Text("Labels")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    createLabel()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                .help("Add a new label")
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-
-            Divider()
-
-            // Label list
+        Group {
             if labels.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "tag")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.tertiary)
-                    Text("No labels yet")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                ContentUnavailableView {
+                    SwiftUI.Label("No labels yet", systemImage: "tag")
+                } description: {
+                    Text("Use the + button above to create your first label.")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
                     ForEach(labels) { label in
-                        LabelRow(label: label, onDelete: { deleteLabel(label) })
+                        LabelRow(label: label) { labelPendingDeletion = label }
                     }
                     .onMove(perform: moveLabels)
                 }
-                .listStyle(.plain)
+                .listStyle(.inset)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: createLabel) {
+                    SwiftUI.Label("Add Label", systemImage: "plus")
+                }
+                .help("Add a new label")
+            }
+        }
+        .alert(
+            "Delete Label?",
+            isPresented: Binding(
+                get: { labelPendingDeletion != nil },
+                set: { if !$0 { labelPendingDeletion = nil } }
+            ),
+            presenting: labelPendingDeletion
+        ) { label in
+            Button("Delete", role: .destructive) {
+                deleteLabel(label)
+                labelPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                labelPendingDeletion = nil
+            }
+        } message: { label in
+            Text("\u{201C}\(label.name)\u{201D} will be removed from any clipboard items it's attached to.")
+        }
     }
 
     // MARK: - Actions
@@ -83,15 +90,14 @@ struct LabelSettingsView: View {
 
 // MARK: - Label Row
 
-/// A single label row with inline editing for name, color, and emoji.
+/// A single label row with always-editable name, swatch popover, and trash button.
 private struct LabelRow: View {
 
     @Bindable var label: Label
     @Environment(\.modelContext) private var modelContext
-    @State private var isEditing = false
     @State private var showingPalette = false
 
-    var onDelete: () -> Void
+    var onRequestDelete: () -> Void
 
     /// Curated label-friendly emojis for quick selection.
     private static let curatedEmojis: [String] = [
@@ -102,69 +108,67 @@ private struct LabelRow: View {
     ]
 
     var body: some View {
-        HStack(spacing: 8) {
-            // Drag handle
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            // Unified color + emoji palette button
+        HStack(spacing: 10) {
             Button {
                 showingPalette.toggle()
             } label: {
-                if let emoji = label.emoji, !emoji.isEmpty {
-                    Text(emoji)
-                        .font(.system(size: 14))
-                        .frame(width: 20, height: 20)
-                } else {
-                    Circle()
-                        .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
-                        .frame(width: 14, height: 14)
-                        .frame(width: 20, height: 20)
-                }
+                swatch
             }
             .buttonStyle(.plain)
-            .sheet(isPresented: $showingPalette) {
+            .popover(isPresented: $showingPalette, arrowEdge: .leading) {
                 colorEmojiPalette
             }
 
-            // Name field (click to edit)
-            if isEditing {
-                TextField("Label name", text: $label.name)
-                    .textFieldStyle(.plain)
-                    .onSubmit {
-                        isEditing = false
-                        saveWithLogging(modelContext, operation: "update label name")
-                    }
-            } else {
-                Text(label.name)
-                    .onTapGesture {
-                        isEditing = true
-                    }
-            }
+            TextField("Label name", text: $label.name)
+                .textFieldStyle(.plain)
+                .onSubmit {
+                    saveWithLogging(modelContext, operation: "update label name")
+                }
 
             Spacer()
 
-            // Delete button
-            Button(role: .destructive) {
-                onDelete()
-            } label: {
+            Button(role: .destructive, action: onRequestDelete) {
                 Image(systemName: "trash")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .help("Delete label")
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+    }
+
+    private var swatch: some View {
+        Group {
+            if let emoji = label.emoji, !emoji.isEmpty {
+                Text(emoji)
+                    .font(.system(size: 14))
+            } else {
+                Circle()
+                    .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
+                    .frame(width: 14, height: 14)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .background(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 
     // MARK: - Color + Emoji Palette Popover
 
     private var colorEmojiPalette: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // 6x2 color grid (same layout as ChipBarView)
-            let columns = Array(repeating: GridItem(.fixed(20), spacing: 6), count: 6)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Color")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            let columns = Array(repeating: GridItem(.fixed(22), spacing: 6), count: 6)
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(LabelColor.allCases, id: \.self) { labelColor in
                     Circle()
@@ -173,7 +177,7 @@ private struct LabelRow: View {
                         .overlay(
                             Circle()
                                 .strokeBorder(
-                                    label.colorName == labelColor.rawValue
+                                    label.colorName == labelColor.rawValue && label.emoji == nil
                                         ? Color.white : Color.clear,
                                     lineWidth: 2
                                 )
@@ -189,20 +193,18 @@ private struct LabelRow: View {
 
             Divider()
 
-            // Emoji header
             Text("Emoji")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            // Curated emoji grid (same 6-column layout as colors)
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(Self.curatedEmojis, id: \.self) { emoji in
                     Text(emoji)
                         .font(.system(size: 16))
-                        .frame(width: 20, height: 20)
+                        .frame(width: 22, height: 22)
                         .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(label.emoji == emoji ? Color.white.opacity(0.2) : Color.clear)
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(label.emoji == emoji ? Color.white.opacity(0.18) : Color.clear)
                         )
                         .onTapGesture {
                             label.emoji = emoji
@@ -210,10 +212,9 @@ private struct LabelRow: View {
                             showingPalette = false
                         }
                 }
-
             }
         }
-        .padding(10)
-        .frame(width: 170)
+        .padding(12)
+        .frame(width: 188)
     }
 }

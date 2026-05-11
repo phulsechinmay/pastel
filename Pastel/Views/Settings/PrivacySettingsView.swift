@@ -1,11 +1,11 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Privacy settings tab with an ignore list table, app picker, and
-/// one-time password manager detection prompt.
+/// Privacy settings tab with an ignore list table, native search, and toolbar
+/// add (menu) / remove buttons. Apps on the ignore list are excluded from
+/// clipboard monitoring.
 ///
-/// Apps on the ignore list are excluded from clipboard monitoring.
-/// The list persists in UserDefaults under three keys:
+/// Persisted in UserDefaults under three keys:
 /// - `ignoredAppBundleIDs`: `[String]` array of bundle IDs
 /// - `ignoredAppDates`: `[String: Double]` dictionary of bundleID -> epoch
 /// - `ignoredAppNames`: `[String: String]` dictionary of bundleID -> display name
@@ -42,72 +42,12 @@ struct PrivacySettingsView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header with title and action buttons
-            HStack {
-                Text("Ignored Applications")
-                    .font(.headline)
-
-                Spacer()
-
-                Button {
-                    showingAppPicker = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                .help("Add application from list")
-
-                Button {
-                    selectAppManually()
-                } label: {
-                    Image(systemName: "folder")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                .help("Browse for application")
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-
-            // Search field
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Filter ignored apps...", text: $searchText)
-                    .textFieldStyle(.plain)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(8)
-            .background(Color.white.opacity(0.06))
-            .cornerRadius(8)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-
-            Divider()
-
-            // Table or empty state
-            if ignoredApps.isEmpty && searchText.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "hand.raised.slash")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.tertiary)
-                    Text("No ignored applications")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text("Apps on this list will be excluded from clipboard monitoring.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .multilineTextAlignment(.center)
+        Group {
+            if ignoredApps.isEmpty {
+                ContentUnavailableView {
+                    SwiftUI.Label("No Ignored Applications", systemImage: "hand.raised.slash")
+                } description: {
+                    Text("Apps on this list are excluded from clipboard monitoring.")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -135,7 +75,6 @@ struct PrivacySettingsView: View {
                     }
                     .width(min: 100, ideal: 120)
                 }
-                .frame(maxHeight: .infinity)
                 .onChange(of: sortOrder) { _, newOrder in
                     ignoredApps.sort(using: newOrder)
                 }
@@ -143,17 +82,30 @@ struct PrivacySettingsView: View {
                     removeSelectedApp()
                 }
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Filter")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    Button("Choose from Installed Apps…") {
+                        showingAppPicker = true
+                    }
+                    Button("Browse for Application…") {
+                        selectAppManually()
+                    }
+                } label: {
+                    SwiftUI.Label("Add Application", systemImage: "plus")
+                }
+                .help("Add an application to the ignore list")
 
-            // Hint text
-            if !ignoredApps.isEmpty {
-                Text("Select an app and press Delete to remove it.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                Button(action: removeSelectedApp) {
+                    SwiftUI.Label("Remove Selected", systemImage: "minus")
+                }
+                .disabled(selectedApp == nil)
+                .help("Remove the selected application")
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .sheet(isPresented: $showingAppPicker) {
             AppPickerView(
                 apps: installedApps,

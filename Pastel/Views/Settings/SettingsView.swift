@@ -1,20 +1,22 @@
 import SwiftUI
 
 /// Tab identifiers for the settings window.
-enum SettingsTab: String, CaseIterable {
+enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case labels
     case privacy
     case history
     case iCloudSync
 
+    var id: Self { self }
+
     var iconName: String {
         switch self {
-        case .general: return "gearshape"
-        case .labels: return "tag"
-        case .privacy: return "hand.raised"
+        case .general: return "gearshape.fill"
+        case .labels: return "tag.fill"
+        case .privacy: return "hand.raised.fill"
         case .history: return "clock.arrow.circlepath"
-        case .iCloudSync: return "icloud"
+        case .iCloudSync: return "icloud.fill"
         }
     }
 
@@ -27,118 +29,89 @@ enum SettingsTab: String, CaseIterable {
         case .iCloudSync: return "iCloud Sync"
         }
     }
+
+    /// Tint color for the sidebar icon backplate (System Settings idiom).
+    var tint: Color {
+        switch self {
+        case .general: return .gray
+        case .labels: return .pink
+        case .privacy: return .blue
+        case .history: return .orange
+        case .iCloudSync: return Color(red: 0.36, green: 0.69, blue: 0.95)
+        }
+    }
 }
 
-/// Root settings view with a custom horizontal tab bar.
+/// Root settings view using a native macOS `NavigationSplitView` sidebar.
 ///
-/// Four tabs: General (all settings), Labels (CRUD label management),
-/// Privacy (app ignore list), and History (full history browser with search and grid).
-/// The tab bar uses a compact icon-above-text layout with accent highlighting.
-/// On macOS 26+, uses GlassEffectContainer with glass button styles.
+/// Sidebar holds the section list (tinted icon backplate + name) with single
+/// selection. The detail column hosts the actual settings panes unchanged.
+/// Honors `SettingsWindowController.switchTab` notifications so callers can
+/// jump to a specific tab while the window is already open.
 struct SettingsView: View {
 
     @State private var selectedTab: SettingsTab
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     init(initialTab: SettingsTab = .general) {
         _selectedTab = State(initialValue: initialTab)
     }
 
-    /// Shared tab label layout used by both glass and legacy tab bar paths.
-    private func tabLabel(_ tab: SettingsTab) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: tab.iconName)
-                .font(.system(size: 16))
-            Text(tab.displayName)
-                .font(.system(size: 12))
-        }
-        .frame(width: 80, height: 52)
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            // Header logo
-            Image("PastelLogo")
-
-                .resizable()
-                .scaledToFit()
-                .frame(height: 38)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
-
-            // Custom tab bar — glass buttons on macOS 26+, legacy plain buttons on older
-            if #available(macOS 26, *) {
-                GlassEffectContainer {
-                    HStack(spacing: 16) {
-                        ForEach(SettingsTab.allCases, id: \.self) { tab in
-                            if selectedTab == tab {
-                                Button { selectedTab = tab } label: { tabLabel(tab) }
-                                    .buttonStyle(.glassProminent)
-                            } else {
-                                Button { selectedTab = tab } label: { tabLabel(tab) }
-                                    .buttonStyle(.glass)
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
-            } else {
-                HStack(spacing: 16) {
-                    ForEach(SettingsTab.allCases, id: \.self) { tab in
-                        Button {
-                            selectedTab = tab
-                        } label: {
-                            tabLabel(tab)
-                                .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.white.opacity(0.6))
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(selectedTab == tab ? Color.accentColor.opacity(0.2) : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(selectedTab == tab ? Color.accentColor : Color.clear, lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
-                .background(.ultraThinMaterial)
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            List(SettingsTab.allCases, selection: $selectedTab) { tab in
+                SidebarRow(tab: tab).tag(tab)
             }
-
-            Divider()
-
-            // Content area
-            Group {
-                switch selectedTab {
-                case .general:
-                    GeneralSettingsView()
-                case .labels:
-                    LabelSettingsView()
-                case .privacy:
-                    PrivacySettingsView()
-                case .history:
-                    HistoryBrowserView()
-                case .iCloudSync:
-                    SyncSettingsView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .frame(
-                minWidth: 500,
-                idealWidth: selectedTab == .history ? nil : 500,
-                maxWidth: selectedTab == .history ? .infinity : 500,
-                minHeight: 480,
-                maxHeight: selectedTab == .history ? .infinity : 600
-            )
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
+        } detail: {
+            detailContent
+                .navigationTitle(selectedTab.displayName)
+                .frame(minWidth: 460, idealWidth: 560, minHeight: 480, idealHeight: 600)
         }
+        .navigationSplitViewStyle(.balanced)
         .fontDesign(.rounded)
         .onReceive(NotificationCenter.default.publisher(for: SettingsWindowController.switchTab)) { notification in
             if let rawValue = notification.userInfo?["tab"] as? String,
                let tab = SettingsTab(rawValue: rawValue) {
                 selectedTab = tab
             }
+        }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selectedTab {
+        case .general:
+            GeneralSettingsView()
+        case .labels:
+            LabelSettingsView()
+        case .privacy:
+            PrivacySettingsView()
+        case .history:
+            HistoryBrowserView()
+        case .iCloudSync:
+            SyncSettingsView()
+        }
+    }
+}
+
+/// Sidebar row: tinted rounded backplate behind a white SF Symbol, then label.
+/// Mirrors the System Settings sidebar look.
+private struct SidebarRow: View {
+    let tab: SettingsTab
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: tab.iconName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(tab.tint.gradient)
+                )
+            Text(tab.displayName)
         }
     }
 }
