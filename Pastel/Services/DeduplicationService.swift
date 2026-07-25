@@ -68,6 +68,7 @@ final class DeduplicationService {
                 }
             }
             keeper.safeLabels = Array(mergedLabelIDs)
+            keeper.refreshLabelKey()
 
             logger.info("Dedup: merging \(group.count - 1) duplicate(s) of hash \(hash.prefix(8))...")
 

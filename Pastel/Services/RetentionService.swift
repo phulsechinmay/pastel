@@ -59,18 +59,22 @@ final class RetentionService {
             )
             let expiredItems = try modelContext.fetch(descriptor)
 
-            guard !expiredItems.isEmpty else {
-                logger.debug("No expired items to purge (cutoff: \(cutoffDate))")
+            // Labeled items are kept regardless of age — users opt into permanence by labeling.
+            let purgeable = expiredItems.filter { $0.safeLabels.isEmpty }
+
+            guard !purgeable.isEmpty else {
+                logger.debug("No expired items to purge (cutoff: \(cutoffDate), labeled kept: \(expiredItems.count))")
                 return
             }
 
             // Delete expired items with full cleanup (images, labels, model)
-            for item in expiredItems {
+            for item in purgeable {
                 deleteClipboardItemWithCleanup(item, from: modelContext)
             }
             try modelContext.save()
 
-            logger.info("Purged \(expiredItems.count) items older than \(retentionDays) days")
+            let keptCount = expiredItems.count - purgeable.count
+            logger.info("Purged \(purgeable.count) items older than \(retentionDays) days (kept \(keptCount) labeled)")
         } catch {
             modelContext.rollback()
             logger.error("Failed to purge expired items: \(error.localizedDescription)")

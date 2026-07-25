@@ -72,7 +72,7 @@ struct LabelSettingsView: View {
     }
 
     private func deleteLabel(_ label: Label) {
-        modelContext.delete(label)
+        deleteLabelWithCleanup(label, from: modelContext)
         saveWithLogging(modelContext, operation: "delete label")
     }
 

@@ -217,6 +217,7 @@ struct ClipboardCardView: View {
                         } else {
                             item.safeLabels.append(label)
                         }
+                        item.refreshLabelKey()
                         saveWithLogging(modelContext, operation: "label toggle")
                     } label: {
                         HStack {
@@ -233,6 +234,7 @@ struct ClipboardCardView: View {
                     Divider()
                     Button("Remove All Labels") {
                         item.safeLabels.removeAll()
+                        item.refreshLabelKey()
                         saveWithLogging(modelContext, operation: "remove all labels")
                     }
                 }

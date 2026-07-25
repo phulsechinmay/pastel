@@ -10,7 +10,11 @@ import AppKit
 /// with the same 200ms debounce pattern.
 ///
 /// The `.id()` modifier forces SwiftUI to destroy and recreate
-/// `HistoryGridView` when filters change, giving it a fresh @Query.
+/// `HistoryGridView` only when the @Query predicate changes (search text).
+/// Label filtering is in-memory, so label chip changes flow through
+/// HistoryGridView's onChange(of: selectedLabelIDs) instead — preserving the
+/// existing @Query (and its reactivity to inserts/edits/deletes) and scroll
+/// position across chip taps.
 /// Selection state lives here (not in the grid) so it persists across
 /// recreations, but is cleared on filter changes to avoid stale IDs.
 ///
@@ -56,7 +60,7 @@ struct HistoryBrowserView: View {
                 onPastePlainText: { item in singlePastePlainText(item) }
             )
             .environment(PanelActions())
-            .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
+            .id(debouncedSearchText)
 
             // Bottom action bar (visible when items are selected)
             if !selectedIDs.isEmpty {

@@ -45,6 +45,10 @@ final class AppState {
     ///
     /// Called from PastelApp.init after the ModelContainer is created.
     func setup(modelContext: ModelContext) {
+        // Bounded repair to populate Label.stableID / ClipboardItem.labelKey
+        // for rows created before those fields existed or synced later.
+        backfillLabelIndex(in: modelContext)
+
         let monitor = ClipboardMonitor(modelContext: modelContext)
         monitor.onItemCountChanged = { [weak self] count in
             self?.itemCount = count

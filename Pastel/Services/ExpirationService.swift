@@ -71,6 +71,8 @@ final class ExpirationService {
 
             var expiredCount = 0
             for item in concealedItems {
+                // Labeled concealed items are kept — the user explicitly opted in.
+                guard item.safeLabels.isEmpty else { continue }
                 if let expiresAt = item.expiresAt, expiresAt < now {
                     deleteClipboardItemWithCleanup(item, from: modelContext)
                     expiredCount += 1
@@ -105,6 +107,12 @@ final class ExpirationService {
         // Fetch the item -- it may have been manually deleted already
         guard let item = modelContext.model(for: itemID) as? ClipboardItem else {
             Self.logger.debug("Concealed item already deleted, skipping expiration")
+            return
+        }
+
+        // The user may have labeled the item during the 60s window — labeled items are kept.
+        guard item.safeLabels.isEmpty else {
+            Self.logger.info("Concealed item was labeled before expiration, keeping it")
             return
         }
 

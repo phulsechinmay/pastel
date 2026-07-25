@@ -347,6 +347,7 @@ final class ImportExportService {
                         item.safeLabels.append(label)
                     }
                 }
+                item.refreshLabelKey()
 
                 modelContext.insert(item)
                 existingHashes.insert(hash)
@@ -473,6 +474,7 @@ final class ImportExportService {
                    let label = folderIdToLabel[collectionId] {
                     item.safeLabels.append(label)
                 }
+                item.refreshLabelKey()
 
                 modelContext.insert(item)
                 existingHashes.insert(contentHash)

@@ -70,11 +70,15 @@ struct GeneralSettingsView: View {
         } header: {
             Text("General")
         } footer: {
-            Text("Pastel uses Sparkle to deliver updates outside the App Store.")
+            Text("Labeled items are kept forever, regardless of retention. Pastel uses Sparkle to deliver updates outside the App Store.")
         }
         #else
-        Section("General") {
+        Section {
             generalRows
+        } header: {
+            Text("General")
+        } footer: {
+            Text("Labeled items are kept forever, regardless of retention.")
         }
         #endif
     }

@@ -49,6 +49,7 @@ struct EditItemView: View {
                                 } else {
                                     item.safeLabels.append(label)
                                 }
+                                item.refreshLabelKey()
                             }
                     }
                 }

@@ -240,7 +240,7 @@ struct ChipBarView: View {
 
     private func deleteLabel(_ label: Label) {
         selectedLabelIDs.remove(label.persistentModelID)
-        modelContext.delete(label)
+        deleteLabelWithCleanup(label, from: modelContext)
         saveWithLogging(modelContext, operation: "delete label from chip bar")
     }
 }

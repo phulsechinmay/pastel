@@ -68,6 +68,15 @@ final class ClipboardItem {
         set { labels = newValue }
     }
 
+    /// Denormalized membership string used for fast label filtering.
+    /// Format: `"|<stableID1>|<stableID2>|"` when one or more labels are assigned,
+    /// `"|"` when indexed with no labels, and `""` for rows that have not been
+    /// indexed yet. Avoids faulting the `labels` to-many relationship during the
+    /// filter pass once indexed. Maintained by `ClipboardItem.refreshLabelKey()`
+    /// at every mutation site. Default `""` keeps the field CloudKit-compatible
+    /// and lets lightweight migration add it transparently.
+    var labelKey: String = ""
+
     /// Detected programming language (e.g., "swift", "python"). Nil = not code.
     /// Populated by CodeDetectionService in Phase 7.
     var detectedLanguage: String?
@@ -136,6 +145,11 @@ final class ClipboardItem {
         self.contentHash = contentHash
         self.title = nil
         self.labels = []
+        // Born indexed: no labels at creation, so "|" is the correct "indexed, empty"
+        // key. Avoids the relationship-fault fallback in label filtering for freshly
+        // captured items (the newest/most-viewed rows) and keeps them out of the
+        // backfill batch. See ClipboardItem.refreshLabelKey / backfillLabelIndex.
+        self.labelKey = "|"
         self.originDeviceID = DeviceIdentifier.current
     }
 }

@@ -123,10 +123,13 @@ struct PanelContentView: View {
                 }
             )
             .focused($panelFocus, equals: .cardList)
-            // .id() triggers full view recreation when search text or label filters change.
+            // .id() triggers full view recreation only when the @Query predicate changes
+            // (search text). Label filtering is in-memory, so changing labels does not
+            // require a new @Query and is handled via onChange(of: selectedLabelIDs)
+            // inside FilteredCardListView — preserving scroll position, dominant-color
+            // caches, and the keyboard NSEvent monitor across chip taps.
             // showCount is intentionally EXCLUDED so scroll position survives panel dismiss/reopen.
-            // Data refresh on panel reopen is handled by FilteredCardListView's onChange(of: showCount).
-            .id("\(debouncedSearchText)\(selectedLabelIDs.sorted(by: { "\($0)" < "\($1)" }).map { "\($0)" }.joined())")
+            .id(debouncedSearchText)
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)

@@ -79,6 +79,13 @@ struct HistoryGridView: View {
         Array(memoizedFilteredItems.prefix(displayLimit))
     }
 
+    /// Compact signature for label metadata that affects labelKey filtering.
+    private var labelFilterSignature: String {
+        allLabels
+            .map { "\($0.persistentModelID)|\($0.stableID)" }
+            .joined(separator: ",")
+    }
+
     /// Compute items filtered by sync rules and selected labels (in-memory).
     ///
     /// Sync filtering (applied first):
@@ -87,7 +94,9 @@ struct HistoryGridView: View {
     /// - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
     ///
     /// Label filtering (applied second, OR logic):
-    /// If no labels selected, returns all sync-filtered items.
+    /// If no labels selected, returns all sync-filtered items. Otherwise checks
+    /// each item's denormalized `labelKey` string — a fast column read that does
+    /// NOT fault the labels relationship.
     private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
         let localDeviceID = DeviceIdentifier.current
         let syncFiltered = items.filter { item in
@@ -100,10 +109,15 @@ struct HistoryGridView: View {
             return item.type != .image && item.type != .file
         }
         guard !selectedLabelIDs.isEmpty else { return syncFiltered }
+
+        let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
         return syncFiltered.filter { item in
-            item.safeLabels.contains { label in
-                selectedLabelIDs.contains(label.persistentModelID)
-            }
+            itemMatchesSelectedLabels(
+                item,
+                selectedLabelIDs: selectedLabelIDs,
+                allLabels: allLabels,
+                knownStableIDs: knownStableIDs
+            )
         }
     }
 
@@ -202,6 +216,18 @@ struct HistoryGridView: View {
         }
         .onChange(of: items) { _, newItems in
             memoizedFilteredItems = computeFilteredItems(from: newItems)
+            resolvedItems = memoizedFilteredItems
+        }
+        .onChange(of: selectedLabelIDs) { _, _ in
+            // Re-run the in-memory label post-filter without rebuilding @Query or recreating
+            // the view. Label filtering is not part of the predicate (see init), so the
+            // existing `items` array is still correct — only the filter output changes.
+            displayLimit = pageSize
+            memoizedFilteredItems = computeFilteredItems(from: items)
+            resolvedItems = memoizedFilteredItems
+        }
+        .onChange(of: labelFilterSignature) { _, _ in
+            memoizedFilteredItems = computeFilteredItems(from: items)
             resolvedItems = memoizedFilteredItems
         }
     }

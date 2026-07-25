@@ -55,6 +55,13 @@ struct FilteredCardListView: View {
         Array(filteredItems.prefix(displayLimit))
     }
 
+    /// Compact signature for label metadata that affects labelKey filtering.
+    private var labelFilterSignature: String {
+        allLabels
+            .map { "\($0.persistentModelID)|\($0.stableID)" }
+            .joined(separator: ",")
+    }
+
     /// Compute items filtered by soft-delete exclusion, sync rules, and selected labels (in-memory).
     ///
     /// Soft-delete exclusion (applied first):
@@ -66,7 +73,9 @@ struct FilteredCardListView: View {
     /// - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
     ///
     /// Label filtering (applied third, OR logic):
-    /// If no labels selected, returns all sync-filtered items.
+    /// If no labels selected, returns all sync-filtered items. Otherwise checks
+    /// each item's denormalized `labelKey` string for the selected labels' stable
+    /// IDs — a fast column read that does NOT fault the labels relationship.
     private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
         // Exclude soft-deleted items (hidden but not yet permanently deleted, undoable via Cmd+Z)
         let softDeleted = appState.deletionManager.softDeletedIDs
@@ -83,10 +92,15 @@ struct FilteredCardListView: View {
             return item.type != .image && item.type != .file
         }
         guard !selectedLabelIDs.isEmpty else { return syncFiltered }
+
+        let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
         return syncFiltered.filter { item in
-            item.safeLabels.contains { label in
-                selectedLabelIDs.contains(label.persistentModelID)
-            }
+            itemMatchesSelectedLabels(
+                item,
+                selectedLabelIDs: selectedLabelIDs,
+                allLabels: allLabels,
+                knownStableIDs: knownStableIDs
+            )
         }
     }
 
@@ -258,6 +272,17 @@ struct FilteredCardListView: View {
             filteredItems = computeFilteredItems(from: items)
             selectedIndex = nil
         }
+        .onChange(of: selectedLabelIDs) { _, _ in
+            // Re-run the in-memory label post-filter without rebuilding @Query or recreating
+            // the view. Label filtering is not part of the predicate (see init), so the
+            // existing `items` array is still correct — only the filter output changes.
+            displayLimit = pageSize
+            filteredItems = computeFilteredItems(from: items)
+            selectedIndex = nil
+        }
+        .onChange(of: labelFilterSignature) { _, _ in
+            filteredItems = computeFilteredItems(from: items)
+        }
         .onDisappear {
             if let monitor = keyMonitor {
                 NSEvent.removeMonitor(monitor)
@@ -307,6 +332,7 @@ struct FilteredCardListView: View {
                 $0.persistentModelID == label.persistentModelID
             }) else { return true }
             item.safeLabels.append(label)
+            item.refreshLabelKey()
             saveWithLogging(modelContext, operation: "label drop assignment")
             return true
         } isTargeted: { targeted in

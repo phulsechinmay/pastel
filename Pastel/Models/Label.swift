@@ -11,6 +11,13 @@ final class Label {
     /// Single emoji character (one grapheme cluster) or nil.
     var emoji: String?
 
+    /// Stable per-label identifier used to build `ClipboardItem.labelKey` for fast
+    /// label filtering. Rename / re-color / re-emoji never touch this; only label
+    /// creation and deletion do. Default `""` for CloudKit compat and lightweight
+    /// migration; populated on init for new labels and by a one-time backfill for
+    /// existing rows (see `backfillLabelIndex`).
+    var stableID: String = ""
+
     /// Inverse relationship: many labels <-> many clipboard items.
     /// Delete rule: .nullify -- deleting a label removes it from item.labels arrays.
     /// No @Relationship attribute needed -- SwiftData infers the inverse from ClipboardItem.labels.
@@ -28,6 +35,7 @@ final class Label {
         self.colorName = colorName
         self.sortOrder = sortOrder
         self.emoji = emoji
+        self.stableID = UUID().uuidString
         self.items = []
     }
 }
