@@ -106,6 +106,8 @@ struct PanelContentView: View {
                 showCount: panelActions.showCount,
                 onPaste: { item in pasteItem(item) },
                 onPastePlainText: { item in pastePlainTextItem(item) },
+                onCopy: { items in panelActions.copyItems?(items) },
+                onPasteItems: { items in panelActions.pasteItems?(items) },
                 onTypeToSearch: { char in
                     searchText.append(char)
                     panelFocus = nil

@@ -144,6 +144,108 @@ final class PasteService {
         logger.info("Copy-only (explicit) -- wrote \(item.type.rawValue) to pasteboard")
     }
 
+    /// Copy one or more selected items to the pasteboard without simulating Cmd+V.
+    ///
+    /// A single item is written with full fidelity (rtf/html/image/file) via the
+    /// single-item path. Multiple items are concatenated as newline-joined plain
+    /// text (non-text items skipped), matching the Settings history bulk-copy.
+    /// Always hides the panel afterward, mirroring the single-item copyOnly.
+    func copyOnly(
+        items: [ClipboardItem],
+        clipboardMonitor: ClipboardMonitor,
+        panelController: PanelController
+    ) {
+        guard !items.isEmpty else { return }
+        if items.count == 1 {
+            copyOnly(item: items[0], clipboardMonitor: clipboardMonitor, panelController: panelController)
+            return
+        }
+        pasteLog("[PASTE] copyOnly(items) entry count=\(items.count)")
+        let wrote = writeConcatenatedText(items: items)
+        clipboardMonitor.skipNextChange = true
+        panelController.hide()
+        logger.info("Copy-only (multi) -- wrote \(items.count) items (\(wrote ? "text" : "nothing copyable"))")
+    }
+
+    /// Paste one or more selected items into the frontmost app.
+    ///
+    /// A single item delegates to the full-fidelity `paste(item:)`. Multiple items
+    /// are written as newline-joined plain text and pasted via the same permission /
+    /// secure-input / CGEvent flow used by `paste(item:)`.
+    func paste(
+        items: [ClipboardItem],
+        clipboardMonitor: ClipboardMonitor,
+        panelController: PanelController,
+        source: String = "unknown"
+    ) {
+        guard !items.isEmpty else { return }
+        if items.count == 1 {
+            paste(item: items[0], clipboardMonitor: clipboardMonitor, panelController: panelController, source: source)
+            return
+        }
+
+        let behaviorRaw = UserDefaults.standard.string(forKey: "pasteBehavior") ?? PasteBehavior.paste.rawValue
+        let behavior = PasteBehavior(rawValue: behaviorRaw) ?? .paste
+        pasteLog("[PASTE] paste(items) entry count=\(items.count) behavior=\(behavior.rawValue) source=\(source)")
+
+        // Nothing copyable (e.g. only images/files selected): hide and bail.
+        guard writeConcatenatedText(items: items) else {
+            panelController.hide()
+            return
+        }
+        clipboardMonitor.skipNextChange = true
+
+        if behavior == .copy {
+            pasteLog("[PASTE] (items) behavior=copy -> write-only, no CGEvent")
+            panelController.hide()
+            return
+        }
+
+        guard AccessibilityService.isGranted else {
+            pasteLog("[PASTE] (items) PERMISSION DENIED — copied to clipboard, showing prompt")
+            AccessibilityService.notePasteDeniedDueToPermission()
+            panelController.hide()
+            onAccessibilityRequired?()
+            return
+        }
+
+        if IsSecureEventInputEnabled() {
+            pasteLog("[PASTE] (items) BLOCKED: secure event input is active")
+            panelController.hide()
+            Self.showFailureAlert(
+                title: "Paste Blocked by Secure Input",
+                message: "A password field or banking app has secure input enabled, which prevents Pastel from simulating ⌘V.\n\nThe items are on your clipboard — paste them manually with ⌘V."
+            )
+            return
+        }
+
+        panelController.hide()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            let posted = Self.simulatePaste()
+            pasteLog("[PASTE] (items) CGEvent posted=\(posted) (source=\(source))")
+        }
+    }
+
+    /// Concatenate the text content of multiple items (newline-joined, non-text
+    /// items skipped) and write it to the general pasteboard as plain text.
+    /// Returns false when nothing was written (all items were non-text).
+    @discardableResult
+    private func writeConcatenatedText(items: [ClipboardItem]) -> Bool {
+        let parts = items.compactMap { item -> String? in
+            switch item.type {
+            case .text, .richText, .url, .code, .color:
+                return item.textContent
+            case .image, .file:
+                return nil
+            }
+        }
+        guard !parts.isEmpty else { return false }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(parts.joined(separator: "\n"), forType: .string)
+        return true
+    }
+
     /// Paste a clipboard item as plain text (RTF stripped) into the frontmost app.
     ///
     /// Follows the same flow as `paste()` but uses `writeToPasteboardPlainText(item:)` which

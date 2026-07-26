@@ -43,13 +43,11 @@ struct URLCardView: View {
         .animation(.easeInOut(duration: 0.3), value: item.urlMetadataFetched)
         .task(id: item.urlPreviewImagePath) {
             guard let path = item.urlPreviewImagePath else { bannerImage = nil; return }
-            let url = ImageStorageService.shared.resolveImageURL(path)
-            bannerImage = await loadImageFromDisk(url: url)
+            bannerImage = await loadPreview(path: path, maxPixelSize: ThumbnailLoader.cardPreviewMaxPixelSize)
         }
         .task(id: item.urlFaviconPath) {
             guard let path = item.urlFaviconPath else { faviconImage = nil; return }
-            let url = ImageStorageService.shared.resolveImageURL(path)
-            faviconImage = await loadImageFromDisk(url: url)
+            faviconImage = await loadPreview(path: path, maxPixelSize: ThumbnailLoader.faviconMaxPixelSize)
         }
     }
 
@@ -165,13 +163,12 @@ struct URLCardView: View {
 
     // MARK: - Helpers
 
-    /// Load an NSImage from a file URL on a background thread.
-    private func loadImageFromDisk(url: URL) async -> NSImage? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let loaded = NSImage(contentsOf: url)
-                continuation.resume(returning: loaded)
-            }
+    /// Load a decoded, size-capped preview image via `ThumbnailLoader`, using a warm
+    /// cache hit synchronously when available to avoid a flash.
+    private func loadPreview(path: String, maxPixelSize: Int) async -> NSImage? {
+        if let warm = ThumbnailLoader.shared.cached(filename: path, maxPixelSize: maxPixelSize) {
+            return warm
         }
+        return await ThumbnailLoader.shared.load(filename: path, maxPixelSize: maxPixelSize)
     }
 }

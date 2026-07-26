@@ -32,6 +32,11 @@ struct FilteredCardListView: View {
     @State private var displayLimit: Int = 50
     private let pageSize: Int = 50
 
+    /// Anchor index for Shift+arrow range selection. `nil` means single selection
+    /// (only `selectedIndex`). When set, the selection is the contiguous range
+    /// between `selectionAnchor` and `selectedIndex` (the cursor).
+    @State private var selectionAnchor: Int? = nil
+
     let allLabels: [Label]
     @Binding var selectedIndex: Int?
     var isShiftHeld: Bool
@@ -40,6 +45,12 @@ struct FilteredCardListView: View {
     var showCount: Int
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
+    /// Copy the current selection (one or many items). Single copies full fidelity;
+    /// multiple concatenate as newline-joined text. Invoked by Cmd+C and Cmd+Ctrl+digit.
+    var onCopy: ([ClipboardItem]) -> Void
+    /// Paste the current multi-selection (concatenated text). Invoked by Enter when
+    /// more than one item is selected.
+    var onPasteItems: ([ClipboardItem]) -> Void
     var onTypeToSearch: ((Character) -> Void)?
     var onDragStarted: (() -> Void)?
     /// Callback for Cmd+Left/Right label cycling. Direction: -1 = previous, +1 = next.
@@ -53,6 +64,19 @@ struct FilteredCardListView: View {
     /// Items visible after pagination (first `displayLimit` of filteredItems).
     private var visibleItems: [ClipboardItem] {
         Array(filteredItems.prefix(displayLimit))
+    }
+
+    /// Indices (into `visibleItems`) currently selected. A single cursor when
+    /// `selectionAnchor` is nil, otherwise the contiguous anchor…cursor range.
+    private var selectedIndices: Set<Int> {
+        guard let cursor = selectedIndex, cursor < visibleItems.count else { return [] }
+        guard let anchor = selectionAnchor, anchor < visibleItems.count else { return [cursor] }
+        return Set(min(anchor, cursor)...max(anchor, cursor))
+    }
+
+    /// Selected items in display order (top to bottom), for copy/paste.
+    private var selectedItems: [ClipboardItem] {
+        selectedIndices.sorted().map { visibleItems[$0] }
     }
 
     /// Compact signature for label metadata that affects labelKey filtering.
@@ -133,6 +157,8 @@ struct FilteredCardListView: View {
         showCount: Int = 0,
         onPaste: @escaping (ClipboardItem) -> Void,
         onPastePlainText: @escaping (ClipboardItem) -> Void,
+        onCopy: @escaping ([ClipboardItem]) -> Void = { _ in },
+        onPasteItems: @escaping ([ClipboardItem]) -> Void = { _ in },
         onTypeToSearch: ((Character) -> Void)? = nil,
         onDragStarted: (() -> Void)? = nil,
         onCycleLabelFilter: ((Int) -> Void)? = nil,
@@ -175,6 +201,8 @@ struct FilteredCardListView: View {
         self.isShiftHeld = isShiftHeld
         self.onPaste = onPaste
         self.onPastePlainText = onPastePlainText
+        self.onCopy = onCopy
+        self.onPasteItems = onPasteItems
         self.onTypeToSearch = onTypeToSearch
         self.onDragStarted = onDragStarted
         self.onCycleLabelFilter = onCycleLabelFilter
@@ -245,6 +273,7 @@ struct FilteredCardListView: View {
         }
         .onAppear {
             selectedIndex = nil
+            selectionAnchor = nil
             displayLimit = pageSize
             filteredItems = computeFilteredItems(from: items)
             installKeyboardMonitor()
@@ -260,6 +289,8 @@ struct FilteredCardListView: View {
             withAnimation(.easeOut(duration: 0.2)) {
                 filteredItems = computeFilteredItems(from: items)
             }
+            // A multi-selection range can't survive index shifts from deletion; collapse it.
+            selectionAnchor = nil
             // Advance selection after deletion: if deleted item was last, select new last;
             // if in middle, same index now points to next item (shifted up).
             if let idx = selectedIndex, idx >= visibleItems.count {
@@ -271,6 +302,7 @@ struct FilteredCardListView: View {
             displayLimit = pageSize
             filteredItems = computeFilteredItems(from: items)
             selectedIndex = nil
+            selectionAnchor = nil
         }
         .onChange(of: selectedLabelIDs) { _, _ in
             // Re-run the in-memory label post-filter without rebuilding @Query or recreating
@@ -279,6 +311,7 @@ struct FilteredCardListView: View {
             displayLimit = pageSize
             filteredItems = computeFilteredItems(from: items)
             selectedIndex = nil
+            selectionAnchor = nil
         }
         .onChange(of: labelFilterSignature) { _, _ in
             filteredItems = computeFilteredItems(from: items)
@@ -300,7 +333,7 @@ struct FilteredCardListView: View {
         let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
         ClipboardCardView(
             item: item,
-            isSelected: selectedIndex == index,
+            isSelected: selectedIndices.contains(index),
             allLabels: allLabels,
             badgePosition: badge,
             isDropTarget: dropTargetIndex == index,
@@ -319,7 +352,14 @@ struct FilteredCardListView: View {
             }
         }
         .onTapGesture(count: 1) {
+            selectionAnchor = nil
             selectedIndex = index
+            // Option+click copies the clicked item (full fidelity) without pasting,
+            // mirroring the Shift+double-click plain-text paste convention.
+            if NSEvent.modifierFlags.contains(.option) {
+                pasteLog("[PASTE] origin=option-click index=\(index) COPY")
+                onCopy([item])
+            }
         }
         .dropDestination(for: String.self) { strings, _ in
             guard let encodedID = strings.first,
@@ -362,7 +402,7 @@ struct FilteredCardListView: View {
                 if event.modifierFlags.contains(.command) {
                     onCycleLabelFilter?(-1)
                 } else if isHorizontal {
-                    moveSelection(by: -1)
+                    moveOrExtend(by: -1, shift: event.modifierFlags.contains(.shift))
                 } else {
                     return event // pass through in vertical mode
                 }
@@ -371,24 +411,31 @@ struct FilteredCardListView: View {
                 if event.modifierFlags.contains(.command) {
                     onCycleLabelFilter?(1)
                 } else if isHorizontal {
-                    moveSelection(by: 1)
+                    moveOrExtend(by: 1, shift: event.modifierFlags.contains(.shift))
                 } else {
                     return event
                 }
                 return nil
             case 125: // Down arrow
                 if !isHorizontal {
-                    moveSelection(by: 1)
+                    moveOrExtend(by: 1, shift: event.modifierFlags.contains(.shift))
                     return nil
                 }
                 return event
             case 126: // Up arrow
                 if !isHorizontal {
-                    moveSelection(by: -1)
+                    moveOrExtend(by: -1, shift: event.modifierFlags.contains(.shift))
                     return nil
                 }
                 return event
             case 0x24, 0x4C: // Return, Keypad Enter
+                let selected = selectedItems
+                if selected.count > 1 {
+                    // Multi-selection: paste all selected items (concatenated text).
+                    pasteLog("[PASTE] origin=Return-key multi count=\(selected.count)")
+                    onPasteItems(selected)
+                    return nil // consumed
+                }
                 if let index = selectedIndex, index < visibleItems.count {
                     pasteLog("[PASTE] origin=Return-key index=\(index) shift=\(event.modifierFlags.contains(.shift))")
                     if event.modifierFlags.contains(.shift) {
@@ -399,6 +446,16 @@ struct FilteredCardListView: View {
                     return nil // consumed
                 }
                 return event // no valid selection, pass through
+            case 0x08: // kVK_ANSI_C — Cmd+C copies the current selection (1 or many)
+                if event.modifierFlags.contains(.command),
+                   !event.modifierFlags.contains(.option) {
+                    let selected = selectedItems
+                    guard !selected.isEmpty else { return event } // let search-field copy through
+                    pasteLog("[PASTE] origin=Cmd+C count=\(selected.count)")
+                    onCopy(selected)
+                    return nil // consumed
+                }
+                return event
             case 0x06: // kVK_ANSI_Z — Cmd+Z undo last deletion
                 if event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.shift) {
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -428,7 +485,7 @@ struct FilteredCardListView: View {
                 }
                 return event
             default:
-                // Cmd+1-9 / Cmd+Shift+1-9 quick paste activation
+                // Cmd+1-9 paste / Cmd+Shift+1-9 paste plain / Cmd+Ctrl+1-9 copy
                 if event.modifierFlags.contains(.command),
                    let digit = Self.digitKeyCodeMap[event.keyCode] {
                     guard quickPasteEnabled else {
@@ -440,11 +497,17 @@ struct FilteredCardListView: View {
                         pasteLog("[PASTE] origin=Cmd+digit digit=\(digit) but only \(visibleItems.count) items")
                         return event
                     }
-                    pasteLog("[PASTE] origin=Cmd+digit digit=\(digit) index=\(index) shift=\(event.modifierFlags.contains(.shift))")
-                    if event.modifierFlags.contains(.shift) {
-                        onPastePlainText(visibleItems[index])
+                    let target = visibleItems[index]
+                    if event.modifierFlags.contains(.control) {
+                        // Cmd+Ctrl+digit — copy the Nth item instead of pasting.
+                        pasteLog("[PASTE] origin=Cmd+Ctrl+digit digit=\(digit) index=\(index) COPY")
+                        onCopy([target])
+                    } else if event.modifierFlags.contains(.shift) {
+                        pasteLog("[PASTE] origin=Cmd+Shift+digit digit=\(digit) index=\(index)")
+                        onPastePlainText(target)
                     } else {
-                        onPaste(visibleItems[index])
+                        pasteLog("[PASTE] origin=Cmd+digit digit=\(digit) index=\(index)")
+                        onPaste(target)
                     }
                     return nil // consumed
                 }
@@ -453,8 +516,19 @@ struct FilteredCardListView: View {
         }
     }
 
+    /// Route an arrow key to single-move or shift-extend depending on the Shift key.
+    private func moveOrExtend(by offset: Int, shift: Bool) {
+        if shift {
+            extendSelection(by: offset)
+        } else {
+            moveSelection(by: offset)
+        }
+    }
+
+    /// Move the cursor by `offset`, collapsing any multi-selection to a single item.
     private func moveSelection(by offset: Int) {
         guard !visibleItems.isEmpty else { return }
+        selectionAnchor = nil
         if let current = selectedIndex {
             let newIndex = max(0, min(visibleItems.count - 1, current + offset))
             selectedIndex = newIndex
@@ -464,6 +538,25 @@ struct FilteredCardListView: View {
             }
         } else {
             selectedIndex = 0
+        }
+    }
+
+    /// Extend the contiguous selection by moving the cursor while keeping the anchor.
+    /// Establishes the anchor at the current cursor on the first Shift+arrow.
+    private func extendSelection(by offset: Int) {
+        guard !visibleItems.isEmpty else { return }
+        guard let current = selectedIndex else {
+            // No cursor yet — start a selection at the first item.
+            selectedIndex = 0
+            return
+        }
+        if selectionAnchor == nil {
+            selectionAnchor = current
+        }
+        let newIndex = max(0, min(visibleItems.count - 1, current + offset))
+        selectedIndex = newIndex
+        if newIndex >= displayLimit - 10 && displayLimit < filteredItems.count {
+            displayLimit += pageSize
         }
     }
 }

@@ -12,6 +12,11 @@ final class PanelActions {
     var pasteItem: ((ClipboardItem) -> Void)?
     var pastePlainTextItem: ((ClipboardItem) -> Void)?
     var copyOnlyItem: ((ClipboardItem) -> Void)?
+    /// Copy one or more selected items (Cmd+C / Cmd+Ctrl+digit). Single item copies
+    /// full fidelity; multiple concatenate as newline-joined text.
+    var copyItems: (([ClipboardItem]) -> Void)?
+    /// Paste one or more selected items (Enter on a multi-selection).
+    var pasteItems: (([ClipboardItem]) -> Void)?
     var onDragStarted: (() -> Void)?
     /// Incremented each time the panel is shown; observed by PanelContentView to reset focus
     /// and by FilteredCardListView to refresh data without view recreation.
@@ -79,6 +84,14 @@ final class PanelController {
     /// Callback invoked when a SwiftUI view triggers an explicit copy-only action.
     /// Set by AppState during setupPanel() to wire into PasteService.copyOnly.
     var onCopyOnlyItem: ((ClipboardItem) -> Void)?
+
+    /// Callback invoked to copy a selection of one or more items (Cmd+C / Cmd+Ctrl+digit).
+    /// Set by AppState during setupPanel() to wire into PasteService.copyOnly(items:).
+    var onCopyItems: (([ClipboardItem]) -> Void)?
+
+    /// Callback invoked to paste a selection of one or more items (Enter on multi-select).
+    /// Set by AppState during setupPanel() to wire into PasteService.paste(items:).
+    var onPasteItems: (([ClipboardItem]) -> Void)?
 
     /// Whether the panel is currently visible on screen.
     var isVisible: Bool {
@@ -177,6 +190,8 @@ final class PanelController {
         panelActions.pasteItem = onPasteItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
+        panelActions.copyItems = onCopyItems
+        panelActions.pasteItems = onPasteItems
         panelActions.onDragStarted = { [weak self] in
             self?.dragSessionStarted()
         }
@@ -379,6 +394,8 @@ final class PanelController {
         panelActions.pasteItem = onPasteItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
+        panelActions.copyItems = onCopyItems
+        panelActions.pasteItems = onPasteItems
         panelActions.onDragStarted = { [weak self] in
             self?.dragSessionStarted()
         }

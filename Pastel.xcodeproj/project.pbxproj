@@ -17,6 +17,7 @@
 		1B8747A27E4A24B8EC0C06E2 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */; };
 		1FF817C58BBCAC1F6A6DA2DD /* AsyncThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D50320FC5B6099D7C6B668 /* AsyncThumbnailView.swift */; };
 		2103A21B8C8E7C2FCD20019E /* RetentionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA2DA3D25FB59CE37228411 /* RetentionService.swift */; };
+		26618B6C3F1BE440C2AC796F /* ThumbnailLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95B96E88D3DBC7E6F3661B4 /* ThumbnailLoader.swift */; };
 		311D38AA5AD215646217479E /* DeviceIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34B531FE14E94C513D7A73D /* DeviceIdentifier.swift */; };
 		3442E2E6EDB5B2E9A747C631 /* EditItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6802DF0A84D98A037B3BC192 /* EditItemView.swift */; };
 		35B2B78C88F753B2D19BB929 /* PanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A89B1626914331B041874D /* PanelController.swift */; };
@@ -144,6 +145,7 @@
 		ADCC1FB498E66C2E4D112994 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		B3C99DE2608198777D57CA9B /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		B8EDC77C4CCB143B62248B29 /* SwiftDataHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataHelpers.swift; sourceTree = "<group>"; };
+		B95B96E88D3DBC7E6F3661B4 /* ThumbnailLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailLoader.swift; sourceTree = "<group>"; };
 		C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageStorageService.swift; sourceTree = "<group>"; };
 		C5E8102D1B1A6E4F5BCCF0A6 /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
 		C6FD4DDB3C6EA32691798901 /* CodeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeCardView.swift; sourceTree = "<group>"; };
@@ -225,6 +227,7 @@
 			children = (
 				E2DBAFFC0300717000685459 /* AppRelaunchService.swift */,
 				A34B531FE14E94C513D7A73D /* DeviceIdentifier.swift */,
+				B95B96E88D3DBC7E6F3661B4 /* ThumbnailLoader.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -549,6 +552,7 @@
 				7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */,
 				9D191D480AC6C916F6BC879B /* SyncSettingsView.swift in Sources */,
 				3ADFAC504957D459F381AFB2 /* TextCardView.swift in Sources */,
+				26618B6C3F1BE440C2AC796F /* ThumbnailLoader.swift in Sources */,
 				8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */,
 				B140415A01B99DBECC39C8AF /* URLMetadataService.swift in Sources */,
 				8D3A1DE972AB5DED09F5C907 /* UpdaterService.swift in Sources */,
@@ -685,7 +689,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = QLSJ39DRSH;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -710,7 +714,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = QLSJ39DRSH;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -734,7 +738,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = QLSJ39DRSH;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -878,7 +882,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = QLSJ39DRSH;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
