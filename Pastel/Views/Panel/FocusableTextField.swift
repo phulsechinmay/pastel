@@ -19,6 +19,11 @@ struct FocusableTextField: NSViewRepresentable {
     /// meantime (e.g. SwiftUI moved first responder elsewhere).
     var focusRequestID: Int = 0
 
+    /// Invoked when the user presses Return while the field is focused.
+    var onSubmit: (() -> Void)?
+    /// Invoked when the user presses Escape while the field is focused.
+    var onCancel: (() -> Void)?
+
     func makeNSView(context: Context) -> NSTextField {
         let tf = NSTextField()
         tf.placeholderString = placeholder
@@ -46,6 +51,10 @@ struct FocusableTextField: NSViewRepresentable {
             tf.stringValue = text
         }
 
+        // Refresh callbacks each update so the coordinator invokes the latest closures.
+        context.coordinator.onSubmit = onSubmit
+        context.coordinator.onCancel = onCancel
+
         if focusRequestID != context.coordinator.lastSeenFocusRequestID {
             context.coordinator.lastSeenFocusRequestID = focusRequestID
             DispatchQueue.main.async {
@@ -65,6 +74,8 @@ struct FocusableTextField: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextFieldDelegate {
         @Binding var text: String
         var lastSeenFocusRequestID: Int = 0
+        var onSubmit: (() -> Void)?
+        var onCancel: (() -> Void)?
 
         init(text: Binding<String>) {
             _text = text
@@ -73,6 +84,26 @@ struct FocusableTextField: NSViewRepresentable {
         func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTextField else { return }
             text = tf.stringValue
+        }
+
+        /// Intercept Return / Escape from the field editor so callers can commit or
+        /// cancel. Returning true marks the command handled and suppresses the beep.
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            switch commandSelector {
+            case #selector(NSResponder.insertNewline(_:)):
+                if let onSubmit {
+                    onSubmit()
+                    return true
+                }
+            case #selector(NSResponder.cancelOperation(_:)):
+                if let onCancel {
+                    onCancel()
+                    return true
+                }
+            default:
+                break
+            }
+            return false
         }
     }
 }

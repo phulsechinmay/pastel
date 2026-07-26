@@ -29,6 +29,10 @@ final class ThumbnailLoader: @unchecked Sendable {
     /// Target max pixel dimension for favicons (displayed at ≤64pt).
     static let faviconMaxPixelSize = 128
 
+    /// Target max pixel dimension for the full-screen image viewer. Matches the
+    /// stored full-image cap (4K) so zooming reveals real detail, not upscaled pixels.
+    static let fullImageMaxPixelSize = 4096
+
     /// Thread-safe; access is unsynchronized by design.
     private let cache = NSCache<NSString, NSImage>()
 

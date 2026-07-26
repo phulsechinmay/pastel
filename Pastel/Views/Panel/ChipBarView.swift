@@ -22,18 +22,19 @@ struct ChipBarView: View {
 
     // MARK: - Label Creation State
 
-    @State private var showingCreateLabel = false
+    /// Whether the "+" has morphed into the inline creation chip.
+    @State private var isCreating = false
     @State private var newLabelName = ""
-    @State private var newLabelColor: LabelColor = .blue
+    @State private var newLabelColorName: String = LabelColor.blue.rawValue
     @State private var newLabelEmoji: String?
+    /// Bumped after the chip appears to pull keyboard focus into the name field.
+    @State private var createFocusRequestID = 0
+    /// Whether the color/emoji picker dropdown is open (anchored to the chip's dot).
+    @State private var showStylePicker = false
 
-    /// Curated label-friendly emojis for quick selection.
-    private static let curatedEmojis: [String] = [
-        "📌", "📎", "📝", "📋", "📂", "💡",
-        "⭐", "❤️", "🔥", "🎯", "🏷️", "🔖",
-        "✅", "❌", "⚡", "🎨", "🔧", "🐛",
-        "💬", "📧", "🔒", "🌟", "💎", "🚀"
-    ]
+    private var canCreate: Bool {
+        !newLabelName.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         CenteredFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
@@ -41,8 +42,16 @@ struct ChipBarView: View {
             ForEach(labels) { label in
                 labelChip(for: label)
             }
-            createChip
+            // The "+" morphs into a compact editable chip in place.
+            if isCreating {
+                inlineCreateChip
+            } else {
+                createChip
+            }
         }
+        // Springy reflow as chips are added/removed and as the "+" morphs.
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: labels.count)
+        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: isCreating)
         .padding(.vertical, 4)
         .sheet(item: $editingLabel) { label in
             LabelEditPalette(label: label, onDismiss: { editingLabel = nil })
@@ -125,100 +134,106 @@ struct ChipBarView: View {
 
     // MARK: - Create Chip
 
+    /// The idle "+" chip. Tapping it morphs into the inline creation chip.
     private var createChip: some View {
         Button {
-            newLabelName = ""
-            newLabelColor = .blue
-            newLabelEmoji = nil
-            showingCreateLabel = true
+            openCreate()
         } label: {
-            Text("+")
-                .font(.caption.weight(.semibold))
+            Image(systemName: "plus")
+                .font(.system(size: 11, weight: .semibold))
                 .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.vertical, 5)
                 .background(Color.white.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showingCreateLabel) {
-            createLabelPopover
-        }
     }
 
-    // MARK: - Create Label Popover
+    // MARK: - Inline Create Chip
 
-    private var createLabelPopover: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("New Label")
-                .font(.headline)
-
-            TextField("Label name", text: $newLabelName)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 180)
-
-            // Color palette (6x2 grid)
-            let columns = Array(repeating: GridItem(.fixed(20), spacing: 6), count: 6)
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(LabelColor.allCases, id: \.self) { labelColor in
-                    Circle()
-                        .fill(labelColor.color)
-                        .frame(width: 20, height: 20)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(
-                                    newLabelEmoji == nil && newLabelColor == labelColor
-                                        ? Color.white : Color.clear,
-                                    lineWidth: 2
-                                )
-                        )
-                        .onTapGesture {
-                            newLabelColor = labelColor
-                            newLabelEmoji = nil
-                        }
+    /// Compact editable chip that replaces the "+": a color/emoji dot (tap for the
+    /// style dropdown), a name field, and a trailing cancel. Enter creates, Esc cancels.
+    /// The label starts with a randomly assigned color so no picking is required.
+    private var inlineCreateChip: some View {
+        HStack(spacing: 6) {
+            Button {
+                showStylePicker.toggle()
+            } label: {
+                HStack(spacing: 2) {
+                    styleDot
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 7, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            Divider()
-
-            // Emoji header
-            Text("Emoji")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            // Curated emoji grid (same 6-column layout)
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(Self.curatedEmojis, id: \.self) { emoji in
-                    Text(emoji)
-                        .font(.system(size: 16))
-                        .frame(width: 20, height: 20)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(newLabelEmoji == emoji ? Color.white.opacity(0.2) : Color.clear)
-                        )
-                        .onTapGesture {
-                            newLabelEmoji = emoji
-                        }
-                }
-
+            .buttonStyle(.plain)
+            .popover(isPresented: $showStylePicker, arrowEdge: .bottom) {
+                LabelStyleSelector(colorName: $newLabelColorName, emoji: $newLabelEmoji)
+                    .padding(12)
+                    .frame(width: 220)
+                    .preferredColorScheme(.dark)
             }
 
-            HStack {
-                Button("Cancel") {
-                    showingCreateLabel = false
-                }
+            FocusableTextField(
+                text: $newLabelName,
+                placeholder: "Label name",
+                focusRequestID: createFocusRequestID,
+                onSubmit: { createLabel() },
+                onCancel: { closeCreate() }
+            )
+            .frame(width: 104)
 
-                Spacer()
+            Button {
+                closeCreate()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.1), in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1))
+        .transition(.scale(scale: 0.85).combined(with: .opacity))
+    }
 
-                Button("Create") {
-                    createLabel()
-                }
-                .disabled(newLabelName.trimmingCharacters(in: .whitespaces).isEmpty)
+    /// The chip's leading indicator: the chosen emoji, or a color dot when none.
+    private var styleDot: some View {
+        Group {
+            if let emoji = newLabelEmoji, !emoji.isEmpty {
+                Text(emoji).font(.system(size: 11))
+            } else {
+                Circle()
+                    .fill(LabelColor(rawValue: newLabelColorName)?.color ?? .gray)
+                    .frame(width: 10, height: 10)
             }
         }
-        .padding(12)
-        .frame(width: 220)
+        .animation(.snappy, value: newLabelEmoji)
+        .animation(.snappy, value: newLabelColorName)
     }
 
     // MARK: - Actions
+
+    private func openCreate() {
+        newLabelName = ""
+        // Assign a random color up front so the user can just type and hit Enter.
+        newLabelColorName = (LabelColor.allCases.randomElement() ?? .blue).rawValue
+        newLabelEmoji = nil
+        showStylePicker = false
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            isCreating = true
+        }
+        // Pull focus into the name field once the chip is in the hierarchy.
+        DispatchQueue.main.async { createFocusRequestID &+= 1 }
+    }
+
+    private func closeCreate() {
+        showStylePicker = false
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            isCreating = false
+        }
+    }
 
     private func createLabel() {
         let trimmedName = newLabelName.trimmingCharacters(in: .whitespaces)
@@ -228,20 +243,90 @@ struct ChipBarView: View {
         let maxOrder = labels.map(\.sortOrder).max() ?? -1
         let newLabel = Label(
             name: trimmedName,
-            colorName: newLabelColor.rawValue,
+            colorName: newLabelColorName,
             sortOrder: maxOrder + 1,
             emoji: newLabelEmoji
         )
 
         modelContext.insert(newLabel)
-        saveWithLogging(modelContext, operation: "label reorder")
-        showingCreateLabel = false
+        saveWithLogging(modelContext, operation: "create label")
+        closeCreate()
     }
 
     private func deleteLabel(_ label: Label) {
         selectedLabelIDs.remove(label.persistentModelID)
         deleteLabelWithCleanup(label, from: modelContext)
         saveWithLogging(modelContext, operation: "delete label from chip bar")
+    }
+}
+
+// MARK: - Label Style Selector
+
+/// Shared color + emoji picker used by both inline label creation and the edit palette.
+///
+/// Selecting a color clears the emoji (color dot mode); selecting an emoji keeps the
+/// stored color but hides the dot — matching `LabelChipView`'s rendering. Selection
+/// changes animate so the highlight glides between swatches.
+struct LabelStyleSelector: View {
+
+    /// Bound to the label's `colorName` (a `LabelColor` raw value).
+    @Binding var colorName: String
+    /// Bound to the label's optional emoji.
+    @Binding var emoji: String?
+
+    /// Curated label-friendly emojis for quick selection.
+    static let curatedEmojis: [String] = [
+        "📌", "📎", "📝", "📋", "📂", "💡",
+        "⭐", "❤️", "🔥", "🎯", "🏷️", "🔖",
+        "✅", "❌", "⚡", "🎨", "🔧", "🐛",
+        "💬", "📧", "🔒", "🌟", "💎", "🚀"
+    ]
+
+    private var isColorSelected: Bool { emoji?.isEmpty ?? true }
+
+    private let columns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 6)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(LabelColor.allCases, id: \.self) { labelColor in
+                    let selected = isColorSelected && colorName == labelColor.rawValue
+                    Circle()
+                        .fill(labelColor.color)
+                        .frame(width: 22, height: 22)
+                        .overlay(
+                            Circle().strokeBorder(selected ? Color.white : Color.clear, lineWidth: 2)
+                        )
+                        .scaleEffect(selected ? 1.12 : 1.0)
+                        .contentShape(Circle())
+                        .onTapGesture {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                colorName = labelColor.rawValue
+                                emoji = nil
+                            }
+                        }
+                }
+            }
+
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(Self.curatedEmojis, id: \.self) { curatedEmoji in
+                    let selected = emoji == curatedEmoji
+                    Text(curatedEmoji)
+                        .font(.system(size: 16))
+                        .frame(width: 22, height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(selected ? Color.white.opacity(0.22) : Color.clear)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5))
+                        .onTapGesture {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                emoji = curatedEmoji
+                            }
+                        }
+                }
+            }
+        }
     }
 }
 
@@ -252,13 +337,6 @@ private struct LabelEditPalette: View {
     @Bindable var label: Label
     @Environment(\.modelContext) private var modelContext
     var onDismiss: () -> Void
-
-    private static let curatedEmojis: [String] = [
-        "📌", "📎", "📝", "📋", "📂", "💡",
-        "⭐", "❤️", "🔥", "🎯", "🏷️", "🔖",
-        "✅", "❌", "⚡", "🎨", "🔧", "🐛",
-        "💬", "📧", "🔒", "🌟", "💎", "🚀"
-    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -272,49 +350,13 @@ private struct LabelEditPalette: View {
                     saveWithLogging(modelContext, operation: "update label name")
                 }
 
-            // 6x2 color grid
-            let columns = Array(repeating: GridItem(.fixed(20), spacing: 6), count: 6)
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(LabelColor.allCases, id: \.self) { labelColor in
-                    Circle()
-                        .fill(labelColor.color)
-                        .frame(width: 20, height: 20)
-                        .overlay(
-                            Circle().strokeBorder(
-                                label.emoji == nil && label.colorName == labelColor.rawValue
-                                    ? Color.white : Color.clear,
-                                lineWidth: 2
-                            )
-                        )
-                        .onTapGesture {
-                            label.colorName = labelColor.rawValue
-                            label.emoji = nil
-                            saveWithLogging(modelContext, operation: "update label color")
-                        }
+            LabelStyleSelector(colorName: $label.colorName, emoji: $label.emoji)
+                .onChange(of: label.colorName) { _, _ in
+                    saveWithLogging(modelContext, operation: "update label color")
                 }
-            }
-
-            Divider()
-
-            Text("Emoji")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(Self.curatedEmojis, id: \.self) { emoji in
-                    Text(emoji)
-                        .font(.system(size: 16))
-                        .frame(width: 20, height: 20)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(label.emoji == emoji ? Color.white.opacity(0.2) : Color.clear)
-                        )
-                        .onTapGesture {
-                            label.emoji = emoji
-                            saveWithLogging(modelContext, operation: "update label emoji")
-                        }
+                .onChange(of: label.emoji) { _, _ in
+                    saveWithLogging(modelContext, operation: "update label emoji")
                 }
-            }
 
             HStack {
                 Spacer()

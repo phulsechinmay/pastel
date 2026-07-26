@@ -80,6 +80,7 @@
 		DA56D7DCAB8FE7ABF5DFD32E /* AppIconColorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D74628F6FDF4E2185687683A /* AppIconColorService.swift */; };
 		DA7FB4096E7ADE4F6096981F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADCC1FB498E66C2E4D112994 /* OnboardingView.swift */; };
 		DDCF0FD1BB56BC1907EBF1D3 /* NSPasteboard+Reading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1317D22929AB0FAE7702656B /* NSPasteboard+Reading.swift */; };
+		E3F3D39A08C097762B26869F /* ImageViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3195E8C372D8346F04C52E2C /* ImageViewerView.swift */; };
 		E42B5A361ECF65BE3C4B1EF2 /* FileCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FC617DD35144DF808D4822 /* FileCardView.swift */; };
 		EBE43F0C7BE6AC9E23ACA40C /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 48DC4B0F54EF97DFD2C5F416 /* CloudKit.framework */; };
 		FAB729BD87018467E0979A52 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543EE2EEFDD439C620E6A0A0 /* SettingsView.swift */; };
@@ -106,6 +107,7 @@
 		2F339BF74219A6B2629B2C42 /* ImageCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCardView.swift; sourceTree = "<group>"; };
 		30EA2DC6C129FA8392D0E5CA /* ClipboardCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardCardView.swift; sourceTree = "<group>"; };
 		311A67E5A6FA0C55F53F34D2 /* DragItemProviderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DragItemProviderService.swift; sourceTree = "<group>"; };
+		3195E8C372D8346F04C52E2C /* ImageViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageViewerView.swift; sourceTree = "<group>"; };
 		31E69FA6363380EEB64EF71E /* LabelSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelSettingsView.swift; sourceTree = "<group>"; };
 		338F16EE8766601609575DB2 /* ColorFormatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorFormatService.swift; sourceTree = "<group>"; };
 		3C57B64B0B047D80C2F7D4B3 /* ImportExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportExportService.swift; sourceTree = "<group>"; };
@@ -322,6 +324,7 @@
 				3E5CCEAC25DB293F9A16462A /* FilteredCardListView.swift */,
 				27309449A76C08F456D24215 /* FocusableTextField.swift */,
 				2F339BF74219A6B2629B2C42 /* ImageCardView.swift */,
+				3195E8C372D8346F04C52E2C /* ImageViewerView.swift */,
 				4E12D1FF5C4B00F62F48B0F4 /* LabelChipView.swift */,
 				A5FEF0FE3AC5B3076726EAEB /* PanelContentView.swift */,
 				E7A89B1626914331B041874D /* PanelController.swift */,
@@ -521,6 +524,7 @@
 				D08F6F7B616F247E759ACBA6 /* HistoryGridView.swift in Sources */,
 				6AF5D219C387B0CA3EF35ED8 /* ImageCardView.swift in Sources */,
 				B2B95FF2ABFFE29D25EAD8D0 /* ImageStorageService.swift in Sources */,
+				E3F3D39A08C097762B26869F /* ImageViewerView.swift in Sources */,
 				3AED169433F86C8E70EB00B7 /* ImportExportService.swift in Sources */,
 				D6DBC62B5BFAA514DE489339 /* ImportSheetView.swift in Sources */,
 				B5985155933EAAF6A59D0F45 /* Label.swift in Sources */,

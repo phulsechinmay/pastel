@@ -159,6 +159,13 @@ struct ClipboardCardView: View {
         .animation(.easeInOut(duration: 0.15), value: isSelected)
         .animation(.easeInOut(duration: 0.15), value: isDropTarget)
         .contextMenu(hideContextMenu ? nil : ContextMenu {
+            if item.type == .image {
+                Button("View Image") {
+                    ImageViewerWindow.show(for: item)
+                }
+                Divider()
+            }
+
             Button("Copy") {
                 panelActions.copyOnlyItem?(item)
             }

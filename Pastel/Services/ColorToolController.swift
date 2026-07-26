@@ -25,7 +25,13 @@ final class ColorToolController: NSObject {
         panel.isContinuous = true
         let dockLevel = Int(CGWindowLevelForKey(.dockWindow))
         panel.level = NSWindow.Level(rawValue: dockLevel + 3)  // 23 -- match SlidingPanel
-        panel.orderFront(nil)
+
+        // Pastel is an LSUIElement (menu-bar) app, so it is never the active app on its
+        // own. NSColorPanel only comes forward and becomes interactive when its owning
+        // app is active, so activate explicitly before ordering it front. Without this,
+        // the picker opens behind everything and the eyedropper appears to do nothing.
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
 
         // Clean up target/action when the color panel closes to avoid
         // conflicts with SwiftUI ColorPicker in the edit modal.

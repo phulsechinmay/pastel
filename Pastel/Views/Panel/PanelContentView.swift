@@ -208,7 +208,7 @@ struct PanelContentView: View {
             } label: {
                 Image(systemName: "rectangle.leadinghalf.inset.filled.arrow.leading")
                     .font(.system(size: 14))
-                    .foregroundStyle(.primary.opacity(0.7))
+                    .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
             .menuStyle(.borderlessButton)
@@ -278,11 +278,10 @@ struct PanelContentView: View {
 /// provides the glass backdrop; using `.glass` here would be glass-on-glass), `.plain` on older.
 private struct AdaptiveGlassButtonStyle: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(macOS 26, *) {
-            content.buttonStyle(.borderless)
-        } else {
-            content.buttonStyle(.plain)
-        }
+        // Use `.plain` on all versions: `.borderless` applies control vibrancy that
+        // dims the glyph relative to the position `Menu`, which renders undimmed.
+        // `.plain` renders label content as-is, keeping all toolbar icons the same brightness.
+        content.buttonStyle(.plain)
     }
 }
 
