@@ -18,6 +18,9 @@ final class PanelActions {
     /// Paste one or more selected items (Enter on a multi-selection).
     var pasteItems: (([ClipboardItem]) -> Void)?
     var onDragStarted: (() -> Void)?
+    /// Called by PanelContentView (horizontal mode) with the extra height needed for
+    /// wrapped chip rows. Wired to PanelController.applyHorizontalExtra.
+    var onHorizontalExtraHeightChange: ((CGFloat) -> Void)?
     /// Incremented each time the panel is shown; observed by PanelContentView to reset focus
     /// and by FilteredCardListView to refresh data without view recreation.
     var showCount = 0
@@ -49,6 +52,11 @@ final class PanelController {
     private var screenChangeObserver: Any?
     private var modelContainer: ModelContainer?
     private var appState: AppState?
+
+    /// Extra height (points) added to a horizontal panel for wrapped chip rows.
+    /// Persists across show/hide so a reopen renders at the right height with no
+    /// grow animation. Always 0 for vertical edges.
+    private var horizontalExtraHeight: CGFloat = 0
 
     /// Observable actions bridge for SwiftUI views.
     let panelActions = PanelActions()
@@ -159,6 +167,8 @@ final class PanelController {
     /// throughout — no app switch happens, and no `previousApp` tracking is needed.
     func show() {
         let edge = currentEdge
+        // Vertical panels are already full height; never carry a horizontal delta.
+        if edge.isVertical { horizontalExtraHeight = 0 }
         let screen = screenWithMouse()
 
         // Build a frame that covers the dock but not the menu bar.
@@ -195,12 +205,15 @@ final class PanelController {
         panelActions.onDragStarted = { [weak self] in
             self?.dragSessionStarted()
         }
+        panelActions.onHorizontalExtraHeightChange = { [weak self] extra in
+            self?.applyHorizontalExtra(extra)
+        }
         panelActions.showCount += 1
 
         guard let panel else { return }
 
-        let onScreen = edge.onScreenFrame(screenFrame: screenFrame)
-        let offScreen = edge.offScreenFrame(screenFrame: screenFrame)
+        let onScreen = edge.onScreenFrame(screenFrame: screenFrame, extraHeight: horizontalExtraHeight)
+        let offScreen = edge.offScreenFrame(screenFrame: screenFrame, extraHeight: horizontalExtraHeight)
 
         panel.setFrame(offScreen, display: false)
         panel.orderFrontRegardless()
@@ -243,7 +256,7 @@ final class PanelController {
             height: fullFrame.height - menuBarHeight
         )
 
-        let offScreen = edge.offScreenFrame(screenFrame: screenFrame)
+        let offScreen = edge.offScreenFrame(screenFrame: screenFrame, extraHeight: horizontalExtraHeight)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = animationDuration
@@ -257,6 +270,45 @@ final class PanelController {
         }
 
         logger.info("Panel hidden from \(edge.rawValue) edge")
+    }
+
+    /// Grow/shrink a horizontal panel to fit wrapped chip rows (top/bottom edges only).
+    ///
+    /// Called from PanelContentView when the chip bar's measured height changes.
+    /// `extra` is the chip bar's height beyond a single row; it's clamped to one row
+    /// and, when the panel is visible, animated. The existing edge-anchored frame math
+    /// keeps the top edge pinned (grows down) / bottom edge pinned (grows up).
+    func applyHorizontalExtra(_ extra: CGFloat) {
+        let edge = currentEdge
+        guard !edge.isVertical else {
+            horizontalExtraHeight = 0
+            return
+        }
+
+        // Cap at a single extra row so the panel never balloons for 3+ rows.
+        let maxExtra = PanelLayout.chipHeight + PanelLayout.chipRowSpacing
+        let clamped = max(0, min(extra, maxExtra))
+        guard abs(clamped - horizontalExtraHeight) > 0.5 else { return }
+        horizontalExtraHeight = clamped
+
+        guard let panel, panel.isVisible else { return }
+
+        let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens[0]
+        let fullFrame = screen.frame
+        let menuBarHeight = fullFrame.maxY - screen.visibleFrame.maxY
+        let screenFrame = NSRect(
+            x: fullFrame.origin.x,
+            y: fullFrame.origin.y,
+            width: fullFrame.width,
+            height: fullFrame.height - menuBarHeight
+        )
+
+        let newFrame = edge.onScreenFrame(screenFrame: screenFrame, extraHeight: horizontalExtraHeight)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(newFrame, display: true)
+        }
     }
 
     /// Handle a panel edge change from Settings.
@@ -398,6 +450,9 @@ final class PanelController {
         panelActions.pasteItems = onPasteItems
         panelActions.onDragStarted = { [weak self] in
             self?.dragSessionStarted()
+        }
+        panelActions.onHorizontalExtraHeightChange = { [weak self] extra in
+            self?.applyHorizontalExtra(extra)
         }
 
         // Build SwiftUI content

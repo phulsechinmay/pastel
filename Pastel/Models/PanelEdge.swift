@@ -14,19 +14,24 @@ enum PanelEdge: String, CaseIterable {
     /// Panel dimensions for the given screen frame, accounting for insets.
     ///
     /// Vertical edges: panel width from PanelLayout, full height minus top/bottom insets.
-    /// Horizontal edges: full width minus left/right insets, panel height from PanelLayout.
-    func panelSize(screenFrame: NSRect) -> NSSize {
+    /// Horizontal edges: full width minus left/right insets, panel height from PanelLayout
+    /// plus `extraHeight` (extra chip rows). `extraHeight` only applies to horizontal edges;
+    /// vertical panels are already full height.
+    func panelSize(screenFrame: NSRect, extraHeight: CGFloat = 0) -> NSSize {
         let inset = PanelLayout.edgeInset
         if isVertical {
             return NSSize(width: PanelLayout.verticalPanelWidth, height: screenFrame.height - 2 * inset)
         } else {
-            return NSSize(width: screenFrame.width - 2 * inset, height: PanelLayout.horizontalPanelHeight)
+            return NSSize(
+                width: screenFrame.width - 2 * inset,
+                height: PanelLayout.horizontalPanelHeight + extraHeight
+            )
         }
     }
 
     /// The visible (on-screen) frame for the panel on the given screen.
-    func onScreenFrame(screenFrame: NSRect) -> NSRect {
-        let size = panelSize(screenFrame: screenFrame)
+    func onScreenFrame(screenFrame: NSRect, extraHeight: CGFloat = 0) -> NSRect {
+        let size = panelSize(screenFrame: screenFrame, extraHeight: extraHeight)
         let inset = PanelLayout.edgeInset
         switch self {
         case .right:
@@ -61,8 +66,8 @@ enum PanelEdge: String, CaseIterable {
     }
 
     /// The off-screen frame used as the start/end position for slide animations.
-    func offScreenFrame(screenFrame: NSRect) -> NSRect {
-        let size = panelSize(screenFrame: screenFrame)
+    func offScreenFrame(screenFrame: NSRect, extraHeight: CGFloat = 0) -> NSRect {
+        let size = panelSize(screenFrame: screenFrame, extraHeight: extraHeight)
         let inset = PanelLayout.edgeInset
         switch self {
         case .right:

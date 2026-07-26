@@ -72,7 +72,7 @@ struct ChipBarView: View {
                     .lineLimit(1)
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .frame(height: PanelLayout.chipHeight)
             .background(
                 isAllHistoryActive ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.1),
                 in: Capsule()
@@ -142,7 +142,7 @@ struct ChipBarView: View {
             Image(systemName: "plus")
                 .font(.system(size: 11, weight: .semibold))
                 .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .frame(height: PanelLayout.chipHeight)
                 .background(Color.white.opacity(0.1), in: Capsule())
         }
         .buttonStyle(.plain)
@@ -176,6 +176,7 @@ struct ChipBarView: View {
             FocusableTextField(
                 text: $newLabelName,
                 placeholder: "Label name",
+                fontSize: 11,
                 focusRequestID: createFocusRequestID,
                 onSubmit: { createLabel() },
                 onCancel: { closeCreate() }
@@ -192,7 +193,7 @@ struct ChipBarView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 4)
+        .frame(height: PanelLayout.chipHeight)
         .background(Color.white.opacity(0.1), in: Capsule())
         .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1))
         .transition(.scale(scale: 0.85).combined(with: .opacity))
@@ -206,7 +207,7 @@ struct ChipBarView: View {
             } else {
                 Circle()
                     .fill(LabelColor(rawValue: newLabelColorName)?.color ?? .gray)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 7, height: 7)
             }
         }
         .animation(.snappy, value: newLabelEmoji)

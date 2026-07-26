@@ -10,6 +10,9 @@ struct FocusableTextField: NSViewRepresentable {
 
     @Binding var text: String
     var placeholder: String = ""
+    /// Point size for the field's text and placeholder. Defaults to 13 (search field);
+    /// the inline label-create chip passes 11 to match normal chip text height.
+    var fontSize: CGFloat = 13
     /// Monotonically-increasing focus request token. Each time the caller wants
     /// the field focused they increment this value; we observe the change in
     /// `updateNSView` and call `makeFirstResponder`. A counter is used instead
@@ -27,7 +30,7 @@ struct FocusableTextField: NSViewRepresentable {
     func makeNSView(context: Context) -> NSTextField {
         let tf = NSTextField()
         tf.placeholderString = placeholder
-        tf.font = .systemFont(ofSize: 13)
+        tf.font = .systemFont(ofSize: fontSize)
         tf.isBordered = false
         tf.drawsBackground = false
         tf.focusRingType = .none
@@ -36,7 +39,7 @@ struct FocusableTextField: NSViewRepresentable {
             string: placeholder,
             attributes: [
                 .foregroundColor: NSColor.secondaryLabelColor,
-                .font: NSFont.systemFont(ofSize: 13)
+                .font: NSFont.systemFont(ofSize: fontSize)
             ]
         )
         tf.delegate = context.coordinator

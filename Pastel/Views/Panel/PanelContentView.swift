@@ -65,6 +65,13 @@ struct PanelContentView: View {
                         isAllHistoryActive: selectedLabelIDs.isEmpty,
                         onSelectAllHistory: { selectedLabelIDs.removeAll() }
                     )
+                    // Grow the horizontal panel by a row when the chips wrap to two lines.
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height
+                    } action: { chipBarHeight in
+                        let extra = max(0, chipBarHeight - PanelLayout.chipHeight)
+                        panelActions.onHorizontalExtraHeightChange?(extra)
+                    }
 
                     Spacer()
 

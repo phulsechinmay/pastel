@@ -36,6 +36,7 @@ struct LabelChipView: View {
         }
         .padding(.horizontal, size == .compact ? 5 : 10)
         .padding(.vertical, size == .compact ? 2 : 5)
+        .frame(height: size == .compact ? nil : PanelLayout.chipHeight)
         .background(background, in: Capsule())
         .overlay(
             Capsule().strokeBorder(

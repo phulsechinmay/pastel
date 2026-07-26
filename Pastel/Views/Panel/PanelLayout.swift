@@ -22,6 +22,14 @@ enum PanelLayout {
     // Section spacing (between header, search, chips, cards)
     static let sectionSpacing: CGFloat = 6
 
+    // Chip dimensions
+    /// Uniform height for all chip-bar chips (label chips, "+", and the inline
+    /// create chip). Fixing this makes the create chip match normal chips and gives
+    /// the horizontal-panel resize a precise single-row baseline.
+    static let chipHeight: CGFloat = 24
+    /// Vertical spacing between wrapped chip rows (matches CenteredFlowLayout usage).
+    static let chipRowSpacing: CGFloat = 6
+
     // Card dimensions
     static let cardSpacing: CGFloat = 8
     static let cardHorizontalPadding: CGFloat = 14
