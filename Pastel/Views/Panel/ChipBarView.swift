@@ -31,6 +31,8 @@ struct ChipBarView: View {
     @State private var createFocusRequestID = 0
     /// Whether the color/emoji picker dropdown is open (anchored to the chip's dot).
     @State private var showStylePicker = false
+    /// Hover state for the create chip's left color/emoji section (lightens on hover).
+    @State private var isHoveringStyle = false
 
     private var canCreate: Bool {
         !newLabelName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -154,18 +156,28 @@ struct ChipBarView: View {
     /// style dropdown), a name field, and a trailing cancel. Enter creates, Esc cancels.
     /// The label starts with a randomly assigned color so no picking is required.
     private var inlineCreateChip: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
+            // The whole left region (leading inset + dot + gap) opens the picker and
+            // lightens on hover to signal it's interactive.
             Button {
                 showStylePicker.toggle()
             } label: {
-                HStack(spacing: 2) {
-                    styleDot
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 7, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
+                styleDot
+                    .padding(.leading, 10)
+                    .padding(.trailing, 6)
+                    .frame(maxHeight: .infinity)
+                    .background(
+                        isHoveringStyle ? Color.white.opacity(0.12) : Color.clear,
+                        in: UnevenRoundedRectangle(
+                            topLeadingRadius: PanelLayout.chipHeight / 2,
+                            bottomLeadingRadius: PanelLayout.chipHeight / 2
+                        )
+                    )
+                    .contentShape(Rectangle())
+                    .animation(.easeInOut(duration: 0.12), value: isHoveringStyle)
             }
             .buttonStyle(.plain)
+            .onHover { isHoveringStyle = $0 }
             .popover(isPresented: $showStylePicker, arrowEdge: .bottom) {
                 LabelStyleSelector(colorName: $newLabelColorName, emoji: $newLabelEmoji)
                     .padding(12)
@@ -182,6 +194,8 @@ struct ChipBarView: View {
                 onCancel: { closeCreate() }
             )
             .frame(width: 104)
+            // Un-highlighted margin so the hover fill doesn't reach the cursor.
+            .padding(.leading, 4)
 
             Button {
                 closeCreate()
@@ -189,10 +203,13 @@ struct ChipBarView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.secondary)
+                    .padding(.leading, 6)
+                    .padding(.trailing, 10)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 10)
         .frame(height: PanelLayout.chipHeight)
         .background(Color.white.opacity(0.1), in: Capsule())
         .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1))
