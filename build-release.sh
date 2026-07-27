@@ -48,6 +48,11 @@ if ! gh auth status >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! command -v xcodegen >/dev/null 2>&1; then
+    echo "Error: xcodegen not installed. Run: brew install xcodegen"
+    exit 1
+fi
+
 if git tag -l "$TAG" | grep -q "$TAG"; then
     echo "Error: Tag $TAG already exists. Bump MARKETING_VERSION in Xcode first."
     exit 1
@@ -59,7 +64,12 @@ CURRENT_BUILD=$(grep 'CURRENT_PROJECT_VERSION:' project.yml | head -1 | sed 's/.
 NEW_BUILD=$((CURRENT_BUILD + 1))
 sed -i '' "s/CURRENT_PROJECT_VERSION: \"$CURRENT_BUILD\"/CURRENT_PROJECT_VERSION: \"$NEW_BUILD\"/" project.yml
 echo "    Build number: $CURRENT_BUILD -> $NEW_BUILD"
-git add project.yml
+
+# Regenerate the Xcode project so the committed pbxproj matches project.yml.
+# Without this the pbxproj keeps the old build number and disagrees with what
+# was actually released (the archive below takes the value from the CLI).
+xcodegen generate >/dev/null
+git add project.yml Pastel.xcodeproj/project.pbxproj
 git commit -m "build: bump CURRENT_PROJECT_VERSION to $NEW_BUILD"
 
 # ─── Clean previous build artifacts ──────────────────────────────────────────
