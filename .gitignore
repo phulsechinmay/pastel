@@ -19,3 +19,4 @@ SourcePackages/
 
 # Environment
 .env
+.plans/
