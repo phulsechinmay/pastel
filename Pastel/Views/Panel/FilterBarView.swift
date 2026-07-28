@@ -87,7 +87,8 @@ struct FilterBarView: View {
         filterMenu(
             title: appTitle,
             isActive: !filters.appBundleIDs.isEmpty,
-            systemImage: "app.dashed"
+            systemImage: "app.dashed",
+            leadingIcon: selectedAppIcon
         ) {
             if availableApps.isEmpty {
                 Text("No source apps yet")
@@ -96,7 +97,18 @@ struct FilterBarView: View {
                     Button {
                         toggle(app.bundleID)
                     } label: {
-                        Text(checkmarkTitle(app.name, isOn: filters.appBundleIDs.contains(app.bundleID)))
+                        let label = checkmarkTitle(app.name, isOn: filters.appBundleIDs.contains(app.bundleID))
+                        if let icon = AppIconCache.shared.menuIcon(forBundleID: app.bundleID) {
+                            SwiftUI.Label {
+                                Text(label)
+                            } icon: {
+                                Image(nsImage: icon)
+                            }
+                        } else {
+                            // Uninstalled or sandbox-unresolvable app — keep the row
+                            // rather than hiding history the user can still filter to.
+                            SwiftUI.Label(label, systemImage: "app")
+                        }
                     }
                 }
             }
@@ -115,6 +127,22 @@ struct FilterBarView: View {
             return availableApps.first { $0.bundleID == id }?.name ?? "App"
         default: return "\(filters.appBundleIDs.count) Apps"
         }
+    }
+
+    /// Chip icon size. A little larger than the 10pt SF Symbols beside it — app icons
+    /// carry detail that reads poorly at glyph size — but still under the 11pt text's
+    /// line height, so the taller icon never grows the filter row.
+    private static let appIconSize: CGFloat = 13
+
+    /// The icon to stand in for the chip's glyph when the filter names exactly one app.
+    ///
+    /// Only for a single selection: with two or more there is no one icon that honestly
+    /// represents the set, and the count in `appTitle` already carries it.
+    private var selectedAppIcon: NSImage? {
+        guard filters.appBundleIDs.count == 1, let bundleID = filters.appBundleIDs.first else {
+            return nil
+        }
+        return AppIconCache.shared.menuIcon(forBundleID: bundleID, size: Self.appIconSize)
     }
 
     private func toggle(_ bundleID: String) {
@@ -159,14 +187,30 @@ struct FilterBarView: View {
         title: String,
         isActive: Bool,
         systemImage: String,
+        leadingIcon: NSImage? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
         Menu {
             content()
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 10))
+                if let leadingIcon {
+                    // Drawn as an overlay on a sized spacer rather than as a bare
+                    // `Image` child: a top-level non-symbol image makes SwiftUI reduce
+                    // the whole label to a native title+icon popup button, which drops
+                    // the chip's font and capsule and draws the icon at its own size.
+                    // The image is pre-scaled too, so that fallback can't grow the row.
+                    Color.clear
+                        .frame(width: Self.appIconSize, height: Self.appIconSize)
+                        .overlay {
+                            Image(nsImage: leadingIcon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        }
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 10))
+                }
                 Text(title)
                     .font(.system(size: 11, weight: isActive ? .semibold : .regular))
                 Image(systemName: "chevron.down")

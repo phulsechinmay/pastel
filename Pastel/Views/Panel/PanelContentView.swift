@@ -71,8 +71,14 @@ struct PanelContentView: View {
                         .scaledToFit()
                         .frame(height: 38)
 
-                    SearchFieldView(searchText: $searchText, focusRequestID: searchFocusRequestID)
-                        .frame(maxWidth: 200)
+                    SearchFieldView(
+                        searchText: $searchText,
+                        focusRequestID: searchFocusRequestID,
+                        isFilterExpanded: showFilters,
+                        isFilterActive: !searchFilters.isEmpty,
+                        onToggleFilters: toggleFilters
+                    )
+                    .frame(maxWidth: 240)
 
                     ChipBarView(
                         labels: labels,
@@ -121,8 +127,14 @@ struct PanelContentView: View {
 
                 Divider()
 
-                SearchFieldView(searchText: $searchText, focusRequestID: searchFocusRequestID)
-                    .padding(.vertical, PanelLayout.sectionSpacing)
+                SearchFieldView(
+                    searchText: $searchText,
+                    focusRequestID: searchFocusRequestID,
+                    isFilterExpanded: showFilters,
+                    isFilterActive: !searchFilters.isEmpty,
+                    onToggleFilters: toggleFilters
+                )
+                .padding(.vertical, PanelLayout.sectionSpacing)
                 ChipBarView(
                     labels: labels,
                     selectedLabelIDs: $selectedLabelIDs,
@@ -249,27 +261,6 @@ struct PanelContentView: View {
             .help("New Snippet (\u{2318}N)")
 
             Button {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    showFilters.toggle()
-                }
-                if showFilters {
-                    refreshAvailableApps()
-                } else {
-                    // Collapsing must clear, or a filter the user can no longer see
-                    // keeps narrowing results and reads as missing history.
-                    searchFilters.removeAll()
-                }
-            } label: {
-                Image(systemName: searchFilters.isEmpty
-                      ? "line.3.horizontal.decrease.circle"
-                      : "line.3.horizontal.decrease.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(searchFilters.isEmpty ? Color.primary : Color.accentColor)
-            }
-            .modifier(AdaptiveGlassButtonStyle())
-            .help("Filter by Type, App, or Date")
-
-            Button {
                 ColorToolController.shared.showColorPicker()
             } label: {
                 Image(systemName: "eyedropper")
@@ -325,6 +316,20 @@ struct PanelContentView: View {
     /// which would duplicate the card list's fetch on every panel show. Bounded to the
     /// most recent slice — the apps a user filters by are the ones they copy from now,
     /// and scanning an entire multi-thousand-item history for a menu isn't worth it.
+    /// Reveal or hide the Type/App/Date filter row.
+    private func toggleFilters() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            showFilters.toggle()
+        }
+        if showFilters {
+            refreshAvailableApps()
+        } else {
+            // Collapsing must clear, or a filter the user can no longer see keeps
+            // narrowing results and reads as missing history.
+            searchFilters.removeAll()
+        }
+    }
+
     /// Tell the panel how much taller than baseline the header has become.
     private func reportHorizontalExtraHeight() {
         panelActions.onHorizontalExtraHeightChange?(chipExtraHeight + filterRowHeight)

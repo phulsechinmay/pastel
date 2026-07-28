@@ -20,3 +20,4 @@ SourcePackages/
 # Environment
 .env
 .plans/
+.impeccable/
