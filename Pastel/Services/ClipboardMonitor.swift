@@ -326,21 +326,21 @@ final class ClipboardMonitor {
     /// Image data is read on the main thread (NSPasteboard is NOT thread-safe),
     /// then handed to ImageStorageService for background disk I/O. The ClipboardItem
     /// is created in the completion handler back on the main thread.
+    ///
+    /// Deduplication happens in that completion rather than up front, because the hash
+    /// describes the canonical PNG the storage service produces — it does not exist yet
+    /// at this point. The cost is that a duplicate is written to disk before being
+    /// recognized, so that branch deletes the files it just wrote.
     private func processImageContent(isConcealed: Bool) {
-        // Read image data on the main thread (NSPasteboard is NOT thread-safe)
-        guard let imageData = pasteboard.data(forType: .tiff) ?? pasteboard.data(forType: .png) else {
+        // Read image data on the main thread (NSPasteboard is NOT thread-safe).
+        //
+        // PNG first: screenshots offer both, and pasteboard TIFF is uncompressed — a
+        // full-screen Retina capture is ~30MB of TIFF against ~2MB of PNG, all of it
+        // copied on the main thread. Not every app offers PNG, hence the fallback.
+        guard let imageData = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) else {
             Self.logger.warning("Image classified but no image data found on pasteboard")
             return
         }
-
-        // Compute hash for dedup (first 4KB for speed)
-        let contentHash = ContentHash.hash(imageData: imageData)
-
-        // Consecutive duplicate check
-        if isDuplicateOfMostRecent(contentHash: contentHash) { return }
-
-        // Non-consecutive duplicate check: any existing item with same hash
-        if isDuplicateByHash(contentHash) { return }
 
         // Capture source app (must be on main thread)
         let sourceApp = NSWorkspace.shared.frontmostApplication
@@ -350,8 +350,27 @@ final class ClipboardMonitor {
         let currentChangeCount = pasteboard.changeCount
 
         // Save image to disk on background queue; completion fires on main thread
-        ImageStorageService.shared.saveImage(data: imageData) { [weak self] imagePath, thumbnailPath in
+        ImageStorageService.shared.saveImage(data: imageData) { [weak self] imagePath, thumbnailPath, contentHash in
             guard let self else { return }
+
+            // The write failed; there is nothing to dedup against or to keep.
+            guard !contentHash.isEmpty else { return }
+
+            // Consecutive duplicate check
+            // Non-consecutive duplicate check: any existing item with same hash
+            //
+            // `backgroundQueue` is serial and hops back through `DispatchQueue.main.async`,
+            // so completions arrive in capture order. A second copy of the same image
+            // therefore always sees the first one already persisted — no in-flight window.
+            if self.isDuplicateOfMostRecent(contentHash: contentHash)
+                || self.isDuplicateByHash(contentHash) {
+                // Reclaim the files written before the duplicate was recognized.
+                ImageStorageService.shared.deleteImage(
+                    imagePath: imagePath,
+                    thumbnailPath: thumbnailPath
+                )
+                return
+            }
 
             let item = ClipboardItem(
                 textContent: nil,

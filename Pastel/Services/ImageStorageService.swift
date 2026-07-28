@@ -61,11 +61,17 @@ final class ImageStorageService: Sendable {
 
     /// Save image data to disk with a thumbnail, executing all I/O on a background queue.
     ///
+    /// Also returns the content hash of the *stored* image. Hashing here rather than at
+    /// the call site keeps a multi-millisecond digest off the main thread, and hashing
+    /// the canonicalized PNG instead of the raw pasteboard bytes makes the hash
+    /// independent of which representation the source app happened to offer — the same
+    /// picture pasted as TIFF and as PNG lands on one hash.
+    ///
     /// - Parameters:
     ///   - data: Raw image data (read from pasteboard on the main thread).
-    ///   - completion: Called on the **main thread** with (imageFilename, thumbnailFilename),
-    ///     or (nil, nil) if saving failed.
-    func saveImage(data: Data, completion: @escaping @MainActor @Sendable (String?, String?) -> Void) {
+    ///   - completion: Called on the **main thread** with (imageFilename, thumbnailFilename,
+    ///     contentHash), or (nil, nil, "") if saving failed.
+    func saveImage(data: Data, completion: @escaping @MainActor @Sendable (String?, String?, String) -> Void) {
         backgroundQueue.async { [imagesDirectory] in
             let uuid = UUID().uuidString
 
@@ -78,6 +84,9 @@ final class ImageStorageService: Sendable {
                 fullImageData = data
             }
 
+            // Hashed before the write so the digest always describes what lands on disk.
+            let contentHash = ContentHash.hash(imageData: fullImageData)
+
             let imageFilename = "\(uuid).png"
             let imageURL = imagesDirectory.appendingPathComponent(imageFilename)
 
@@ -85,7 +94,7 @@ final class ImageStorageService: Sendable {
                 try fullImageData.write(to: imageURL)
             } catch {
                 Self.logger.error("Failed to write full image: \(error.localizedDescription)")
-                DispatchQueue.main.async { completion(nil, nil) }
+                DispatchQueue.main.async { completion(nil, nil, "") }
                 return
             }
 
@@ -107,7 +116,7 @@ final class ImageStorageService: Sendable {
             }
 
             Self.logger.info("Saved image: \(imageFilename), thumb: \(thumbnailFilename ?? "none")")
-            DispatchQueue.main.async { completion(imageFilename, thumbnailFilename) }
+            DispatchQueue.main.async { completion(imageFilename, thumbnailFilename, contentHash) }
         }
     }
 
@@ -188,17 +197,6 @@ final class ImageStorageService: Sendable {
                 }
             }
         }
-    }
-
-    /// Compute a fast hash of image data for deduplication.
-    ///
-    /// Hashes only the first 4096 bytes for speed -- sufficient to distinguish
-    /// different images without the cost of hashing multi-megabyte data.
-    ///
-    /// - Parameter data: Raw image data.
-    /// - Returns: Hex-encoded SHA256 hash string.
-    static func computeImageHash(data: Data) -> String {
-        ContentHash.hash(imageData: data)
     }
 
     // MARK: - Private Helpers

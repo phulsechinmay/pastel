@@ -42,9 +42,16 @@ final class DeduplicationService {
             return
         }
 
-        // Group by contentHash, filtering out empty hashes
+        // Group by contentHash, filtering out empty hashes.
+        //
+        // Images are excluded. This sweep exists to reconcile items that arrived from
+        // another device, and images are not synced — so every image row here is local,
+        // and capture-time dedup has already handled it. Grouping them would only put
+        // rows at risk of deletion on the strength of a hash this pass never verifies,
+        // including hashes written by the old prefix-based scheme. Revisit if image
+        // sync ships, and verify the hash against the stored file before merging.
         var hashGroups: [String: [ClipboardItem]] = [:]
-        for item in allItems where !item.contentHash.isEmpty {
+        for item in allItems where !item.contentHash.isEmpty && item.type != .image {
             hashGroups[item.contentHash, default: []].append(item)
         }
 
@@ -90,9 +97,13 @@ final class DeduplicationService {
             // Save the label merge first (separate from deletion per research pitfall 2)
             saveWithLogging(modelContext, operation: "dedup-label-merge")
 
-            // Delete non-keeper items in a separate pass
+            // Delete non-keeper items in a separate pass.
+            //
+            // Routed through the shared cleanup so cached URL favicon and preview files
+            // are removed with the row; a bare `modelContext.delete` orphans them on disk
+            // with nothing left to reference them.
             for item in group where item !== keeper {
-                modelContext.delete(item)
+                deleteClipboardItemWithCleanup(item, from: modelContext)
             }
             saveWithLogging(modelContext, operation: "dedup-delete-duplicates")
 

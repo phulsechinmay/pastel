@@ -32,16 +32,22 @@ enum ContentHash {
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
 
-    /// Compute SHA256 hash of image data (first 4KB for speed).
+    /// Compute SHA256 hash of image data over its full length.
     ///
-    /// Hashing only the first 4096 bytes is sufficient to distinguish
-    /// different images without the cost of hashing multi-megabyte data.
+    /// This hashed only the first 4KB until it was found to collide constantly:
+    /// pasteboard TIFF is uncompressed, so the leading bytes are the header plus
+    /// part of the *first row of pixels*. Any two screenshots sharing a top edge —
+    /// same menu bar, same title bar, same background — hashed identically and the
+    /// second was silently discarded as a duplicate.
     ///
-    /// - Parameter imageData: Raw image data.
+    /// Call this with the canonical PNG written to disk rather than raw pasteboard
+    /// bytes: it is roughly an order of magnitude smaller than the equivalent TIFF,
+    /// so full coverage costs a few milliseconds. See `ImageStorageService.saveImage`.
+    ///
+    /// - Parameter imageData: Encoded image data.
     /// - Returns: Lowercase hex-encoded SHA256 hash string.
     static func hash(imageData: Data) -> String {
-        let prefix = imageData.prefix(4096)
-        let digest = SHA256.hash(data: prefix)
+        let digest = SHA256.hash(data: imageData)
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
