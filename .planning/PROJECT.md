@@ -43,6 +43,9 @@ Clipboard history is always one hotkey away, with instant paste-back into any ap
 - [x] URL metadata fetching — auto-fetch title, favicon, og:image
 - [x] Quick paste hotkeys — Cmd+1-9 and Cmd+Shift+1-9 with position badges
 - [x] Label enhancements — 12 colors, optional emoji, emoji picker
+- [x] Edit clip content — fix a clip's text in place (Cmd+E), retention-safe
+- [x] Pin to top — per-item pinning, sorts above history, exempt from retention
+- [x] Manual snippets — author a clip without copying (Cmd+N), born pinned
 
 ### Active
 
@@ -56,9 +59,10 @@ See REQUIREMENTS.md for v1.5 milestone requirements.
 ### Out of Scope
 
 - iOS companion app — macOS only
-- Snippet templates / text expansion — separate tool category
+- Text expansion (trigger-string substitution while typing) — separate tool category.
+  Narrowed 2026-07-27: manual snippet *authoring* (creating a clip without copying)
+  is in scope and planned; only TextExpander-style triggers are excluded.
 - Light mode / system-adaptive theme — always dark
-- Pinned/favorite items — defer to future
 - Image sync — text-only for v1.5, architecture supports future image sync
 - Real-time collaboration / shared clipboard between different Apple IDs
 

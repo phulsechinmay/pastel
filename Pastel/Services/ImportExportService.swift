@@ -33,6 +33,12 @@ struct ExportedItem: Codable, Sendable {
     let detectedLanguage: String?
     let detectedColorHex: String?
     let labelNames: [String]
+    /// Optional so v1 files written before pinning existed still decode, and so
+    /// files written now stay readable by older builds (which ignore unknown keys).
+    /// Adding them this way avoids a version bump, which older builds hard-reject.
+    let isPinned: Bool?
+    let pinnedAt: Date?
+    let isUserCreated: Bool?
 }
 
 struct ExportedLabel: Codable, Sendable {
@@ -214,7 +220,10 @@ final class ImportExportService {
                 title: item.title,
                 detectedLanguage: item.detectedLanguage,
                 detectedColorHex: item.detectedColorHex,
-                labelNames: item.safeLabels.map(\.name)
+                labelNames: item.safeLabels.map(\.name),
+                isPinned: item.isPinned,
+                pinnedAt: item.pinnedAt,
+                isUserCreated: item.isUserCreated
             )
         }
 
@@ -340,6 +349,10 @@ final class ImportExportService {
                 item.title = exportedItem.title
                 item.detectedLanguage = exportedItem.detectedLanguage
                 item.detectedColorHex = exportedItem.detectedColorHex
+                // Absent in v1 files written before pinning existed — default to unpinned.
+                item.isPinned = exportedItem.isPinned ?? false
+                item.pinnedAt = item.isPinned ? (exportedItem.pinnedAt ?? .now) : nil
+                item.isUserCreated = exportedItem.isUserCreated ?? false
 
                 // Wire label relationships
                 for labelName in exportedItem.labelNames {

@@ -113,6 +113,70 @@ extension ClipboardItem {
     }
 }
 
+// MARK: - In-Place Content Editing
+
+extension ClipboardItem {
+    /// Replace the item's text content, keeping every derived field consistent.
+    ///
+    /// Rewrites `contentHash` (dedup correctness) and the size counters, and stamps
+    /// `modifiedAt`. Representations that no longer describe the new text are dropped
+    /// rather than left stale:
+    /// - `htmlContent` / `rtfData` are cleared, downgrading a `.richText` item to
+    ///   `.text`. The edit sheet warns before this happens.
+    /// - URL metadata (title, favicon, preview) is discarded so it can be re-fetched,
+    ///   and the cached favicon/preview files are removed from disk.
+    ///
+    /// Color classification is re-run in both directions, because a `.color` card
+    /// draws itself from `detectedColorHex` and would render the wrong swatch with a
+    /// stale value. The code language is deliberately left alone — the edit sheet's
+    /// picker is a manual override that shouldn't be second-guessed by re-detection.
+    ///
+    /// `timestamp` is untouched: editing a clip must not reshuffle the history.
+    ///
+    /// - Returns: The superseded content hash, so callers can evict caches keyed on
+    ///   it, or `nil` when the text was unchanged and nothing was written.
+    @discardableResult
+    func applyEditedText(_ newText: String) -> String? {
+        let original = textContent ?? ""
+        guard newText != original else { return nil }
+        let supersededHash = contentHash
+
+        textContent = newText
+        characterCount = newText.count
+        byteCount = Data(newText.utf8).count
+        contentHash = ContentHash.hash(text: newText)
+        modifiedAt = .now
+
+        // Rich representations describe the text as it was captured, not as it is now.
+        if htmlContent != nil || rtfData != nil {
+            htmlContent = nil
+            rtfData = nil
+            if type == .richText { type = .text }
+        }
+
+        if type == .url {
+            ImageStorageService.shared.deleteImage(
+                imagePath: urlFaviconPath,
+                thumbnailPath: urlPreviewImagePath
+            )
+            urlTitle = nil
+            urlFaviconPath = nil
+            urlPreviewImagePath = nil
+            urlMetadataFetched = nil
+        }
+
+        let detectedColor = ColorDetectionService.detectColor(newText)
+        detectedColorHex = detectedColor
+        if detectedColor != nil, type == .text {
+            type = .color
+        } else if detectedColor == nil, type == .color {
+            type = .text
+        }
+
+        return supersededHash
+    }
+}
+
 /// Split a `labelKey` into its stable-ID tokens (drops the `|` delimiters and the
 /// empty leading/trailing segments). `"|a|b|"` -> `["a", "b"]`, `"|"` -> `[]`.
 func labelKeyTokens(_ key: String) -> [Substring] {

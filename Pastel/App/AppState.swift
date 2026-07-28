@@ -36,9 +36,62 @@ final class AppState {
     /// would not trigger SwiftUI updates. This stored property is synced via callback.
     var itemCount: Int = 0
 
+    /// Bumped whenever an item's pin state changes, so the panel can re-partition
+    /// its in-memory list. Mutating `isPinned` on a model object does not change the
+    /// identity of the `@Query` array, so `onChange(of: items)` would never fire —
+    /// this is the same reason `DeletionManager.softDeletedIDs` is observed separately.
+    private(set) var pinRevision: Int = 0
+
     /// Whether clipboard monitoring is active (delegates to monitor)
     var isMonitoring: Bool {
         clipboardMonitor?.isMonitoring ?? false
+    }
+
+    /// Toggle an item's pin, stamping `pinnedAt` so pins can be ordered
+    /// most-recently-pinned first. Bumps `pinRevision` for the panel.
+    @MainActor
+    func togglePin(_ item: ClipboardItem, in modelContext: ModelContext) {
+        item.isPinned.toggle()
+        item.pinnedAt = item.isPinned ? .now : nil
+        saveWithLogging(modelContext, operation: "toggle pin")
+        pinRevision &+= 1
+    }
+
+    /// Create an empty user-authored clip and return it for editing.
+    ///
+    /// Born pinned, so a snippet isn't buried by the next hour of copying, and
+    /// retention-exempt for the same reason labeled items are.
+    ///
+    /// `contentHash` is deliberately left empty until the user types something:
+    /// `DeduplicationService` skips empty hashes, so two blank drafts can never be
+    /// merged into each other, and `applyEditedText` computes the real hash on the
+    /// first edit. A draft closed without content is removed by `discardSnippet`.
+    @MainActor
+    func createSnippet(in modelContext: ModelContext) -> ClipboardItem {
+        let item = ClipboardItem(contentType: .text, contentHash: "")
+        item.isUserCreated = true
+        item.isPinned = true
+        item.pinnedAt = .now
+        modelContext.insert(item)
+        saveWithLogging(modelContext, operation: "create snippet")
+        itemCount += 1
+        pinRevision &+= 1
+        return item
+    }
+
+    /// Remove a snippet draft the user closed without typing anything.
+    ///
+    /// Deliberately does NOT bump `pinRevision`. Deleting the row already changes the
+    /// panel's `@Query` array, so `onChange(of: items)` re-partitions on its own. Bumping
+    /// here would additionally run `computeFilteredItems` over the *pre-refresh* array,
+    /// which still contains the row just deleted — and reading `isPinned` off an
+    /// invalidated model traps. Callers must ensure nothing is still bound to `item`
+    /// before calling this; see `EditItemWindow`'s close handler.
+    @MainActor
+    func discardSnippet(_ item: ClipboardItem, in modelContext: ModelContext) {
+        deleteClipboardItemWithCleanup(item, from: modelContext)
+        saveWithLogging(modelContext, operation: "discard empty snippet")
+        itemCount -= 1
     }
 
     /// Initialize the clipboard monitor with a SwiftData model context and start capturing.

@@ -59,11 +59,14 @@ final class RetentionService {
             )
             let expiredItems = try modelContext.fetch(descriptor)
 
-            // Labeled items are kept regardless of age — users opt into permanence by labeling.
-            let purgeable = expiredItems.filter { $0.safeLabels.isEmpty }
+            // Items are kept regardless of age when the user opted into permanence:
+            // by labeling them, by pinning them, or by authoring them by hand.
+            let purgeable = expiredItems.filter {
+                $0.safeLabels.isEmpty && !$0.isPinned && !$0.isUserCreated
+            }
 
             guard !purgeable.isEmpty else {
-                logger.debug("No expired items to purge (cutoff: \(cutoffDate), labeled kept: \(expiredItems.count))")
+                logger.debug("No expired items to purge (cutoff: \(cutoffDate), kept: \(expiredItems.count))")
                 return
             }
 
@@ -74,7 +77,7 @@ final class RetentionService {
             try modelContext.save()
 
             let keptCount = expiredItems.count - purgeable.count
-            logger.info("Purged \(purgeable.count) items older than \(retentionDays) days (kept \(keptCount) labeled)")
+            logger.info("Purged \(purgeable.count) items older than \(retentionDays) days (kept \(keptCount) labeled/pinned)")
         } catch {
             modelContext.rollback()
             logger.error("Failed to purge expired items: \(error.localizedDescription)")

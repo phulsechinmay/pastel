@@ -88,6 +88,12 @@ struct ClipboardCardView: View {
 
                 Spacer()
 
+                if item.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
+                }
+
                 // Abbreviated relative time
                 Text(relativeTimeString(for: item.timestamp))
                     .font(.caption2)
@@ -203,6 +209,10 @@ struct ClipboardCardView: View {
             }
 
             Divider()
+
+            Button(item.isPinned ? "Unpin" : "Pin to Top") {
+                appState.togglePin(item, in: modelContext)
+            }
 
             Button("Edit...") {
                 EditItemWindow.show(for: item, modelContainer: modelContext.container)
@@ -331,7 +341,15 @@ struct ClipboardCardView: View {
 
     @ViewBuilder
     private var sourceAppIcon: some View {
-        if let bundleID = item.sourceAppBundleID,
+        if item.isUserCreated {
+            // Authored clips have no source app. A distinct glyph reads as "you wrote
+            // this" instead of looking like a failed icon lookup, and `sourceAppName`
+            // stays nil so no sentinel string leaks into search results.
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 15))
+                .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.8) : .secondary)
+                .frame(width: 24, height: 24)
+        } else if let bundleID = item.sourceAppBundleID,
            let icon = AppIconCache.shared.icon(forBundleID: bundleID) {
             Image(nsImage: icon)
                 .resizable()

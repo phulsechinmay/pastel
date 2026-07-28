@@ -2,14 +2,60 @@ import SwiftUI
 import SwiftData
 import AppKit
 
+/// Mutable box holding the editor's working text.
+///
+/// Owned by `EditItemWindow`, mirrored from `EditItemView`'s `@State` on every
+/// keystroke. The window needs the current text in its `willClose` handler, which
+/// runs when the view's own state is no longer reachable.
+@MainActor
+final class EditDraft {
+    var text: String = ""
+}
+
+/// Write `newText` back to `item`, along with the side effects an in-place content
+/// edit implies. Idempotent — `applyEditedText` no-ops when the text already matches.
+///
+/// A free function rather than a method on `EditItemView` so `EditItemWindow` can run
+/// the identical commit from its close handler.
+@MainActor
+func commitEditedText(_ newText: String, to item: ClipboardItem, in modelContext: ModelContext) {
+    // Images and files have no editable text; never let an empty draft blank them.
+    guard item.type != .image, item.type != .file else { return }
+    guard let supersededHash = item.applyEditedText(newText) else { return }
+
+    saveWithLogging(modelContext, operation: "edit item content")
+
+    // Highlighted output is cached by content hash; the old entry is unreachable now.
+    Task { await HighlightCache.shared.evict(supersededHash) }
+
+    // applyEditedText discarded the stale preview — fetch the new URL's metadata.
+    // fetchMetadata honours the "fetchURLMetadata" setting itself.
+    if item.type == .url, let urlString = item.textContent {
+        let itemID = item.persistentModelID
+        let ctx = modelContext
+        Task { await URLMetadataService.fetchMetadata(for: urlString, itemID: itemID, modelContext: ctx) }
+    }
+}
+
 struct EditItemView: View {
     @Bindable var item: ClipboardItem
     @Query(sort: \Label.sortOrder) private var allLabels: [Label]
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
 
     /// Optional close callback for standalone window presentation.
     /// When nil, falls back to SwiftUI dismiss (sheet context).
     var onDone: (() -> Void)?
+
+    /// Whether this is a freshly created snippet draft rather than an existing clip.
+    /// Changes the heading; the discard-if-empty path lives in `EditItemWindow`,
+    /// which is the only close path both the Done button and the window's close
+    /// button pass through.
+    var isNewSnippet: Bool = false
+
+    /// Window-owned mirror of `editedText`, so the close handler can flush text typed
+    /// inside the debounce window. Nil when presented without a hosting window.
+    var draft: EditDraft?
 
     /// Tracks selected language for the code language picker.
     /// Empty string means "Auto-detect", non-empty is a specific language ID.
@@ -18,10 +64,32 @@ struct EditItemView: View {
     /// Tracks the edited color for the color picker.
     @State private var editColor: Color = .white
 
+    /// Working copy of the item's text. Committed to the model by
+    /// `commitContentEdit()` — debounced while typing, and again on close.
+    @State private var editedText: String = ""
+
+    /// Guards `commitContentEdit()` until `onAppear` has seeded `editedText`,
+    /// so the debounce task can never write an empty string over real content.
+    @State private var hasLoadedContent = false
+
+    /// Images and files have no text to edit; everything else does.
+    private var isContentEditable: Bool {
+        item.type != .image && item.type != .file
+    }
+
+    /// Whether the item still carries a rich representation that editing will drop.
+    private var willDropFormatting: Bool {
+        item.htmlContent != nil || item.rtfData != nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Edit Item")
+            Text(isNewSnippet ? "New Snippet" : "Edit Item")
                 .font(.headline)
+
+            if isContentEditable {
+                contentEditor
+            }
 
             // Title field
             TextField("Title (optional)", text: titleBinding)
@@ -68,13 +136,20 @@ struct EditItemView: View {
             HStack {
                 Spacer()
                 Button("Done") { closeSelf() }
-                    .keyboardShortcut(.return, modifiers: [])
+                    // Return has to stay available to the content editor for newlines,
+                    // so Done takes Cmd+Return whenever that editor is present.
+                    .keyboardShortcut(.return, modifiers: isContentEditable ? .command : [])
             }
         }
         .padding()
-        .frame(width: 280)
+        .frame(width: 340)
         .onExitCommand { closeSelf() }
         .onAppear {
+            // Seed the content editor's working copy
+            editedText = item.textContent ?? ""
+            draft?.text = editedText
+            hasLoadedContent = true
+
             // Initialize language picker state
             selectedLanguage = item.detectedLanguage ?? ""
 
@@ -83,11 +158,66 @@ struct EditItemView: View {
                 editColor = Color(hex: hex)
             }
         }
+        .onChange(of: editedText) { _, newValue in
+            // Mirror synchronously so the window's close handler always sees the
+            // latest keystroke, even when the debounce below hasn't fired yet.
+            draft?.text = newValue
+        }
+        .task(id: editedText) {
+            // Debounced commit: rehashing on every keystroke would be wasteful, but
+            // committing only on Done would lose the edit if the window is closed
+            // via its close button, which doesn't route through closeSelf().
+            // Text typed inside this 400ms window is flushed by EditItemWindow.
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            commitContentEdit()
+        }
+    }
+
+    // MARK: - Content Editor
+
+    @ViewBuilder
+    private var contentEditor: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Content")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            TextEditor(text: $editedText)
+                .font(.system(size: 12, design: item.type == .code ? .monospaced : .default))
+                .scrollContentBackground(.hidden)
+                .padding(4)
+                .frame(height: 120)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                )
+
+            if willDropFormatting {
+                // Answering Q6.1: the rich representation is dropped rather than left
+                // stale, so say so before the user commits to it.
+                SwiftUI.Label(
+                    "Editing removes this clip's formatting.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Write the working copy back to the model, if it actually changed.
+    /// Idempotent — `applyEditedText` no-ops when the text matches.
+    private func commitContentEdit() {
+        guard hasLoadedContent, isContentEditable else { return }
+        commitEditedText(editedText, to: item, in: modelContext)
     }
 
     // MARK: - Dismiss
 
     private func closeSelf() {
+        commitContentEdit()
         if let onDone {
             onDone()
         } else {
@@ -119,7 +249,36 @@ struct EditItemView: View {
 enum EditItemWindow {
     private static var currentPanel: NSPanel?
 
-    static func show(for item: ClipboardItem, modelContainer: ModelContainer) {
+    /// Token for the current panel's `willClose` observer. Held so it can be removed:
+    /// the block captures the edited `ClipboardItem`, so leaving it registered would
+    /// pin a model object (possibly a deleted one) alive for the life of the process
+    /// and leave a stale registration against a deallocated window.
+    private static var closeObserver: NSObjectProtocol?
+
+    /// Insert a blank authored clip and open the editor on it, removing the
+    /// placeholder row again if the user closes without typing anything.
+    static func showNewSnippet(appState: AppState, modelContext: ModelContext) {
+        let item = appState.createSnippet(in: modelContext)
+        show(
+            for: item,
+            modelContainer: modelContext.container,
+            isNewSnippet: true,
+            onDiscardEmpty: { appState.discardSnippet(item, in: modelContext) }
+        )
+    }
+
+    /// - Parameters:
+    ///   - isNewSnippet: Presents the window as a snippet draft rather than an edit.
+    ///   - onDiscardEmpty: Called on close when a draft still has no content, so the
+    ///     caller can remove the placeholder row it inserted. Invoked from the
+    ///     `willClose` observer because that is the one path both the Done button and
+    ///     the window's close button go through.
+    static func show(
+        for item: ClipboardItem,
+        modelContainer: ModelContainer,
+        isNewSnippet: Bool = false,
+        onDiscardEmpty: (() -> Void)? = nil
+    ) {
         currentPanel?.close()
 
         let panel = NSPanel(
@@ -129,15 +288,22 @@ enum EditItemWindow {
             defer: true
         )
 
-        let editView = EditItemView(item: item, onDone: {
-            panel.close()
-        })
+        // Pre-seeded so a flush is a no-op if the window closes before the view appears.
+        let draft = EditDraft()
+        draft.text = item.textContent ?? ""
+
+        let editView = EditItemView(
+            item: item,
+            onDone: { panel.close() },
+            isNewSnippet: isNewSnippet,
+            draft: draft
+        )
         .environment(\.colorScheme, .dark)
         .modelContainer(modelContainer)
 
         let hostingView = NSHostingView(rootView: editView)
         panel.contentView = hostingView
-        panel.title = "Edit Item"
+        panel.title = isNewSnippet ? "New Snippet" : "Edit Item"
         panel.level = .floating
         panel.appearance = NSAppearance(named: .darkAqua)
         panel.isReleasedWhenClosed = false
@@ -155,12 +321,49 @@ enum EditItemWindow {
         NSApp.activate(ignoringOtherApps: true)
 
         // Clean up reference when window closes (handles both Done and close button)
-        NotificationCenter.default.addObserver(
+        if let previous = closeObserver {
+            NotificationCenter.default.removeObserver(previous)
+            closeObserver = nil
+        }
+        closeObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: panel,
             queue: .main
-        ) { _ in
-            currentPanel = nil
+        ) { [weak panel] _ in
+            // Registered with `queue: .main`, so this always runs on the main thread;
+            // asserting it lets the body touch the main-actor model and statics.
+            MainActor.assumeIsolated {
+                if let token = closeObserver {
+                    NotificationCenter.default.removeObserver(token)
+                    closeObserver = nil
+                }
+                currentPanel = nil
+
+                // The close button bypasses the Done handler, and teardown cancels the
+                // view's debounced commit — so anything typed in the last 400ms is still
+                // only in the draft box. Flush it before deciding whether the item is
+                // empty, otherwise a fast type-then-close would delete real content.
+                commitEditedText(draft.text, to: item, in: modelContainer.mainContext)
+
+                // A draft closed with nothing in it was never a snippet — drop the
+                // placeholder row rather than leave a blank card in the history.
+                // Decide *before* tearing anything down, while `item` is still valid.
+                guard isNewSnippet, (item.textContent ?? "").isEmpty, item.title == nil else { return }
+
+                // Drop the SwiftUI view before deleting the model it is bound to.
+                // `willClose` fires while the hosting view is still installed, and
+                // `EditItemView` holds the item via @Bindable — a body re-evaluation
+                // scheduled by the delete would read properties off an invalidated
+                // model and trap. Releasing the hosting view first cancels that.
+                panel?.contentView = nil
+
+                // Let the panel's card list drain its pending @Query update too: it keeps
+                // model objects in @State, so the delete has to land on a clean run loop
+                // turn rather than mid-update.
+                DispatchQueue.main.async {
+                    onDiscardEmpty?()
+                }
+            }
         }
 
         currentPanel = panel

@@ -12,6 +12,7 @@ struct PanelContentView: View {
 
     @Environment(PanelActions.self) private var panelActions
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
 
     @Query(sort: \Label.sortOrder) private var labels: [Label]
@@ -189,6 +190,16 @@ struct PanelContentView: View {
     /// Color picker, position switcher, and settings gear — shared between both layouts.
     private var toolbarButtons: some View {
         HStack(spacing: 4) {
+            Button {
+                EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.primary)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+            .help("New Snippet (\u{2318}N)")
+
             Button {
                 ColorToolController.shared.showColorPicker()
             } label: {

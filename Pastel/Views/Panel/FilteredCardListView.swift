@@ -100,6 +100,10 @@ struct FilteredCardListView: View {
     /// If no labels selected, returns all sync-filtered items. Otherwise checks
     /// each item's denormalized `labelKey` string for the selected labels' stable
     /// IDs — a fast column read that does NOT fault the labels relationship.
+    ///
+    /// Pinned ordering (applied last):
+    /// Pinned items are hoisted to the front. Deliberately after label filtering,
+    /// so a filtered view never shows a pinned item that doesn't match the filter.
     private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
         // Exclude soft-deleted items (hidden but not yet permanently deleted, undoable via Cmd+Z)
         let softDeleted = appState.deletionManager.softDeletedIDs
@@ -115,10 +119,10 @@ struct FilteredCardListView: View {
             // Remote items: allow only if NOT image/file (those have no displayable content)
             return item.type != .image && item.type != .file
         }
-        guard !selectedLabelIDs.isEmpty else { return syncFiltered }
+        guard !selectedLabelIDs.isEmpty else { return pinnedFirst(syncFiltered) }
 
         let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
-        return syncFiltered.filter { item in
+        let labelFiltered = syncFiltered.filter { item in
             itemMatchesSelectedLabels(
                 item,
                 selectedLabelIDs: selectedLabelIDs,
@@ -126,6 +130,25 @@ struct FilteredCardListView: View {
                 knownStableIDs: knownStableIDs
             )
         }
+        return pinnedFirst(labelFiltered)
+    }
+
+    /// Hoist pinned items to the front, most-recently-pinned first, preserving the
+    /// query's timestamp order for everything else.
+    ///
+    /// Partitioning here rather than adding a `SortDescriptor` to `@Query` keeps
+    /// pinning off the predicate path, so toggling a pin never re-runs the fetch or
+    /// recreates the view. It also guarantees pins survive pagination: they sit at
+    /// the head of `filteredItems`, which `visibleItems` takes its prefix from.
+    private func pinnedFirst(_ items: [ClipboardItem]) -> [ClipboardItem] {
+        var pinned: [ClipboardItem] = []
+        var unpinned: [ClipboardItem] = []
+        for item in items {
+            if item.isPinned { pinned.append(item) } else { unpinned.append(item) }
+        }
+        guard !pinned.isEmpty else { return unpinned }
+        pinned.sort { ($0.pinnedAt ?? .distantPast) > ($1.pinnedAt ?? .distantPast) }
+        return pinned + unpinned
     }
 
     /// Static dictionary mapping NSEvent.keyCode to digit value (1-9).
@@ -316,6 +339,17 @@ struct FilteredCardListView: View {
         .onChange(of: labelFilterSignature) { _, _ in
             filteredItems = computeFilteredItems(from: items)
         }
+        .onChange(of: appState.pinRevision) { _, _ in
+            // Re-partition after a pin toggle. `items` is unchanged (the mutation was
+            // to a property of an existing model object), so only the ordering moves.
+            withAnimation(.easeInOut(duration: 0.2)) {
+                filteredItems = computeFilteredItems(from: items)
+            }
+            // The item the user pinned just jumped position; a range selection
+            // anchored to old indices no longer describes anything meaningful.
+            selectionAnchor = nil
+            selectedIndex = nil
+        }
         .onDisappear {
             if let monitor = keyMonitor {
                 NSEvent.removeMonitor(monitor)
@@ -397,6 +431,12 @@ struct FilteredCardListView: View {
     /// interruptions and focus issues, enabling reliable keyboard interaction in NSPanel contexts.
     private func installKeyboardMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // The panel deliberately stays visible behind secondary windows — see the
+            // global click monitor in PanelController, which excludes Settings/Edit —
+            // so this app-wide monitor is still installed while one of them is focused.
+            // Without this guard, arrow keys and Return typed into the snippet editor
+            // would drive the card list instead of the text, and be consumed on the way.
+            guard event.window is SlidingPanel else { return event }
             switch event.keyCode {
             case 123: // Left arrow
                 if event.modifierFlags.contains(.command) {
@@ -469,6 +509,26 @@ struct FilteredCardListView: View {
                    !event.modifierFlags.contains(.shift),
                    !event.modifierFlags.contains(.option) {
                     onFocusSearch?()
+                    return nil // consumed
+                }
+                return event
+            case 0x2D: // kVK_ANSI_N — Cmd+N authors a new snippet (matches Paste)
+                if event.modifierFlags.contains(.command),
+                   !event.modifierFlags.contains(.shift),
+                   !event.modifierFlags.contains(.option) {
+                    EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
+                    return nil // consumed
+                }
+                return event
+            case 0x0E: // kVK_ANSI_E — Cmd+E edits the selected item (matches Paste)
+                if event.modifierFlags.contains(.command),
+                   !event.modifierFlags.contains(.shift),
+                   !event.modifierFlags.contains(.option),
+                   let index = selectedIndex, index < visibleItems.count {
+                    EditItemWindow.show(
+                        for: visibleItems[index],
+                        modelContainer: modelContext.container
+                    )
                     return nil // consumed
                 }
                 return event

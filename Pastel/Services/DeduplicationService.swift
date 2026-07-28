@@ -51,12 +51,17 @@ final class DeduplicationService {
         var mergedCount = 0
 
         for (hash, group) in hashGroups where group.count > 1 {
-            // Determine the "keeper": prefer local device's item
+            // Determine the "keeper", in preference order:
+            // 1. A user-authored snippet. It carries a hand-written title the captured
+            //    duplicate does not, and dropping it would destroy real user work.
+            // 2. This device's copy.
+            // 3. The earliest, when every copy came from elsewhere.
             let keeper: ClipboardItem
-            if let localItem = group.first(where: { $0.originDeviceID == DeviceIdentifier.current }) {
+            if let authored = group.first(where: { $0.isUserCreated }) {
+                keeper = authored
+            } else if let localItem = group.first(where: { $0.originDeviceID == DeviceIdentifier.current }) {
                 keeper = localItem
             } else {
-                // Both from other devices -- keep earliest timestamp
                 keeper = group.first!
             }
 
@@ -69,6 +74,16 @@ final class DeduplicationService {
             }
             keeper.safeLabels = Array(mergedLabelIDs)
             keeper.refreshLabelKey()
+
+            // Carry across metadata the keeper lacks, so a merge never silently drops
+            // a title or a pin that only existed on the copy being deleted.
+            if keeper.title == nil, let inheritedTitle = group.compactMap(\.title).first {
+                keeper.title = inheritedTitle
+            }
+            if !keeper.isPinned, group.contains(where: \.isPinned) {
+                keeper.isPinned = true
+                keeper.pinnedAt = group.compactMap(\.pinnedAt).min() ?? .now
+            }
 
             logger.info("Dedup: merging \(group.count - 1) duplicate(s) of hash \(hash.prefix(8))...")
 

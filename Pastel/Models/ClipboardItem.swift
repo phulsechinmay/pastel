@@ -77,6 +77,26 @@ final class ClipboardItem {
     /// and lets lightweight migration add it transparently.
     var labelKey: String = ""
 
+    /// Whether the item is pinned to the top of the panel.
+    /// Pinned items sort above the time-ordered history and are exempt from
+    /// retention purge, the same way labeled items are. Default `false` keeps
+    /// the field CloudKit-compatible and lets lightweight migration add it.
+    var isPinned: Bool = false
+
+    /// When the item was pinned. Orders pinned items among themselves
+    /// (most recently pinned first). Nil whenever `isPinned` is false.
+    var pinnedAt: Date?
+
+    /// Whether the user authored this item rather than copying it.
+    /// Reserved for manual snippet creation; nothing sets it to `true` yet.
+    /// Batched into this migration so the CloudKit schema changes only once.
+    var isUserCreated: Bool = false
+
+    /// When the item's content was last edited in place. Nil = never edited.
+    /// `timestamp` deliberately keeps the original capture time so editing does
+    /// not reshuffle the history.
+    var modifiedAt: Date?
+
     /// Detected programming language (e.g., "swift", "python"). Nil = not code.
     /// Populated by CodeDetectionService in Phase 7.
     var detectedLanguage: String?
