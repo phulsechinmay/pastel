@@ -115,6 +115,32 @@ extension ClipboardItem {
 
 // MARK: - In-Place Content Editing
 
+/// Write `newText` back to `item`, along with the side effects an in-place content
+/// edit implies. Idempotent — `applyEditedText` no-ops when the text already matches.
+///
+/// A free function rather than a view method so every caller that rewrites content —
+/// the edit window, its close handler, and text transforms — runs the identical path
+/// instead of each remembering to evict caches and refresh URL metadata.
+@MainActor
+func commitEditedText(_ newText: String, to item: ClipboardItem, in modelContext: ModelContext) {
+    // Images and files have no editable text; never let an empty draft blank them.
+    guard item.type != .image, item.type != .file else { return }
+    guard let supersededHash = item.applyEditedText(newText) else { return }
+
+    saveWithLogging(modelContext, operation: "edit item content")
+
+    // Highlighted output is cached by content hash; the old entry is unreachable now.
+    Task { await HighlightCache.shared.evict(supersededHash) }
+
+    // applyEditedText discarded the stale preview — fetch the new URL's metadata.
+    // fetchMetadata honours the "fetchURLMetadata" setting itself.
+    if item.type == .url, let urlString = item.textContent {
+        let itemID = item.persistentModelID
+        let ctx = modelContext
+        Task { await URLMetadataService.fetchMetadata(for: urlString, itemID: itemID, modelContext: ctx) }
+    }
+}
+
 extension ClipboardItem {
     /// Replace the item's text content, keeping every derived field consistent.
     ///

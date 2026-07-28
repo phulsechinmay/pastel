@@ -208,6 +208,24 @@ struct ClipboardCardView: View {
                 }
             }
 
+            if let text = item.textContent, !text.isEmpty, isTransformable {
+                Divider()
+                Menu("Transform") {
+                    ForEach(TextTransform.Group.allCases, id: \.self) { group in
+                        Section(group.rawValue) {
+                            ForEach(TextTransformService.transforms(in: group)) { transform in
+                                Button(transform.name) {
+                                    applyTransform(transform, to: text)
+                                }
+                                // Disabled rather than hidden: a stable menu is easier to
+                                // learn than one whose contents shift per clip.
+                                .disabled(!transform.canApply(text))
+                            }
+                        }
+                    }
+                }
+            }
+
             Divider()
 
             Button(item.isPinned ? "Unpin" : "Pin to Top") {
@@ -277,6 +295,23 @@ struct ClipboardCardView: View {
     private func isHexVariant(_ text: String, of hex: String) -> Bool {
         let variants = ["#" + hex, hex, "#" + hex.lowercased(), hex.lowercased()]
         return variants.contains(text)
+    }
+
+    /// Images and files carry no editable text, so the Transform submenu is hidden
+    /// for them entirely rather than shown full of disabled items.
+    private var isTransformable: Bool {
+        item.type != .image && item.type != .file
+    }
+
+    /// Rewrite the clip's content with the transform's output.
+    ///
+    /// Transforms replace in place (plan decision Q3.2), so this routes through the
+    /// same `commitEditedText` the edit window uses — that keeps `contentHash`,
+    /// highlight-cache eviction, and URL-metadata refresh consistent between the two.
+    private func applyTransform(_ transform: TextTransform, to text: String) {
+        // `canApply` only screens cheaply; a transform can still fail on the real input.
+        guard let transformed = transform.apply(text), transformed != text else { return }
+        commitEditedText(transformed, to: item, in: modelContext)
     }
 
     /// Soft-delete the clipboard item: hide from display immediately with animation,

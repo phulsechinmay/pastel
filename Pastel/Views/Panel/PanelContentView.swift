@@ -20,6 +20,20 @@ struct PanelContentView: View {
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var selectedLabelIDs: Set<PersistentIdentifier> = []
+
+    /// Whether the Type/App/Date filter row is revealed. Collapsed by default so it
+    /// costs no vertical space until asked for — the panel is already tight, and the
+    /// chip bar above it grows a row whenever labels wrap.
+    @State private var showFilters = false
+    @State private var searchFilters = SearchFilters()
+    /// Source apps offered by the app filter, refreshed when the row is revealed
+    /// rather than held in a standing @Query that would duplicate the card list's fetch.
+    @State private var availableApps: [SourceAppOption] = []
+
+    /// Horizontal-mode height contributions, tracked separately because the panel takes
+    /// a single combined figure and either source can change independently.
+    @State private var chipExtraHeight: CGFloat = 0
+    @State private var filterRowHeight: CGFloat = 0
     @State private var selectedIndex: Int? = nil
     @State private var isShiftHeld = false
     @State private var flagsMonitor: Any?
@@ -70,8 +84,8 @@ struct PanelContentView: View {
                     .onGeometryChange(for: CGFloat.self) { proxy in
                         proxy.size.height
                     } action: { chipBarHeight in
-                        let extra = max(0, chipBarHeight - PanelLayout.chipHeight)
-                        panelActions.onHorizontalExtraHeightChange?(extra)
+                        chipExtraHeight = max(0, chipBarHeight - PanelLayout.chipHeight)
+                        reportHorizontalExtraHeight()
                     }
 
                     Spacer()
@@ -79,6 +93,20 @@ struct PanelContentView: View {
                     toolbarButtons
                 }
                 .padding(.bottom, PanelLayout.sectionSpacing)
+
+                if showFilters {
+                    FilterBarView(filters: $searchFilters, availableApps: availableApps)
+                        .padding(.bottom, PanelLayout.sectionSpacing)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        // A horizontal panel is a fixed height, so the filter row has to
+                        // buy its own space or it eats into the single row of cards.
+                        .onGeometryChange(for: CGFloat.self) { proxy in
+                            proxy.size.height
+                        } action: { height in
+                            filterRowHeight = height + PanelLayout.sectionSpacing
+                            reportHorizontalExtraHeight()
+                        }
+                }
             } else {
                 // Vertical mode: header on top, search and chips stacked below
                 HStack {
@@ -102,12 +130,19 @@ struct PanelContentView: View {
                     onSelectAllHistory: { selectedLabelIDs.removeAll() }
                 )
                 .padding(.bottom, PanelLayout.sectionSpacing)
+
+                if showFilters {
+                    FilterBarView(filters: $searchFilters, availableApps: availableApps)
+                        .padding(.bottom, PanelLayout.sectionSpacing)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
 
             // Filtered content area with keyboard navigation
             FilteredCardListView(
                 searchText: debouncedSearchText,
                 selectedLabelIDs: selectedLabelIDs,
+                searchFilters: searchFilters,
                 allLabels: labels,
                 selectedIndex: $selectedIndex,
                 isShiftHeld: isShiftHeld,
@@ -168,10 +203,23 @@ struct PanelContentView: View {
             // Clear search text so panel opens fresh
             searchText = ""
             debouncedSearchText = ""
+            // Type/app/date filters reset with everything else (plan decision Q4.4):
+            // a sticky filter the user forgot about looks like missing history.
+            searchFilters.removeAll()
+            showFilters = false
             // Focus card list, not search
             panelFocus = .cardList
         }
         .onChange(of: selectedLabelIDs) { _, _ in
+            panelFocus = .cardList
+        }
+        .onChange(of: showFilters) { _, isShown in
+            // The row's geometry reader stops reporting once it's gone, so give the
+            // height back explicitly or the horizontal panel stays permanently taller.
+            if !isShown {
+                filterRowHeight = 0
+                reportHorizontalExtraHeight()
+            }
             panelFocus = .cardList
         }
         .onChange(of: panelEdgeRaw) {
@@ -199,6 +247,27 @@ struct PanelContentView: View {
             }
             .modifier(AdaptiveGlassButtonStyle())
             .help("New Snippet (\u{2318}N)")
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    showFilters.toggle()
+                }
+                if showFilters {
+                    refreshAvailableApps()
+                } else {
+                    // Collapsing must clear, or a filter the user can no longer see
+                    // keeps narrowing results and reads as missing history.
+                    searchFilters.removeAll()
+                }
+            } label: {
+                Image(systemName: searchFilters.isEmpty
+                      ? "line.3.horizontal.decrease.circle"
+                      : "line.3.horizontal.decrease.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(searchFilters.isEmpty ? Color.primary : Color.accentColor)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+            .help("Filter by Type, App, or Date")
 
             Button {
                 ColorToolController.shared.showColorPicker()
@@ -249,6 +318,26 @@ struct PanelContentView: View {
     }
 
     // MARK: - Private Helpers
+
+    /// Rebuild the app filter's options from recent history.
+    ///
+    /// Run on demand when the filter row opens rather than from a standing `@Query`,
+    /// which would duplicate the card list's fetch on every panel show. Bounded to the
+    /// most recent slice — the apps a user filters by are the ones they copy from now,
+    /// and scanning an entire multi-thousand-item history for a menu isn't worth it.
+    /// Tell the panel how much taller than baseline the header has become.
+    private func reportHorizontalExtraHeight() {
+        panelActions.onHorizontalExtraHeightChange?(chipExtraHeight + filterRowHeight)
+    }
+
+    private func refreshAvailableApps() {
+        var descriptor = FetchDescriptor<ClipboardItem>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        descriptor.fetchLimit = 2000
+        let recent = (try? modelContext.fetch(descriptor)) ?? []
+        availableApps = SourceAppOption.derive(from: recent)
+    }
 
     private func pasteItem(_ item: ClipboardItem) {
         panelActions.pasteItem?(item)

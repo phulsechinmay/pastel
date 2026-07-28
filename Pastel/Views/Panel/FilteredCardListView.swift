@@ -61,6 +61,9 @@ struct FilteredCardListView: View {
     /// Selected label IDs for in-memory post-filtering (OR logic).
     private let selectedLabelIDs: Set<PersistentIdentifier>
 
+    /// Type/app/date filters, applied in memory alongside the label filter.
+    private let searchFilters: SearchFilters
+
     /// Items visible after pagination (first `displayLimit` of filteredItems).
     private var visibleItems: [ClipboardItem] {
         Array(filteredItems.prefix(displayLimit))
@@ -96,7 +99,11 @@ struct FilteredCardListView: View {
     /// - Remote image/file items excluded (no displayable content on receiving device)
     /// - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
     ///
-    /// Label filtering (applied third, OR logic):
+    /// Type/app/date filtering (applied third):
+    /// `SearchFilters` matches OR within a group and AND across groups. Skipped
+    /// entirely when no filter is active, so the common case costs one Bool check.
+    ///
+    /// Label filtering (applied fourth, OR logic):
     /// If no labels selected, returns all sync-filtered items. Otherwise checks
     /// each item's denormalized `labelKey` string for the selected labels' stable
     /// IDs — a fast column read that does NOT fault the labels relationship.
@@ -119,10 +126,19 @@ struct FilteredCardListView: View {
             // Remote items: allow only if NOT image/file (those have no displayable content)
             return item.type != .image && item.type != .file
         }
-        guard !selectedLabelIDs.isEmpty else { return pinnedFirst(syncFiltered) }
+        // Cutoff computed once for the whole pass rather than per item.
+        let attributeFiltered: [ClipboardItem]
+        if searchFilters.isEmpty {
+            attributeFiltered = syncFiltered
+        } else {
+            let cutoff = searchFilters.dateRange?.cutoff()
+            attributeFiltered = syncFiltered.filter { searchFilters.matches($0, cutoff: cutoff) }
+        }
+
+        guard !selectedLabelIDs.isEmpty else { return pinnedFirst(attributeFiltered) }
 
         let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
-        let labelFiltered = syncFiltered.filter { item in
+        let labelFiltered = attributeFiltered.filter { item in
             itemMatchesSelectedLabels(
                 item,
                 selectedLabelIDs: selectedLabelIDs,
@@ -174,6 +190,7 @@ struct FilteredCardListView: View {
     init(
         searchText: String,
         selectedLabelIDs: Set<PersistentIdentifier>,
+        searchFilters: SearchFilters = SearchFilters(),
         allLabels: [Label] = [],
         selectedIndex: Binding<Int?>,
         isShiftHeld: Bool = false,
@@ -189,6 +206,7 @@ struct FilteredCardListView: View {
     ) {
         self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
+        self.searchFilters = searchFilters
         self.showCount = showCount
 
         // Text-only predicate. Label filtering AND sync filtering are done in-memory
@@ -338,6 +356,14 @@ struct FilteredCardListView: View {
         }
         .onChange(of: labelFilterSignature) { _, _ in
             filteredItems = computeFilteredItems(from: items)
+        }
+        .onChange(of: searchFilters) { _, _ in
+            // Same in-memory path as label chips: the @Query predicate is untouched,
+            // so no refetch and no view recreation — scroll position and caches survive.
+            displayLimit = pageSize
+            filteredItems = computeFilteredItems(from: items)
+            selectedIndex = nil
+            selectionAnchor = nil
         }
         .onChange(of: appState.pinRevision) { _, _ in
             // Re-partition after a pin toggle. `items` is unchanged (the mutation was

@@ -46,6 +46,8 @@ Clipboard history is always one hotkey away, with instant paste-back into any ap
 - [x] Edit clip content — fix a clip's text in place (Cmd+E), retention-safe
 - [x] Pin to top — per-item pinning, sorts above history, exempt from retention
 - [x] Manual snippets — author a clip without copying (Cmd+N), born pinned
+- [x] Text transforms — 15 built-in transforms via card context menu, replace in place
+- [x] Search filters — type / source app / date range, behind a panel toolbar disclosure
 
 ### Active
 
