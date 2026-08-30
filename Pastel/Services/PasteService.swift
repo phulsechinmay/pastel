@@ -494,20 +494,50 @@ final class PasteService {
 
     // MARK: - CGEvent Paste Simulation
 
-    /// Simulate Cmd+V keystroke via CGEvent.
+    /// Modifiers that turn a posted ⌘V into some other command in the target app.
     ///
-    /// Uses virtual key code 0x09 (kVK_ANSI_V) which is layout-independent.
-    /// Posts to `.cgSessionEventTap` to reach the frontmost app.
-    /// Returns `true` when both keyDown and keyUp events were created and posted,
-    /// `false` when the event source or events could not be created (permission issue).
+    /// Command is absent deliberately: it is the one we want. Caps Lock is absent
+    /// because ⌘V with Caps Lock on is still Paste.
+    private static let contaminatingModifiers: CGEventFlags = [
+        .maskShift, .maskAlternate, .maskControl, .maskSecondaryFn
+    ]
+
+    /// Simulate a ⌘V keystroke via CGEvent.
+    ///
+    /// Posts to `.cgSessionEventTap` to reach the frontmost app. Returns `true` when
+    /// both keyDown and keyUp were created and posted, `false` when the event source
+    /// or the events could not be created (permission issue).
+    ///
     /// Private now that the Settings bulk-paste path no longer hand-rolls its own
     /// sequence around it. Every paste goes through `performPaste`, which is the only
     /// place that knows a post is safe to make.
     @discardableResult
     private static func simulatePaste() -> Bool {
-        guard let source = CGEventSource(stateID: .combinedSessionState) else {
+        // Two of Pastel's own bindings paste while the user is deliberately holding
+        // Shift: ⇧+Return and ⌘⇧+digit, both bound to paste-as-plain-text. Events from
+        // `.combinedSessionState` are merged with the live hardware modifier state, so
+        // those posts arrive as ⌘⇧V. In apps where that means Paste and Match Style the
+        // outcome happens to match; in Terminal.app it is Paste Escaped Text, in iTerm2
+        // paste-slowly, and in VS Code something else again.
+        //
+        // Note this is not fixable by waiting for the modifiers to clear. The user is
+        // still holding Shift on purpose; the release never comes.
+        //
+        // `.privateState` carries its own modifier state, which starts empty, so the
+        // event says exactly what we set. It is used *only* when a contaminating
+        // modifier is actually down: the common paste paths keep the
+        // `.combinedSessionState` source that ships today and is validated at App
+        // Store scale, so this change cannot regress a path that currently works.
+        let liveFlags = CGEventSource.flagsState(.combinedSessionState)
+        let contaminated = !liveFlags.intersection(contaminatingModifiers).isEmpty
+        let stateID: CGEventSourceStateID = contaminated ? .privateState : .combinedSessionState
+
+        guard let source = CGEventSource(stateID: stateID) else {
             pasteLog("[PASTE] simulatePaste: CGEventSource(stateID:) returned nil")
             return false
+        }
+        if contaminated {
+            pasteLog("[PASTE] held modifiers detected (\(liveFlags.rawValue)) — posting from a private-state source")
         }
 
         // Permit *all* local events during the suppression interval that follows a post.
