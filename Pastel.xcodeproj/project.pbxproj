@@ -20,6 +20,7 @@
 		1FF817C58BBCAC1F6A6DA2DD /* AsyncThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D50320FC5B6099D7C6B668 /* AsyncThumbnailView.swift */; };
 		2103A21B8C8E7C2FCD20019E /* RetentionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA2DA3D25FB59CE37228411 /* RetentionService.swift */; };
 		26618B6C3F1BE440C2AC796F /* ThumbnailLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B95B96E88D3DBC7E6F3661B4 /* ThumbnailLoader.swift */; };
+		30CC8A8A67351D76AB49A125 /* KeyboardLayoutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F863B6E25E754B5F5279A663 /* KeyboardLayoutService.swift */; };
 		311D38AA5AD215646217479E /* DeviceIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34B531FE14E94C513D7A73D /* DeviceIdentifier.swift */; };
 		3442E2E6EDB5B2E9A747C631 /* EditItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6802DF0A84D98A037B3BC192 /* EditItemView.swift */; };
 		35B2B78C88F753B2D19BB929 /* PanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7A89B1626914331B041874D /* PanelController.swift */; };
@@ -177,6 +178,7 @@
 		ED84180D08969FF0AFA614DF /* DeletionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeletionManager.swift; sourceTree = "<group>"; };
 		F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		F774B6CD032B1A682BACC9D7 /* ColorCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorCardView.swift; sourceTree = "<group>"; };
+		F863B6E25E754B5F5279A663 /* KeyboardLayoutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardLayoutService.swift; sourceTree = "<group>"; };
 		FA88123A30157392A4055111 /* SyncMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -303,6 +305,7 @@
 				5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */,
 				C04A5F38AA6B90C3CB6FCF12 /* ImageStorageService.swift */,
 				3C57B64B0B047D80C2F7D4B3 /* ImportExportService.swift */,
+				F863B6E25E754B5F5279A663 /* KeyboardLayoutService.swift */,
 				4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */,
 				ADA2DA3D25FB59CE37228411 /* RetentionService.swift */,
 				B8EDC77C4CCB143B62248B29 /* SwiftDataHelpers.swift */,
@@ -544,6 +547,7 @@
 				E3F3D39A08C097762B26869F /* ImageViewerView.swift in Sources */,
 				3AED169433F86C8E70EB00B7 /* ImportExportService.swift in Sources */,
 				D6DBC62B5BFAA514DE489339 /* ImportSheetView.swift in Sources */,
+				30CC8A8A67351D76AB49A125 /* KeyboardLayoutService.swift in Sources */,
 				B5985155933EAAF6A59D0F45 /* Label.swift in Sources */,
 				56831EBF806DA04E646ED2E7 /* LabelChipView.swift in Sources */,
 				0718766F684C890B0D3CC008 /* LabelColor.swift in Sources */,

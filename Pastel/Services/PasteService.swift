@@ -551,7 +551,9 @@ final class PasteService {
             state: .eventSuppressionStateSuppressionInterval
         )
 
-        let vKeyCode: CGKeyCode = 0x09 // kVK_ANSI_V
+        // Resolved from the active layout, not hardcoded to the ANSI V *position*.
+        // See `KeyboardLayoutService`.
+        let vKeyCode = KeyboardLayoutService.pasteKeyCode
 
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false) else {

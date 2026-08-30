@@ -449,6 +449,22 @@ struct FilteredCardListView: View {
             // Without this guard, arrow keys and Return typed into the snippet editor
             // would drive the card list instead of the text, and be consumed on the way.
             guard event.window is SlidingPanel else { return event }
+
+            // ⌘-letter shortcuts dispatch on the character the key actually produces,
+            // not on where it sits. Virtual key codes name positions: 0x08 is C's
+            // position on ANSI, but on Dvorak that key produces "J", so a keycode
+            // switch means ⌘C does not copy and ⌘F does not focus the search field.
+            // `charactersIgnoringModifiers` already reports QWERTY letters under
+            // "Dvorak - QWERTY ⌘", which is what that layout exists to do.
+            //
+            // The switch below stays keycode-based, correctly: arrows, Return and
+            // Delete carry no letter and sit in the same place on every layout.
+            if event.modifierFlags.contains(.command),
+               let letter = event.charactersIgnoringModifiers?.lowercased(),
+               handleCommandLetter(letter, modifiers: event.modifierFlags) {
+                return nil // consumed
+            }
+
             switch event.keyCode {
             case 123: // Left arrow
                 if event.modifierFlags.contains(.command) {
@@ -498,52 +514,6 @@ struct FilteredCardListView: View {
                     return nil // consumed
                 }
                 return event // no valid selection, pass through
-            case 0x08: // kVK_ANSI_C — Cmd+C copies the current selection (1 or many)
-                if event.modifierFlags.contains(.command),
-                   !event.modifierFlags.contains(.option) {
-                    let selected = selectedItems
-                    guard !selected.isEmpty else { return event } // let search-field copy through
-                    pasteLog("[PASTE] origin=Cmd+C count=\(selected.count)")
-                    onCopy(selected)
-                    return nil // consumed
-                }
-                return event
-            case 0x06: // kVK_ANSI_Z — Cmd+Z undo last deletion
-                if event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.shift) {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        appState.deletionManager.undo(in: modelContext)
-                    }
-                    return nil // consumed
-                }
-                return event
-            case 0x03: // kVK_ANSI_F — Cmd+F focuses the search field
-                if event.modifierFlags.contains(.command),
-                   !event.modifierFlags.contains(.shift),
-                   !event.modifierFlags.contains(.option) {
-                    onFocusSearch?()
-                    return nil // consumed
-                }
-                return event
-            case 0x2D: // kVK_ANSI_N — Cmd+N authors a new snippet (matches Paste)
-                if event.modifierFlags.contains(.command),
-                   !event.modifierFlags.contains(.shift),
-                   !event.modifierFlags.contains(.option) {
-                    EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
-                    return nil // consumed
-                }
-                return event
-            case 0x0E: // kVK_ANSI_E — Cmd+E edits the selected item (matches Paste)
-                if event.modifierFlags.contains(.command),
-                   !event.modifierFlags.contains(.shift),
-                   !event.modifierFlags.contains(.option),
-                   let index = selectedIndex, index < visibleItems.count {
-                    EditItemWindow.show(
-                        for: visibleItems[index],
-                        modelContainer: modelContext.container
-                    )
-                    return nil // consumed
-                }
-                return event
             case 0x33: // kVK_Delete (Backspace) — Cmd+Delete soft-deletes selected item
                 if event.modifierFlags.contains(.command) {
                     if let index = selectedIndex, index < visibleItems.count {
@@ -585,6 +555,55 @@ struct FilteredCardListView: View {
                 }
                 return event // pass through all other keys
             }
+        }
+    }
+
+    /// Handle the panel's ⌘-letter shortcuts.
+    ///
+    /// - Parameters:
+    ///   - letter: `charactersIgnoringModifiers`, lowercased.
+    ///   - modifiers: the event's modifier flags; Command is already known to be held.
+    /// - Returns: `true` if the event was consumed. `false` falls through to the
+    ///   keycode switch and, failing that, to the app — which is how ⌘C reaches the
+    ///   search field when no cards are selected.
+    private func handleCommandLetter(_ letter: String, modifiers: NSEvent.ModifierFlags) -> Bool {
+        switch letter {
+        case "c": // Copy the current selection (1 or many)
+            guard !modifiers.contains(.option) else { return false }
+            let selected = selectedItems
+            guard !selected.isEmpty else { return false } // let search-field copy through
+            pasteLog("[PASTE] origin=Cmd+C count=\(selected.count)")
+            onCopy(selected)
+            return true
+
+        case "z": // Undo last deletion
+            guard !modifiers.contains(.shift) else { return false }
+            withAnimation(.easeOut(duration: 0.2)) {
+                appState.deletionManager.undo(in: modelContext)
+            }
+            return true
+
+        case "f": // Focus the search field
+            guard !modifiers.contains(.shift), !modifiers.contains(.option) else { return false }
+            onFocusSearch?()
+            return true
+
+        case "n": // Author a new snippet (matches Paste)
+            guard !modifiers.contains(.shift), !modifiers.contains(.option) else { return false }
+            EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
+            return true
+
+        case "e": // Edit the selected item (matches Paste)
+            guard !modifiers.contains(.shift), !modifiers.contains(.option),
+                  let index = selectedIndex, index < visibleItems.count else { return false }
+            EditItemWindow.show(
+                for: visibleItems[index],
+                modelContainer: modelContext.container
+            )
+            return true
+
+        default:
+            return false
         }
     }
 
