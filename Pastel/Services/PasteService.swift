@@ -97,17 +97,17 @@ final class PasteService {
         case .panel(let panelController):
             return Dismissal(
                 finishWithoutPosting: { panelController.hide() },
-                beforePosting: { post in
-                    panelController.hide()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { post() }
-                }
+                beforePosting: { post in panelController.hideForPaste(completion: post) }
             )
         case .settings:
             return Dismissal(
                 finishWithoutPosting: {},
                 beforePosting: { post in
+                    // Settings is a normal window and its `orderOut` is synchronous,
+                    // but AppKit hands key status to the next window on the following
+                    // turn of the run loop — post after that, not inside it.
                     SettingsWindowController.shared.hide()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { post() }
+                    DispatchQueue.main.async { post() }
                 }
             )
         }

@@ -53,6 +53,20 @@ final class PanelController {
     private var modelContainer: ModelContainer?
     private var appState: AppState?
 
+    /// True from the moment a hide starts until the panel is actually ordered out.
+    ///
+    /// `panel.isVisible` is *not* a substitute: during the slide-out it is still
+    /// `true`, because `orderOut` only runs in the animation's completion handler.
+    /// Four independent triggers can fire inside that window — drag-end,
+    /// click-outside, Escape, screen change — and without this a second `hide()`
+    /// starts a second animation and runs the completions a second time, which
+    /// means a doubled ⌘V and a doubled `commitPendingDeletion`.
+    private var isHiding = false
+
+    /// Completions waiting on the in-flight hide. Taken and cleared before being
+    /// invoked so each runs exactly once, even if one of them calls back into `hide`.
+    private var pendingHideCompletions: [() -> Void] = []
+
     /// Extra height (points) added to a horizontal panel for wrapped chip rows.
     /// Persists across show/hide so a reopen renders at the right height with no
     /// grow animation. Always 0 for vertical edges.
@@ -241,13 +255,38 @@ final class PanelController {
     ///
     /// Because the panel never activated Pastel, focus is already with whichever
     /// app the user was using before; nothing needs to be re-activated on dismiss.
-    func hide() {
-        guard let panel, panel.isVisible else { return }
+    ///
+    /// - Parameters:
+    ///   - animated: `false` skips the slide-out and orders the panel out immediately.
+    ///     Paste uses this: the animation is 100ms of latency in front of a keystroke.
+    ///   - completion: Run once the panel is off-screen and its monitors are gone.
+    func hide(animated: Bool = true, completion: (() -> Void)? = nil) {
+        guard let panel, panel.isVisible else {
+            // Nothing to hide, but a caller may be waiting on this to post ⌘V —
+            // Settings pastes arrive here with the panel already down. Deliberately
+            // no `removeEventMonitors()`: this path legitimately has none installed,
+            // and calling it would clear `isDragging` out from under a live drag.
+            completion?()
+            return
+        }
+
+        if let completion { pendingHideCompletions.append(completion) }
+
+        // Already sliding out: chain onto it rather than starting a second animation.
+        guard !isHiding else { return }
+        isHiding = true
 
         // Commit any pending soft-deletion before hiding the panel.
         // This permanently deletes the item, clearing the undo buffer.
         if let modelContext = appState?.modelContainer?.mainContext {
             appState?.deletionManager.commitPendingDeletion(in: modelContext)
+        }
+
+        guard animated else {
+            panel.orderOut(nil)
+            finishHide()
+            logger.info("Panel hidden (immediate)")
+            return
         }
 
         let edge = currentEdge
@@ -272,11 +311,77 @@ final class PanelController {
         } completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 panel.orderOut(nil)
-                self?.removeEventMonitors()
+                self?.finishHide()
             }
         }
 
         logger.info("Panel hidden from \(edge.rawValue) edge")
+    }
+
+    /// Tear down after the panel is off-screen, and run whatever was waiting on it.
+    ///
+    /// The `orderOut` / `removeEventMonitors` pairing is not optional: skip the
+    /// removal and every monitor leaks, then doubles on the next `show()`. Two global
+    /// click monitors means two `hide()` calls per outside click — which, now that
+    /// hide carries completions, would be two ⌘V posts.
+    private func finishHide() {
+        isHiding = false
+        removeEventMonitors()
+
+        let completions = pendingHideCompletions
+        pendingHideCompletions = []
+        for completion in completions { completion() }
+    }
+
+    /// Hide the panel and call `completion` once it can no longer swallow a keystroke.
+    ///
+    /// The panel is non-activating, so the user's app never lost focus — but the panel
+    /// *is* the key window while visible (`SlidingPanel.canBecomeKey`), and a ⌘V posted
+    /// while it still is gets eaten by the panel rather than reaching the target app.
+    ///
+    /// This used to be a flat 250ms wait, commented as covering "panel hide animation +
+    /// previous app re-activation". There is no re-activation — commit `d5d1e40` made
+    /// the panel non-activating — so the delay was a guess at one event: the panel
+    /// giving up key status. Waiting for `didResignKey` instead makes the paste both
+    /// faster and correct, and the timeout below is a backstop rather than the
+    /// mechanism. The `[PASTE]` log line says which one actually fired.
+    func hideForPaste(completion: @escaping () -> Void) {
+        guard let panel, panel.isVisible else {
+            completion()
+            return
+        }
+
+        var hasFired = false
+        var observer: NSObjectProtocol?
+        var backstop: DispatchWorkItem?
+
+        func fire(_ reason: String) {
+            guard !hasFired else { return }
+            hasFired = true
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            backstop?.cancel()
+            pasteLog("[PASTE] panel released key (\(reason)) — posting now")
+            completion()
+        }
+
+        // Installed before `hide` so a synchronous resign inside `orderOut` is caught.
+        observer = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: panel,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { fire("didResignKey") }
+        }
+
+        let work = DispatchWorkItem { MainActor.assumeIsolated { fire("backstop") } }
+        backstop = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+
+        hide(animated: false)
+
+        // If the panel was never key, or resigned without a notification we saw,
+        // this catches it rather than making the paste wait out the backstop.
+        if !panel.isKeyWindow { fire("already resigned") }
     }
 
     /// Grow/shrink a horizontal panel to fit wrapped chip rows (top/bottom edges only).
@@ -327,11 +432,15 @@ final class PanelController {
         if wasVisible {
             // Quick hide without animation
             panel?.orderOut(nil)
-            removeEventMonitors()
         }
         panel = nil
         let newEdge = currentEdge
         logger.info("Panel edge changed to \(newEdge.rawValue), panel will recreate on next toggle")
+
+        // Flush anything waiting on an in-flight hide *before* toggling. A queued
+        // paste that ran after `toggle()` would post ⌘V into the fresh key panel it
+        // just created — the exact failure the completion exists to prevent.
+        finishHide()
 
         if wasVisible || reopen {
             toggle()
