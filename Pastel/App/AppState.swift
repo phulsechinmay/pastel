@@ -257,47 +257,77 @@ final class AppState {
         }
     }
 
+    // MARK: - Paste relays
+    //
+    // Every relay takes an `origin`, defaulting to the panel. Settings paste actions
+    // must pass `.settings`: the Settings window is a normal activating window, so a
+    // ⌘V posted while it is up lands in Settings itself rather than in the app the
+    // user is aiming at.
+
     /// Paste a clipboard item into the frontmost app.
     ///
-    /// Delegates to PasteService which handles: accessibility check, pasteboard write,
-    /// self-paste loop prevention, panel hide, and CGEvent Cmd+V simulation.
-    func paste(item: ClipboardItem) {
+    /// Delegates to PasteService which handles: pasteboard write, capture suppression,
+    /// permission and secure-input checks, dismissal, and CGEvent Cmd+V simulation.
+    func paste(item: ClipboardItem, from origin: PasteService.PasteOrigin? = nil) {
         guard let clipboardMonitor else {
             pasteLog("[PASTE] AppState.paste: no clipboardMonitor, dropping")
             return
         }
         pasteLog("[PASTE] AppState.paste relaying to PasteService")
-        pasteService.paste(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController, source: "AppState.paste")
+        pasteService.paste(
+            item: item,
+            clipboardMonitor: clipboardMonitor,
+            from: origin ?? .panel(panelController),
+            source: "AppState.paste"
+        )
     }
 
     /// Paste a clipboard item as plain text (RTF stripped) into the frontmost app.
     ///
     /// Delegates to PasteService.pastePlainText which omits RTF data from the pasteboard,
     /// causing receiving apps to fall back to their default text styling.
-    func pastePlainText(item: ClipboardItem) {
+    func pastePlainText(item: ClipboardItem, from origin: PasteService.PasteOrigin? = nil) {
         guard let clipboardMonitor else {
             pasteLog("[PASTE] AppState.pastePlainText: no clipboardMonitor, dropping")
             return
         }
         pasteLog("[PASTE] AppState.pastePlainText relaying to PasteService")
-        pasteService.pastePlainText(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController, source: "AppState.pastePlainText")
+        pasteService.pastePlainText(
+            item: item,
+            clipboardMonitor: clipboardMonitor,
+            from: origin ?? .panel(panelController),
+            source: "AppState.pastePlainText"
+        )
     }
 
     /// Copy a clipboard item to the pasteboard without simulating Cmd+V.
-    func copyOnly(item: ClipboardItem) {
+    func copyOnly(item: ClipboardItem, from origin: PasteService.PasteOrigin? = nil) {
         guard let clipboardMonitor else { return }
-        pasteService.copyOnly(item: item, clipboardMonitor: clipboardMonitor, panelController: panelController)
+        pasteService.copyOnly(
+            item: item,
+            clipboardMonitor: clipboardMonitor,
+            from: origin ?? .panel(panelController)
+        )
     }
 
     /// Copy a selection of one or more items to the pasteboard (no Cmd+V simulation).
-    func copyItems(_ items: [ClipboardItem]) {
+    func copyItems(_ items: [ClipboardItem], from origin: PasteService.PasteOrigin? = nil) {
         guard let clipboardMonitor else { return }
-        pasteService.copyOnly(items: items, clipboardMonitor: clipboardMonitor, panelController: panelController)
+        pasteService.copyOnly(
+            items: items,
+            clipboardMonitor: clipboardMonitor,
+            from: origin ?? .panel(panelController)
+        )
     }
 
     /// Paste a selection of one or more items into the frontmost app.
-    func pasteItems(_ items: [ClipboardItem]) {
+    func pasteItems(_ items: [ClipboardItem], from origin: PasteService.PasteOrigin? = nil) {
         guard let clipboardMonitor else { return }
-        pasteService.paste(items: items, clipboardMonitor: clipboardMonitor, panelController: panelController, source: "AppState.pasteItems")
+        pasteService.paste(
+            items: items,
+            clipboardMonitor: clipboardMonitor,
+            from: origin ?? .panel(panelController),
+            source: "AppState.pasteItems"
+        )
     }
 }

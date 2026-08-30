@@ -88,4 +88,21 @@ final class SettingsWindowController {
         NSApp.activate(ignoringOtherApps: true)
         self.window = window
     }
+
+    /// Order the Settings window out, if it is up.
+    ///
+    /// Paste-back needs this. Unlike the panel, Settings is a normal activating
+    /// window, so while it is key a posted ⌘V lands *in Settings* rather than in the
+    /// app the user is aiming at. The user reopens from the menu bar.
+    ///
+    /// Asking the controller for its own window replaces a `NSApp.windows.first { $0.title == … }`
+    /// scan, which broke on any title change and silently matched nothing.
+    ///
+    /// - Returns: `true` if a visible window was ordered out.
+    @discardableResult
+    func hide() -> Bool {
+        guard let window, window.isVisible else { return false }
+        window.orderOut(nil)
+        return true
+    }
 }

@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import AppKit
 
 /// Root view for the History tab in Settings.
 ///
@@ -143,62 +142,40 @@ struct HistoryBrowserView: View {
 
     // MARK: - Bulk Actions
 
-    /// Concatenate text content of selected items with newlines and copy to pasteboard.
-    /// Non-text items (images, files) are silently skipped.
+    /// The items currently selected, in the grid's own order.
+    private var selection: [ClipboardItem] {
+        resolvedItems.filter { selectedIDs.contains($0.persistentModelID) }
+    }
+
+    /// Copy the selection to the pasteboard. Non-text items (images, files) are skipped.
     private func bulkCopy() {
-        let selected = resolvedItems.filter { selectedIDs.contains($0.persistentModelID) }
-        let textParts = selected.compactMap { item -> String? in
-            switch item.type {
-            case .text, .richText, .url, .code, .color:
-                return item.textContent
-            case .image, .file:
-                return nil
-            }
-        }
-        guard !textParts.isEmpty else { return }
-
-        // Drain before writing: a copy the user made in the last ~600ms may not have
-        // been polled yet, and overwriting it without draining loses it for good.
-        appState.clipboardMonitor?.drainPendingChange()
-
-        let concatenated = textParts.joined(separator: "\n")
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(concatenated, forType: .string)
-
-        // Self-paste loop prevention: suppress exactly our own write, not "the next
-        // change", which would eat a copy the user makes before the next poll.
-        appState.clipboardMonitor?.suppressChange(count: pasteboard.changeCount)
+        appState.copyItems(selection, from: .settings)
     }
 
-    /// Copy concatenated text to pasteboard, hide settings window, and simulate Cmd+V.
-    /// Falls back to copy-only if Accessibility permission is not granted.
+    /// Copy the selection, order the Settings window out, and simulate Cmd+V.
+    ///
+    /// This used to hand-roll the whole sequence: its own pasteboard write, its own
+    /// suppression flag, a silent permission bail with no prompt, no secure-input
+    /// check at all, a `title == "Pastel Settings"` window scan, and a fifth magic
+    /// delay. Routing it through `PasteService` means it gains all the guards the
+    /// panel paths already had, and there is one sequence left to fix instead of four.
     private func bulkPaste() {
-        bulkCopy()
-
-        // Check Accessibility before simulating Cmd+V
-        guard AccessibilityService.isGranted else { return }
-
-        // Hide the settings window instantly (user can reopen from menu bar)
-        if let settingsWindow = NSApp.windows.first(where: { $0.title == "Pastel Settings" }) {
-            settingsWindow.orderOut(nil)
-        }
-
-        // Simulate Cmd+V after delay (350ms > panel hide; settings window uses orderOut for instant hide)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            PasteService.simulatePaste()
-        }
+        appState.pasteItems(selection, from: .settings)
     }
 
-    /// Paste a single item as plain text via AppState (same flow as panel paste-as-plain-text).
+    /// Paste a single item as plain text (same flow as panel paste-as-plain-text).
+    ///
+    /// `.settings` is load-bearing: without it the panel is asked to hide (it is not
+    /// visible, so nothing happens) and ⌘V is posted while Settings still holds
+    /// keyboard focus — pasting into Pastel's own window.
     private func singlePastePlainText(_ item: ClipboardItem) {
-        appState.pastePlainText(item: item)
+        appState.pastePlainText(item: item, from: .settings)
     }
 
     /// Delete selected items with full cleanup: disk images, label relationships, and model deletion.
     /// Clears selection after deletion.
     private func bulkDelete() {
-        let itemsToDelete = resolvedItems.filter { selectedIDs.contains($0.persistentModelID) }
+        let itemsToDelete = selection
         for item in itemsToDelete {
             deleteClipboardItemWithCleanup(item, from: modelContext)
         }
