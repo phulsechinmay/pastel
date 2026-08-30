@@ -104,7 +104,10 @@ enum PanelLayout {
     static let cardURLBannerHeight: CGFloat = 106
     static let cardURLBannerCornerRadius: CGFloat = 6
     /// Favicon that stands in for a banner when the site's og:image is favicon-sized.
+    /// Centred inside a full-height `cardURLBannerHeight` slot rather than shrinking
+    /// the slot to fit, so the text below it lands where a banner card's text does.
     static let cardURLSmallImageSize: CGFloat = 64
+    static let cardURLSmallImageCornerRadius: CGFloat = 8
     /// Leading glyph (favicon or globe) on a URL card's metadata rows.
     static let urlGlyphSize: CGFloat = 16
     /// Gap between that glyph and the text beside it. The URL line is inset by glyph

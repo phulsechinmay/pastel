@@ -102,35 +102,23 @@ struct URLCardView: View {
     private var enrichedState: some View {
         VStack(alignment: .leading, spacing: 6) {
             if hasBannerSizedImage, let bannerImage {
-                Image(nsImage: bannerImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: PanelLayout.cardURLBannerHeight,
-                        maxHeight: PanelLayout.cardURLBannerHeight
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardURLBannerCornerRadius))
-                    .transition(.opacity)
-            } else if bannerImage != nil || faviconImage != nil {
-                // Small og:image or favicon only — show centered at natural size
-                let displayImage = faviconImage ?? bannerImage
-                if let displayImage {
-                    HStack {
-                        Spacer()
-                        Image(nsImage: displayImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(
-                                maxWidth: PanelLayout.cardURLSmallImageSize,
-                                maxHeight: PanelLayout.cardURLSmallImageSize
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .transition(.opacity)
+                imageSlot {
+                    Image(nsImage: bannerImage)
+                        .resizable()
+                        .scaledToFill()
+                }
+            } else if let smallImage = faviconImage ?? bannerImage {
+                // The site gave us a favicon or a favicon-sized og:image. Centre it at
+                // its natural size rather than scaling it up into mush.
+                imageSlot {
+                    Image(nsImage: smallImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(
+                            maxWidth: PanelLayout.cardURLSmallImageSize,
+                            maxHeight: PanelLayout.cardURLSmallImageSize
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardURLSmallImageCornerRadius))
                 }
             }
 
@@ -138,6 +126,32 @@ struct URLCardView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .transition(.opacity)
+    }
+
+    /// Fixed-height slot for whatever image the site handed back, with its content
+    /// centred on both axes.
+    ///
+    /// Both image branches go through here, which is the whole point. A site that
+    /// returns a proper og:image and a site that returns only a 64pt favicon now
+    /// produce cards whose title, URL, and footer sit at the same heights. Before
+    /// this the small-image branch measured 80pt against the banner's 106, so its
+    /// text floated up and the ⌘1-9 badges lost their shared baseline down the list,
+    /// which is exactly the alignment those badges are scanned by.
+    ///
+    /// The recessed well is only ever visible in the small-image case: a full banner
+    /// covers it completely. That is why the background lives on the slot rather than
+    /// on the branch, and it is what keeps a lone favicon reading as "this is all the
+    /// site gave us" instead of as a layout that failed to fill itself.
+    private func imageSlot<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        PanelStyle.surfaceRecessed
+            .frame(
+                maxWidth: .infinity,
+                minHeight: PanelLayout.cardURLBannerHeight,
+                maxHeight: PanelLayout.cardURLBannerHeight
+            )
+            .overlay { content() }
+            .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardURLBannerCornerRadius))
+            .transition(.opacity)
     }
 
     /// Favicon/globe + page title, with the URL on a second line beneath it.
