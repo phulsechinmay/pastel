@@ -10,15 +10,14 @@ import OSLog
 /// **Paste / Copy + Paste mode:**
 /// 1. Check Accessibility permission (required for CGEvent)
 /// 2. Check secure input (fall back to copy-only if active)
-/// 3. Write item content to NSPasteboard.general
-/// 4. Set skipNextChange on ClipboardMonitor (self-paste loop prevention)
-/// 5. Hide the panel
-/// 6. After 50ms delay, simulate Cmd+V via CGEvent
+/// 3. Write item content to NSPasteboard.general via `writeSuppressed`
+///    (drains any pending capture, then suppresses our own changeCount)
+/// 4. Hide the panel
+/// 5. After a delay, simulate Cmd+V via CGEvent
 ///
 /// **Copy mode:**
-/// 1. Write item content to NSPasteboard.general
-/// 2. Set skipNextChange on ClipboardMonitor (self-paste loop prevention)
-/// 3. Hide the panel
+/// 1. Write item content to NSPasteboard.general via `writeSuppressed`
+/// 2. Hide the panel
 ///
 /// Handles all 5 content types: text, richText, url, image, file.
 /// Static helper logger so call sites in other files (and the static methods here)
@@ -45,7 +44,7 @@ final class PasteService {
     ///
     /// - Parameters:
     ///   - item: The clipboard item to paste.
-    ///   - clipboardMonitor: The monitor whose skipNextChange flag will be set.
+    ///   - clipboardMonitor: The monitor to drain before, and suppress after, the write.
     ///   - panelController: The panel to hide before simulating paste.
     ///   - source: Free-form tag identifying which UI path triggered the paste (for logging).
     func paste(
@@ -62,8 +61,7 @@ final class PasteService {
         // Copy-only mode: write to pasteboard and hide panel (no accessibility or CGEvent needed)
         if behavior == .copy {
             pasteLog("[PASTE] behavior=copy -> write-only, no CGEvent")
-            writeToPasteboard(item: item)
-            clipboardMonitor.skipNextChange = true
+            writeSuppressed(clipboardMonitor) { writeToPasteboard(item: item) }
             panelController.hide()
             logger.info("Copy-only mode -- wrote to pasteboard, skipping Cmd+V simulation")
             return
@@ -79,8 +77,7 @@ final class PasteService {
         guard granted else {
             pasteLog("[PASTE] PERMISSION DENIED — copying to clipboard and showing permission prompt (source=\(source))")
             AccessibilityService.notePasteDeniedDueToPermission()
-            writeToPasteboard(item: item)
-            clipboardMonitor.skipNextChange = true
+            writeSuppressed(clipboardMonitor) { writeToPasteboard(item: item) }
             panelController.hide()
             logger.info("Accessibility not granted -- copied to clipboard, showing permission prompt")
             onAccessibilityRequired?()
@@ -91,8 +88,7 @@ final class PasteService {
         if IsSecureEventInputEnabled() {
             pasteLog("[PASTE] BLOCKED: secure event input is active — copying only, user must Cmd+V manually")
             logger.warning("Secure input is active -- writing to pasteboard only (user must Cmd+V manually)")
-            writeToPasteboard(item: item)
-            clipboardMonitor.skipNextChange = true
+            writeSuppressed(clipboardMonitor) { writeToPasteboard(item: item) }
             panelController.hide()
             Self.showFailureAlert(
                 title: "Paste Blocked by Secure Input",
@@ -104,19 +100,16 @@ final class PasteService {
         // 3. Write item content to pasteboard. If the item resolves to nothing the
         //    pasteboard still holds whatever the user copied last — posting ⌘V here
         //    would paste that instead, so bail rather than paste something unasked for.
-        guard writeToPasteboard(item: item) else {
+        guard writeSuppressed(clipboardMonitor, { writeToPasteboard(item: item) }) else {
             panelController.hide()
             return
         }
 
-        // 4. Signal monitor to skip the next change (self-paste loop prevention)
-        clipboardMonitor.skipNextChange = true
-
-        // 5. Hide panel
+        // 4. Hide panel
         panelController.hide()
         pasteLog("[PASTE] panel.hide() called, scheduling CGEvent Cmd+V in 250ms (source=\(source))")
 
-        // 6. Simulate Cmd+V after 250ms delay (must exceed panel hide animation + previous app re-activation)
+        // 5. Simulate Cmd+V after 250ms delay (must exceed panel hide animation + previous app re-activation)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             let frontmost = NSWorkspace.shared.frontmostApplication
             pasteLog("[PASTE] CGEvent firing now. frontmostApp=\(frontmost?.localizedName ?? "nil") bundle=\(frontmost?.bundleIdentifier ?? "nil") pid=\(frontmost?.processIdentifier ?? -1)")
@@ -143,8 +136,7 @@ final class PasteService {
         panelController: PanelController
     ) {
         pasteLog("[PASTE] copyOnly() entry itemType=\(item.type.rawValue)")
-        writeToPasteboard(item: item)
-        clipboardMonitor.skipNextChange = true
+        writeSuppressed(clipboardMonitor) { writeToPasteboard(item: item) }
         panelController.hide()
         logger.info("Copy-only (explicit) -- wrote \(item.type.rawValue) to pasteboard")
     }
@@ -166,8 +158,7 @@ final class PasteService {
             return
         }
         pasteLog("[PASTE] copyOnly(items) entry count=\(items.count)")
-        let wrote = writeConcatenatedText(items: items)
-        clipboardMonitor.skipNextChange = true
+        let wrote = writeSuppressed(clipboardMonitor) { writeConcatenatedText(items: items) }
         panelController.hide()
         logger.info("Copy-only (multi) -- wrote \(items.count) items (\(wrote ? "text" : "nothing copyable"))")
     }
@@ -194,11 +185,10 @@ final class PasteService {
         pasteLog("[PASTE] paste(items) entry count=\(items.count) behavior=\(behavior.rawValue) source=\(source)")
 
         // Nothing copyable (e.g. only images/files selected): hide and bail.
-        guard writeConcatenatedText(items: items) else {
+        guard writeSuppressed(clipboardMonitor, { writeConcatenatedText(items: items) }) else {
             panelController.hide()
             return
         }
-        clipboardMonitor.skipNextChange = true
 
         if behavior == .copy {
             pasteLog("[PASTE] (items) behavior=copy -> write-only, no CGEvent")
@@ -271,8 +261,7 @@ final class PasteService {
 
         if behavior == .copy {
             pasteLog("[PASTE] behavior=copy (plain) -> write-only, no CGEvent")
-            writeToPasteboardPlainText(item: item)
-            clipboardMonitor.skipNextChange = true
+            writeSuppressed(clipboardMonitor) { writeToPasteboardPlainText(item: item) }
             panelController.hide()
             logger.info("Copy-only mode (plain text) -- wrote to pasteboard, skipping Cmd+V simulation")
             return
@@ -285,8 +274,7 @@ final class PasteService {
         guard grantedPT else {
             pasteLog("[PASTE] (plain) PERMISSION DENIED — copying plain text to clipboard and showing permission prompt (source=\(source))")
             AccessibilityService.notePasteDeniedDueToPermission()
-            writeToPasteboardPlainText(item: item)
-            clipboardMonitor.skipNextChange = true
+            writeSuppressed(clipboardMonitor) { writeToPasteboardPlainText(item: item) }
             panelController.hide()
             logger.info("Accessibility not granted -- copied plain text to clipboard, showing permission prompt")
             onAccessibilityRequired?()
@@ -296,8 +284,7 @@ final class PasteService {
         if IsSecureEventInputEnabled() {
             pasteLog("[PASTE] (plain) BLOCKED: secure event input is active")
             logger.warning("Secure input is active -- writing plain text to pasteboard only (user must Cmd+V manually)")
-            writeToPasteboardPlainText(item: item)
-            clipboardMonitor.skipNextChange = true
+            writeSuppressed(clipboardMonitor) { writeToPasteboardPlainText(item: item) }
             panelController.hide()
             Self.showFailureAlert(
                 title: "Paste Blocked by Secure Input",
@@ -308,11 +295,10 @@ final class PasteService {
 
         // As in `paste(item:)`: a no-op write leaves the user's own clipboard in place,
         // so posting ⌘V would paste that rather than the item they asked for.
-        guard writeToPasteboardPlainText(item: item) else {
+        guard writeSuppressed(clipboardMonitor, { writeToPasteboardPlainText(item: item) }) else {
             panelController.hide()
             return
         }
-        clipboardMonitor.skipNextChange = true
         panelController.hide()
         pasteLog("[PASTE] (plain) panel.hide() called, scheduling CGEvent Cmd+V in 250ms (source=\(source))")
 
@@ -333,6 +319,30 @@ final class PasteService {
     }
 
     // MARK: - Pasteboard Writing
+
+    /// Drain, write, suppress — in that order, synchronously on the main actor.
+    ///
+    /// All three steps are load-bearing and the order is not negotiable:
+    ///
+    /// - **Drain first.** The capture poll runs every 0.5s with 0.1s tolerance, so a
+    ///   copy the user made moments ago may not have been recorded yet. Writing over
+    ///   it without draining loses it permanently.
+    /// - **Suppress by exact changeCount, after the write.** The old `skipNextChange`
+    ///   flag meant "skip whatever change I see next", which is a different event from
+    ///   "skip the change I just made" the moment the user copies something in between.
+    ///
+    /// - Returns: whatever `write` returned; on `false` nothing is suppressed because
+    ///   nothing was written.
+    @discardableResult
+    private func writeSuppressed(
+        _ clipboardMonitor: ClipboardMonitor,
+        _ write: () -> Bool
+    ) -> Bool {
+        clipboardMonitor.drainPendingChange()
+        guard write() else { return false }
+        clipboardMonitor.suppressChange(count: NSPasteboard.general.changeCount)
+        return true
+    }
 
     /// One resolved pasteboard representation, held so the whole set can be built
     /// *before* anything is cleared. See `commit(_:describing:)`.

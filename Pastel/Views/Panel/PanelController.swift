@@ -77,9 +77,15 @@ final class PanelController {
     /// When true, the global click monitor will NOT dismiss the panel.
     var isDragging: Bool = false
 
-    /// Callback invoked when a drag session starts from a clipboard card.
-    /// Set by AppState to wire into ClipboardMonitor.skipNextChange.
-    var onDragStarted: (() -> Void)?
+    /// Callback invoked when a card drag session *ends* (mouse-up), so the monitor can
+    /// open a short window in which a drop-triggered pasteboard write is not captured.
+    ///
+    /// Deliberately not fired at drag start. The start→drop interval is user-controlled
+    /// and unbounded — dragging across displays takes seconds — so a window armed there
+    /// either expires before the drop it exists to cover, or blinds capture for its full
+    /// length when the user cancels. Mouse-up is the only anchor with a bounded distance
+    /// to the write it needs to suppress.
+    var onDragEnded: (() -> Void)?
 
     /// Callback invoked when a SwiftUI view triggers a paste action.
     /// Set by AppState during setupPanel() to wire into PasteService.
@@ -134,7 +140,6 @@ final class PanelController {
     /// Installs a global mouse-up monitor to detect when the drag ends.
     func dragSessionStarted() {
         isDragging = true
-        onDragStarted?() // Notify AppState to set clipboardMonitor.skipNextChange
 
         // Install one-shot mouse-up monitor to detect drag end
         dragEndMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { [weak self] _ in
@@ -143,6 +148,8 @@ final class PanelController {
                 NSEvent.removeMonitor(monitor)
                 self?.dragEndMonitor = nil
             }
+            // Open the no-capture window now, at the drop — see `onDragEnded`.
+            self?.onDragEnded?()
             // Delay isDragging reset to allow receiving app to process the drop
             // and avoid the drop triggering a new clipboard history entry
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

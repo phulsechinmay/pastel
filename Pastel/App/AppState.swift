@@ -143,9 +143,13 @@ final class AppState {
             self?.pasteItems(items)
         }
 
-        // Wire drag-started callback: SwiftUI -> PanelActions -> PanelController -> AppState -> ClipboardMonitor
-        panelController.onDragStarted = { [weak self] in
-            self?.clipboardMonitor?.skipNextChange = true
+        // Wire drag-ended callback: SwiftUI -> PanelActions -> PanelController -> AppState -> ClipboardMonitor
+        //
+        // Time-bounded rather than changeCount-based: the write, if there is one at all,
+        // comes from the app receiving the drop, so we cannot know its changeCount in
+        // advance. 2s comfortably outlasts the 0.5s post-drop settle in PanelController.
+        panelController.onDragEnded = { [weak self] in
+            self?.clipboardMonitor?.suppressCaptures(for: 2.0)
         }
 
         // Wire accessibility permission prompt: PasteService -> AppState

@@ -157,13 +157,18 @@ struct HistoryBrowserView: View {
         }
         guard !textParts.isEmpty else { return }
 
+        // Drain before writing: a copy the user made in the last ~600ms may not have
+        // been polled yet, and overwriting it without draining loses it for good.
+        appState.clipboardMonitor?.drainPendingChange()
+
         let concatenated = textParts.joined(separator: "\n")
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(concatenated, forType: .string)
 
-        // Self-paste loop prevention
-        appState.clipboardMonitor?.skipNextChange = true
+        // Self-paste loop prevention: suppress exactly our own write, not "the next
+        // change", which would eat a copy the user makes before the next poll.
+        appState.clipboardMonitor?.suppressChange(count: pasteboard.changeCount)
     }
 
     /// Copy concatenated text to pasteboard, hide settings window, and simulate Cmd+V.

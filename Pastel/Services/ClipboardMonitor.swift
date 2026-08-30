@@ -25,13 +25,19 @@ final class ClipboardMonitor {
     /// Callback fired when itemCount changes, wired to AppState for @Observable reactivity.
     var onItemCountChanged: ((Int) -> Void)?
 
-    /// When true, the next clipboard change will be skipped (self-paste loop prevention, Phase 3)
-    var skipNextChange: Bool = false
-
     // MARK: - Private Properties
 
     private var timer: Timer?
     private var lastChangeCount: Int = 0
+
+    /// The exact `changeCount` of a write Pastel made itself, which must not be
+    /// captured back into history. See `suppressChange(count:)`.
+    private var suppressedChangeCount: Int?
+
+    /// Deadline for a time-bounded suppression window, used where the offending
+    /// write comes from *another* app and its changeCount cannot be known ahead of
+    /// time. See `suppressCaptures(for:)`.
+    private var suppressCaptureUntil: Date?
     private let pasteboard = NSPasteboard.general
     private var modelContext: ModelContext
     private var wakeObserver: NSObjectProtocol?
@@ -126,6 +132,78 @@ final class ClipboardMonitor {
         }
     }
 
+    // MARK: - Self-write suppression
+
+    /// Capture anything already sitting on the pasteboard, right now.
+    ///
+    /// **Must be called synchronously immediately before Pastel writes to the
+    /// pasteboard.** The poll runs every 0.5s with 0.1s tolerance, so a copy the
+    /// user made up to 600ms ago may not have been seen yet. Overwriting it without
+    /// draining first loses it permanently: `checkForChanges` only ever reads the
+    /// *current* changeCount, so an intermediate state it never observed is gone.
+    ///
+    /// This is the common case, not a corner: copy in Chrome, ⌘⇧V, ⌘1.
+    func drainPendingChange() {
+        checkForChanges()
+    }
+
+    /// Ignore exactly the change identified by `count` — the one Pastel is about to make.
+    ///
+    /// Suppressing by changeCount rather than "skip the next change I see" matters
+    /// because the two are not the same event. If the user copies something between
+    /// our write and the next tick, a "skip next" flag eats *their* copy and keeps
+    /// ours. Call with `NSPasteboard.general.changeCount` read after the write.
+    func suppressChange(count: Int) {
+        suppressedChangeCount = count
+    }
+
+    /// Ignore every change for `interval`, for writes Pastel does not perform itself.
+    ///
+    /// Used for drag-and-drop: the receiving app may or may not write to the
+    /// pasteboard on drop, and if it does we cannot know its changeCount in advance.
+    func suppressCaptures(for interval: TimeInterval) {
+        suppressCaptureUntil = Date().addingTimeInterval(interval)
+    }
+
+#if DEBUG
+    // MARK: - Deterministic race testing
+
+    /// Stop the poll timer *without* re-syncing `lastChangeCount`, so a pending
+    /// pasteboard change stays pending.
+    ///
+    /// The suppression defects this exists to test are races against a 0.5s timer
+    /// with 0.1s tolerance — a human cannot reliably lose them by hand. Pausing here
+    /// makes the interleaving exact:
+    ///
+    ///     (lldb) e appState.clipboardMonitor!.debugPausePolling()
+    ///     — copy something in another app —
+    ///     — paste from Pastel —
+    ///     (lldb) e appState.clipboardMonitor!.debugResumePolling()
+    ///
+    /// Both the copy and the pasted item must be in history. Note that `stop()`/`start()`
+    /// cannot substitute: `start()` re-syncs `lastChangeCount` and swallows the pending
+    /// change, which is the exact state under test.
+    func debugPausePolling() {
+        timer?.invalidate()
+        timer = nil
+        Self.logger.notice("[DEBUG] polling paused at changeCount=\(self.lastChangeCount)")
+    }
+
+    /// Resume polling, preserving `lastChangeCount` so anything copied while paused
+    /// is still seen as a change.
+    func debugResumePolling() {
+        guard timer == nil else { return }
+        let pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkForChanges()
+            }
+        }
+        pollTimer.tolerance = 0.1
+        self.timer = pollTimer
+        Self.logger.notice("[DEBUG] polling resumed at changeCount=\(self.lastChangeCount), pasteboard=\(self.pasteboard.changeCount)")
+    }
+#endif
+
     // MARK: - Private Methods
 
     /// Check if the pasteboard has changed since last poll.
@@ -137,10 +215,23 @@ final class ClipboardMonitor {
 
         lastChangeCount = currentChangeCount
 
-        // Phase 3 self-paste prevention: skip if flagged
-        if skipNextChange {
-            skipNextChange = false
-            return
+        // Self-write suppression: skip our own write, and only our own write.
+        if let suppressed = suppressedChangeCount {
+            if currentChangeCount == suppressed {
+                suppressedChangeCount = nil
+                return
+            }
+            // We are already past the write we meant to skip — it can never match
+            // again, so clear it rather than leaving it armed for a future counter
+            // that happens to collide (pasteboardd restarts reset the count).
+            if currentChangeCount > suppressed {
+                suppressedChangeCount = nil
+            }
+        }
+
+        if let until = suppressCaptureUntil {
+            if Date() < until { return }
+            suppressCaptureUntil = nil
         }
 
         // Phase 14: App ignore list filtering
