@@ -101,8 +101,13 @@ final class PasteService {
             return
         }
 
-        // 3. Write item content to pasteboard
-        writeToPasteboard(item: item)
+        // 3. Write item content to pasteboard. If the item resolves to nothing the
+        //    pasteboard still holds whatever the user copied last — posting ⌘V here
+        //    would paste that instead, so bail rather than paste something unasked for.
+        guard writeToPasteboard(item: item) else {
+            panelController.hide()
+            return
+        }
 
         // 4. Signal monitor to skip the next change (self-paste loop prevention)
         clipboardMonitor.skipNextChange = true
@@ -234,7 +239,9 @@ final class PasteService {
         let parts = items.compactMap { item -> String? in
             switch item.type {
             case .text, .richText, .url, .code, .color:
-                return item.textContent
+                // Empty is nothing to write, same as a non-text type — see `commit`.
+                guard let text = item.textContent, !text.isEmpty else { return nil }
+                return text
             case .image, .file:
                 return nil
             }
@@ -299,7 +306,12 @@ final class PasteService {
             return
         }
 
-        writeToPasteboardPlainText(item: item)
+        // As in `paste(item:)`: a no-op write leaves the user's own clipboard in place,
+        // so posting ⌘V would paste that rather than the item they asked for.
+        guard writeToPasteboardPlainText(item: item) else {
+            panelController.hide()
+            return
+        }
         clipboardMonitor.skipNextChange = true
         panelController.hide()
         pasteLog("[PASTE] (plain) panel.hide() called, scheduling CGEvent Cmd+V in 250ms (source=\(source))")
@@ -322,72 +334,116 @@ final class PasteService {
 
     // MARK: - Pasteboard Writing
 
-    /// Write the clipboard item's content to NSPasteboard.general, preserving all representations.
-    private func writeToPasteboard(item: ClipboardItem) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
+    /// One resolved pasteboard representation, held so the whole set can be built
+    /// *before* anything is cleared. See `commit(_:describing:)`.
+    private enum PasteboardWrite {
+        case string(String, NSPasteboard.PasteboardType)
+        case data(Data, NSPasteboard.PasteboardType)
+        /// `writeObjects` appends a new pasteboard item rather than writing into the
+        /// first one, which is why URL items carry both a `.string` and this.
+        case objects([NSPasteboardWriting])
+    }
+
+    /// Resolve everything we intend to put on the pasteboard for this item.
+    ///
+    /// Every branch here can legitimately produce nothing: an `.image` whose backing
+    /// file never synced from CloudKit, or a `.text` snippet the user created but has
+    /// not typed into yet (`AppState.createSnippet` inserts one with no `textContent`).
+    /// Empty strings count as nothing — the only way to hold one is an edited-to-blank
+    /// snippet, since capture rejects empty content.
+    private func representations(for item: ClipboardItem) -> [PasteboardWrite] {
+        var writes: [PasteboardWrite] = []
+
+        func addString(_ value: String?, _ type: NSPasteboard.PasteboardType) {
+            guard let value, !value.isEmpty else { return }
+            writes.append(.string(value, type))
+        }
+        func addData(_ value: Data?, _ type: NSPasteboard.PasteboardType) {
+            guard let value, !value.isEmpty else { return }
+            writes.append(.data(value, type))
+        }
 
         switch item.type {
         case .text:
-            if let text = item.textContent {
-                pasteboard.setString(text, forType: .string)
-            }
-            if let rtfData = item.rtfData {
-                pasteboard.setData(rtfData, forType: .rtf)
-            }
-            if let html = item.htmlContent {
-                pasteboard.setString(html, forType: .html)
-            }
+            addString(item.textContent, .string)
+            addData(item.rtfData, .rtf)
+            addString(item.htmlContent, .html)
 
         case .richText:
             // Write richest format first for maximum fidelity
-            if let rtfData = item.rtfData {
-                pasteboard.setData(rtfData, forType: .rtf)
-            }
-            if let html = item.htmlContent {
-                pasteboard.setString(html, forType: .html)
-            }
-            if let text = item.textContent {
-                pasteboard.setString(text, forType: .string)
-            }
+            addData(item.rtfData, .rtf)
+            addString(item.htmlContent, .html)
+            addString(item.textContent, .string)
 
         case .url:
-            if let urlString = item.textContent {
-                pasteboard.setString(urlString, forType: .string)
+            if let urlString = item.textContent, !urlString.isEmpty {
+                writes.append(.string(urlString, .string))
                 // Also set as proper URL type for apps that support it
                 if let url = URL(string: urlString) {
-                    pasteboard.writeObjects([url as NSURL])
+                    writes.append(.objects([url as NSURL]))
                 }
             }
 
         case .image:
             if let imagePath = item.imagePath {
                 let imageURL = ImageStorageService.shared.resolveImageURL(imagePath)
-                if let imageData = try? Data(contentsOf: imageURL) {
-                    pasteboard.setData(imageData, forType: .png)
+                if let imageData = try? Data(contentsOf: imageURL), !imageData.isEmpty {
+                    writes.append(.data(imageData, .png))
                     // Also write TIFF for broader app compatibility
                     if let nsImage = NSImage(data: imageData),
                        let tiffData = nsImage.tiffRepresentation {
-                        pasteboard.setData(tiffData, forType: .tiff)
+                        writes.append(.data(tiffData, .tiff))
                     }
                 }
             }
 
         case .file:
-            if let filePath = item.textContent {
-                let fileURL = URL(fileURLWithPath: filePath)
-                pasteboard.writeObjects([fileURL as NSURL])
+            if let filePath = item.textContent, !filePath.isEmpty {
+                writes.append(.objects([URL(fileURLWithPath: filePath) as NSURL]))
             }
 
         case .code, .color:
             // Code snippets and color values are stored as text
-            if let text = item.textContent {
-                pasteboard.setString(text, forType: .string)
+            addString(item.textContent, .string)
+        }
+
+        return writes
+    }
+
+    /// Clear the pasteboard and write, or do neither.
+    ///
+    /// `clearContents()` used to run unconditionally before a run of `if let` writes,
+    /// so an item that resolved to nothing destroyed whatever the user had copied.
+    /// Nothing to write now means the pasteboard is left exactly as it was.
+    ///
+    /// - Returns: `true` if the pasteboard now holds this item's content.
+    private func commit(_ writes: [PasteboardWrite], describing label: String) -> Bool {
+        guard !writes.isEmpty else {
+            pasteLog("[PASTE] nothing to write for \(label) — pasteboard left untouched")
+            logger.warning("Refusing to clear pasteboard: \(label) resolved to no content")
+            return false
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        for write in writes {
+            switch write {
+            case .string(let value, let type): pasteboard.setString(value, forType: type)
+            case .data(let value, let type): pasteboard.setData(value, forType: type)
+            case .objects(let objects): pasteboard.writeObjects(objects)
             }
         }
 
-        pasteLog("[PASTE] wrote \(item.type.rawValue) to pasteboard (changeCount=\(pasteboard.changeCount))")
-        logger.info("Wrote \(item.type.rawValue) content to pasteboard")
+        pasteLog("[PASTE] wrote \(label) to pasteboard (changeCount=\(pasteboard.changeCount))")
+        logger.info("Wrote \(label) content to pasteboard")
+        return true
+    }
+
+    /// Write the clipboard item's content to NSPasteboard.general, preserving all representations.
+    /// Returns `false` — leaving the pasteboard untouched — when the item resolves to nothing.
+    @discardableResult
+    private func writeToPasteboard(item: ClipboardItem) -> Bool {
+        commit(representations(for: item), describing: item.type.rawValue)
     }
 
     /// Write the clipboard item's content to NSPasteboard.general WITHOUT RTF data.
@@ -395,26 +451,23 @@ final class PasteService {
     /// For text-based types (.text, .richText, .code, .color), omits `.rtf` so receiving
     /// apps fall back to plain text styling. For non-text types (.url, .image, .file),
     /// delegates to `writeToPasteboard(item:)` since these have no RTF to strip.
-    private func writeToPasteboardPlainText(item: ClipboardItem) {
+    /// Returns `false` — leaving the pasteboard untouched — when the item resolves to nothing.
+    @discardableResult
+    private func writeToPasteboardPlainText(item: ClipboardItem) -> Bool {
         // Non-text types have no RTF -- use normal pasteboard write
         switch item.type {
         case .url, .image, .file:
-            writeToPasteboard(item: item)
-            return
+            return writeToPasteboard(item: item)
         case .text, .richText, .code, .color:
             break
         }
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-
         // Write ONLY plain string -- no .rtf, no .html
-        if let text = item.textContent {
-            pasteboard.setString(text, forType: .string)
+        let writes = representations(for: item).filter { write in
+            if case .string(_, let type) = write { return type == .string }
+            return false
         }
-
-        pasteLog("[PASTE] wrote \(item.type.rawValue) to pasteboard (plain text, changeCount=\(pasteboard.changeCount))")
-        logger.info("Wrote \(item.type.rawValue) content to pasteboard (plain text, RTF and HTML stripped)")
+        return commit(writes, describing: "\(item.type.rawValue) (plain text)")
     }
 
     // MARK: - CGEvent Paste Simulation
