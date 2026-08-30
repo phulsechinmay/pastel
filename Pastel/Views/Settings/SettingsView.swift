@@ -104,7 +104,10 @@ private struct SidebarRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: tab.iconName)
-                .font(.system(size: 11, weight: .semibold))
+                // An icon token, not a text one: this was borrowing `Text.meta` (10pt),
+                // which left the glyph floating in the middle of its 20pt backplate
+                // instead of filling it the way System Settings' do.
+                .font(PanelStyle.Icon.control.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 20, height: 20)
                 .background(

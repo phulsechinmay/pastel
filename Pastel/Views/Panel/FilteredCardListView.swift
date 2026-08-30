@@ -26,7 +26,6 @@ struct FilteredCardListView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
-    @State private var dropTargetIndex: Int? = nil
     @State private var keyMonitor: Any? = nil
     @State private var filteredItems: [ClipboardItem] = []
     @State private var displayLimit: Int = 50
@@ -265,11 +264,17 @@ struct FilteredCardListView: View {
                         LazyHStack(spacing: PanelLayout.cardSpacing) {
                             ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
-                                    .frame(width: PanelLayout.horizontalCardWidth, height: PanelLayout.cardMaxHeight)
+                                    // Height is whatever is left under the header row, not a
+                                    // hardcoded 200. The panel is a fixed height, so a fixed
+                                    // card height left a dead band below the row whose size
+                                    // depended on how tall the search field happened to render.
+                                    .frame(width: PanelLayout.horizontalCardWidth)
+                                    .frame(maxHeight: .infinity)
                             }
                         }
+                        .padding(PanelLayout.selectionRingGutter)
                     }
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxHeight: .infinity)
                     .onChange(of: selectedIndex) { _, newValue in
                         if let newValue, newValue < visibleItems.count {
                             withAnimation(.easeInOut(duration: 0.15)) {
@@ -287,6 +292,7 @@ struct FilteredCardListView: View {
                                 cardView(for: item, at: index)
                             }
                         }
+                        .padding(PanelLayout.selectionRingGutter)
                     }
                     .onChange(of: selectedIndex) { _, newValue in
                         if let newValue, newValue < visibleItems.count {
@@ -396,7 +402,6 @@ struct FilteredCardListView: View {
             isSelected: selectedIndices.contains(index),
             allLabels: allLabels,
             badgePosition: badge,
-            isDropTarget: dropTargetIndex == index,
             isShiftHeld: isShiftHeld
         )
         .onDrag {
@@ -419,25 +424,6 @@ struct FilteredCardListView: View {
             if NSEvent.modifierFlags.contains(.option) {
                 pasteLog("[PASTE] origin=option-click index=\(index) COPY")
                 onCopy([item])
-            }
-        }
-        .dropDestination(for: String.self) { strings, _ in
-            guard let encodedID = strings.first,
-                  let labelID = PersistentIdentifier.fromTransferString(encodedID),
-                  let label = try? modelContext.model(for: labelID) as? Label else {
-                return false
-            }
-            // Append label if not already assigned
-            guard !item.safeLabels.contains(where: {
-                $0.persistentModelID == label.persistentModelID
-            }) else { return true }
-            item.safeLabels.append(label)
-            item.refreshLabelKey()
-            saveWithLogging(modelContext, operation: "label drop assignment")
-            return true
-        } isTargeted: { targeted in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                dropTargetIndex = targeted ? index : nil
             }
         }
         .transition(.asymmetric(

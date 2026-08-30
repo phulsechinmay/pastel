@@ -11,18 +11,18 @@ struct FileCardView: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "doc")
-                .font(.system(size: 16))
+                .font(PanelStyle.Icon.content)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(filename)
-                    .font(.callout)
+                    .font(PanelStyle.Text.body)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 if fullPath != filename {
                     Text(fullPath)
-                        .font(.caption)
+                        .font(PanelStyle.Text.meta)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

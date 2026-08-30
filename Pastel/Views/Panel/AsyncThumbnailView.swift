@@ -24,7 +24,7 @@ struct AsyncThumbnailView: View {
                     .aspectRatio(contentMode: .fit)
             } else {
                 Rectangle()
-                    .fill(Color.white.opacity(0.04))
+                    .fill(PanelStyle.surfaceRecessed)
                     .overlay {
                         ProgressView()
                             .controlSize(.small)

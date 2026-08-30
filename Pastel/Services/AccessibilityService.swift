@@ -212,7 +212,6 @@ enum AccessibilityService {
         window.hasShadow = true
         window.level = .floating
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: .darkAqua)
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
         if let screen = NSScreen.main {
@@ -247,6 +246,5 @@ private struct RelaunchToastView: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .preferredColorScheme(.dark)
     }
 }

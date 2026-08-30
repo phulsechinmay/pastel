@@ -14,6 +14,9 @@ struct CodeCardView: View {
 
     let item: ClipboardItem
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
+    /// Syntax colours have to follow the appearance now that the panel is no longer
+    /// pinned to dark. An atom-one dark palette on a light glass panel is unreadable.
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var highlightedText: AttributedString?
 
@@ -37,7 +40,7 @@ struct CodeCardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: "\(item.contentHash)_\(item.detectedLanguage ?? "")") {
+        .task(id: "\(item.contentHash)_\(item.detectedLanguage ?? "")_\(colorScheme)") {
             await loadHighlighting()
         }
     }
@@ -48,13 +51,13 @@ struct CodeCardView: View {
     private var codePreview: some View {
         if let highlighted = highlightedText {
             Text(highlighted)
-                .font(.system(size: 11, design: .monospaced))
+                .font(PanelStyle.Text.meta.monospaced())
                 .lineLimit(lineLimit)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             // Plain text fallback while highlighting loads
             Text(item.textContent ?? "")
-                .font(.system(size: 11, design: .monospaced))
+                .font(PanelStyle.Text.meta.monospaced())
                 .lineLimit(lineLimit)
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,12 +68,17 @@ struct CodeCardView: View {
 
     /// Load syntax highlighting from cache or compute it.
     private func loadHighlighting() async {
-        let hash = item.contentHash
         let code = item.textContent ?? ""
         guard !code.isEmpty else { return }
 
+        // The scheme is part of the key: the same clip highlighted for dark and for
+        // light are two different results, and without this the first one rendered
+        // would stick around after the user switched appearance.
+        let scheme: HighlightColors = colorScheme == .dark ? .dark(.atomOne) : .light(.atomOne)
+        let cacheKey = "\(item.contentHash)_\(colorScheme == .dark ? "d" : "l")"
+
         // Check cache first
-        if let cached = await HighlightCache.shared.get(hash) {
+        if let cached = await HighlightCache.shared.get(cacheKey) {
             highlightedText = cached
             return
         }
@@ -84,16 +92,16 @@ struct CodeCardView: View {
                 result = try await highlight.attributedText(
                     code,
                     language: language,
-                    colors: .dark(.atomOne)
+                    colors: scheme
                 )
             } else {
                 // Auto-detect language
-                let highlightResult = try await highlight.request(code, mode: .automatic, colors: .dark(.atomOne))
+                let highlightResult = try await highlight.request(code, mode: .automatic, colors: scheme)
                 result = highlightResult.attributedText
             }
 
             // Cache and display
-            await HighlightCache.shared.set(hash, value: result)
+            await HighlightCache.shared.set(cacheKey, value: result)
             highlightedText = result
         } catch {
             // On error, keep showing plain text fallback (highlightedText stays nil)
@@ -119,15 +127,15 @@ private struct LanguageBadge: View {
                     .frame(width: 12, height: 12)
             } else {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    .font(.system(size: 9))
+                    .font(PanelStyle.Icon.meta)
                     .foregroundStyle(.secondary)
             }
             Text(displayName)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .font(PanelStyle.Text.meta.weight(.medium).monospaced())
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
-        .background(Color.white.opacity(0.15), in: Capsule())
+        .background(PanelStyle.surfaceRaised, in: Capsule())
         .foregroundStyle(.secondary)
     }
 

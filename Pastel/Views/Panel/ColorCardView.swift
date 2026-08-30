@@ -34,12 +34,12 @@ struct ColorCardView: View {
         VStack(alignment: .leading, spacing: 2) {
             // Large hex title
             Text("#\(item.detectedColorHex ?? "------")")
-                .font(.system(size: 28, weight: .bold, design: .monospaced))
+                .font(PanelStyle.Text.display.weight(.bold).monospaced())
 
             // Original format subtitle (for rgb/hsl or edited hex)
             if showsOriginalSubtitle {
                 Text(originalWasHex ? "Original: \(item.textContent ?? "")" : item.textContent ?? "")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(PanelStyle.Text.meta.monospaced())
                     .opacity(0.7)
                     .lineLimit(1)
             }

@@ -5,7 +5,12 @@ import SwiftData
 ///
 /// Displays one chip per label plus a trailing "+" chip for creating new labels.
 /// Tapping a chip toggles filtering; tapping the active chip deselects it.
-/// Chips wrap to multiple centered lines when they don't fit in a single row.
+///
+/// Chips wrap to leading-aligned rows, capped at `PanelLayout.chipMaxRows`. Anything
+/// past the cap folds behind a "+N" chip that expands the bar on demand. Both the
+/// alignment and the cap are deliberate: centred rows shared no left edge with the
+/// search field above or the cards below, and an uncapped bar grew until the panel
+/// was mostly chrome.
 struct ChipBarView: View {
 
     let labels: [Label]
@@ -34,15 +39,55 @@ struct ChipBarView: View {
     /// Hover state for the create chip's left color/emoji section (lightens on hover).
     @State private var isHoveringStyle = false
 
+    // MARK: - Overflow State
+
+    /// How many chips of any kind the layout managed to place inside the row cap.
+    @State private var placedChipCount: Int = .max
+    /// Whether the user has tapped "+N" to see every label.
+    @State private var isExpanded = false
+
+    /// The label budget: whatever the layout placed, minus the two slots that
+    /// "All History" and the trailing create chip always occupy.
+    private var visibleLabelCount: Int {
+        placedChipCount == .max ? .max : max(0, placedChipCount - reservedChipCount)
+    }
+
     private var canCreate: Bool {
         !newLabelName.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// Labels past the row cap, folded behind the overflow chip.
+    private var hiddenLabels: [Label] {
+        isExpanded ? [] : Array(labels.dropFirst(visibleLabelCount))
+    }
+
+    private var shownLabels: [Label] {
+        isExpanded ? labels : Array(labels.prefix(visibleLabelCount))
+    }
+
     var body: some View {
-        CenteredFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+        WrappingFlowLayout(
+            horizontalSpacing: PanelLayout.chipSpacing,
+            verticalSpacing: PanelLayout.chipRowSpacing,
+            maxRows: isExpanded ? nil : PanelLayout.chipMaxRows,
+            // Monotone decreasing. The count feeds back into `shownLabels`, which
+            // changes the subview list, which re-runs layout: left free to move in
+            // both directions that settles into a two-value oscillation at widths
+            // where hiding a label frees exactly enough room to show it again.
+            // Shrink-only converges, and the resets below let it recover.
+            visibleCount: Binding(
+                get: { placedChipCount },
+                set: { placedChipCount = min(placedChipCount, $0) }
+            )
+        ) {
             allHistoryChip
-            ForEach(labels) { label in
+            ForEach(shownLabels) { label in
                 labelChip(for: label)
+            }
+            if !hiddenLabels.isEmpty {
+                overflowChip
+            } else if isExpanded {
+                collapseChip
             }
             // The "+" morphs into a compact editable chip in place.
             if isCreating {
@@ -54,10 +99,59 @@ struct ChipBarView: View {
         // Springy reflow as chips are added/removed and as the "+" morphs.
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: labels.count)
         .animation(.spring(response: 0.32, dampingFraction: 0.82), value: isCreating)
+        .animation(.spring(response: 0.32, dampingFraction: 0.85), value: isExpanded)
         .padding(.vertical, 4)
+        // Release the shrink-only ratchet whenever the thing being measured changes,
+        // so the bar can grow back after a label is deleted or the panel widens.
+        .onChange(of: labels.count) { _, _ in placedChipCount = .max }
+        .onChange(of: isExpanded) { _, _ in placedChipCount = .max }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in
+            placedChipCount = .max
+        }
         .sheet(item: $editingLabel) { label in
             LabelEditPalette(label: label, onDismiss: { editingLabel = nil })
         }
+    }
+
+    /// "All History" plus the trailing create chip always hold a slot, so the label
+    /// budget is whatever the layout reported minus those two.
+    private var reservedChipCount: Int { 2 }
+
+    // MARK: - Overflow Chip
+
+    /// Folds the labels that did not fit into a single "+N" chip.
+    ///
+    /// The cap exists because the bar had no ceiling: seven labels already wrapped to
+    /// four centred rows in the 320pt panel, roughly 200pt of chrome before the first
+    /// clip. Every label a user created made their own history harder to see.
+    private var overflowChip: some View {
+        Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                isExpanded = true
+            }
+        } label: {
+            Text("+\(hiddenLabels.count)")
+                .font(PanelStyle.Text.control)
+                .lineLimit(1)
+                .chipChrome()
+        }
+        .buttonStyle(.plain)
+        .help("Show \(hiddenLabels.count) more label\(hiddenLabels.count == 1 ? "" : "s")")
+    }
+
+    /// The way back down to the row cap once the bar has been expanded.
+    private var collapseChip: some View {
+        Button {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+                isExpanded = false
+            }
+        } label: {
+            Image(systemName: "chevron.up")
+                .font(PanelStyle.Text.control.weight(.semibold))
+                .chipChrome()
+        }
+        .buttonStyle(.plain)
+        .help("Show fewer labels")
     }
 
     // MARK: - All History Chip
@@ -68,23 +162,12 @@ struct ChipBarView: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "arrow.counterclockwise.circle.fill")
-                    .font(.system(size: 11))
+                    .font(PanelStyle.Text.control)
                 Text("All History")
-                    .font(.system(size: 11))
+                    .font(PanelStyle.Text.control)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 10)
-            .frame(height: PanelLayout.chipHeight)
-            .background(
-                isAllHistoryActive ? Color.accentColor.opacity(0.3) : Color.white.opacity(0.1),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule().strokeBorder(
-                    isAllHistoryActive ? Color.accentColor.opacity(0.6) : Color.clear,
-                    lineWidth: 1
-                )
-            )
+            .chipChrome(isActive: isAllHistoryActive)
         }
         .buttonStyle(.plain)
     }
@@ -142,12 +225,11 @@ struct ChipBarView: View {
             openCreate()
         } label: {
             Image(systemName: "plus")
-                .font(.system(size: 11, weight: .semibold))
-                .padding(.horizontal, 8)
-                .frame(height: PanelLayout.chipHeight)
-                .background(Color.white.opacity(0.1), in: Capsule())
+                .font(PanelStyle.Text.control.weight(.semibold))
+                .chipChrome()
         }
         .buttonStyle(.plain)
+        .help("New Label")
     }
 
     // MARK: - Inline Create Chip
@@ -163,11 +245,11 @@ struct ChipBarView: View {
                 showStylePicker.toggle()
             } label: {
                 styleDot
-                    .padding(.leading, 10)
+                    .padding(.leading, PanelLayout.chipHorizontalPadding)
                     .padding(.trailing, 6)
                     .frame(maxHeight: .infinity)
                     .background(
-                        isHoveringStyle ? Color.white.opacity(0.12) : Color.clear,
+                        isHoveringStyle ? PanelStyle.surfaceHover : Color.clear,
                         in: UnevenRoundedRectangle(
                             topLeadingRadius: PanelLayout.chipHeight / 2,
                             bottomLeadingRadius: PanelLayout.chipHeight / 2
@@ -182,7 +264,6 @@ struct ChipBarView: View {
                 LabelStyleSelector(colorName: $newLabelColorName, emoji: $newLabelEmoji)
                     .padding(12)
                     .frame(width: 220)
-                    .preferredColorScheme(.dark)
             }
 
             FocusableTextField(
@@ -201,18 +282,18 @@ struct ChipBarView: View {
                 closeCreate()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(PanelStyle.Icon.meta.weight(.bold))
                     .foregroundStyle(.secondary)
                     .padding(.leading, 6)
-                    .padding(.trailing, 10)
+                    .padding(.trailing, PanelLayout.chipHorizontalPadding)
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
         .frame(height: PanelLayout.chipHeight)
-        .background(Color.white.opacity(0.1), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1))
+        .background(PanelStyle.surfaceRaised, in: Capsule())
+        .overlay(Capsule().strokeBorder(PanelStyle.chipActiveStroke, lineWidth: 1))
         .transition(.scale(scale: 0.85).combined(with: .opacity))
     }
 
@@ -220,7 +301,7 @@ struct ChipBarView: View {
     private var styleDot: some View {
         Group {
             if let emoji = newLabelEmoji, !emoji.isEmpty {
-                Text(emoji).font(.system(size: 11))
+                Text(emoji).font(PanelStyle.Text.control)
             } else {
                 Circle()
                     .fill(LabelColor(rawValue: newLabelColorName)?.color ?? .gray)
@@ -312,10 +393,12 @@ struct LabelStyleSelector: View {
                     Circle()
                         .fill(labelColor.color)
                         .frame(width: 22, height: 22)
-                        .overlay(
-                            Circle().strokeBorder(selected ? Color.white : Color.clear, lineWidth: 2)
-                        )
-                        .scaleEffect(selected ? 1.12 : 1.0)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(PanelStyle.swatchSelectionRing, lineWidth: 2)
+                                .padding(-3)
+                                .opacity(selected ? 1 : 0)
+                        }
                         .contentShape(Circle())
                         .onTapGesture {
                             withAnimation(.snappy(duration: 0.2)) {
@@ -330,12 +413,20 @@ struct LabelStyleSelector: View {
                 ForEach(Self.curatedEmojis, id: \.self) { curatedEmoji in
                     let selected = emoji == curatedEmoji
                     Text(curatedEmoji)
-                        .font(.system(size: 16))
+                        .font(PanelStyle.Icon.content)
                         .frame(width: 22, height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 5)
-                                .fill(selected ? Color.white.opacity(0.22) : Color.clear)
+                                .fill(selected ? PanelStyle.surfaceActive : Color.clear)
                         )
+                        // Same ring as the colour swatches above, so "selected" is one
+                        // thing in this control rather than a fill here and a ring there.
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .strokeBorder(PanelStyle.swatchSelectionRing, lineWidth: 2)
+                                .padding(-3)
+                                .opacity(selected ? 1 : 0)
+                        }
                         .contentShape(RoundedRectangle(cornerRadius: 5))
                         .onTapGesture {
                             withAnimation(.snappy(duration: 0.2)) {
@@ -389,75 +480,122 @@ private struct LabelEditPalette: View {
     }
 }
 
-// MARK: - Centered Flow Layout
+// MARK: - Wrapping Flow Layout
 
-/// A layout that arranges subviews in rows, wrapping to new lines and centering each row.
-struct CenteredFlowLayout: Layout {
+/// Arranges subviews in leading-aligned rows, wrapping to new lines, with an optional
+/// hard ceiling on row count.
+///
+/// Replaces the previous centred variant. Centring each row was the single thing that
+/// made a bar of eight or nine pills read as chaotic: no two rows shared a left edge,
+/// so nothing lined up with the search field above it or the cards below it. Leading
+/// alignment costs nothing and gives the whole panel one vertical rhythm.
+///
+/// `maxRows` clips overflow rather than growing without bound. The caller learns how
+/// many subviews actually fit via `onVisibleCountChange` and folds the rest behind a
+/// "+N" chip. The last slot on the final row is always reserved for the trailing
+/// control (the create chip), so it never gets clipped away.
+struct WrappingFlowLayout: Layout {
 
     var horizontalSpacing: CGFloat
     var verticalSpacing: CGFloat
+    /// `nil` means unlimited.
+    var maxRows: Int?
+    /// Receives how many subviews were placed within the row cap.
+    ///
+    /// A `Binding` rather than a closure on purpose. Swift matches a trailing closure
+    /// by scanning parameters backward for the first function-typed one, wherever it
+    /// sits in the list, so a `((Int) -> Void)?` member would swallow the layout's
+    /// content closure at every call site that omitted it. The compiler's diagnostic
+    /// for that ("requires conformance to View") points nowhere near the cause.
+    var visibleCount: Binding<Int>?
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        // When no width proposed, calculate single-line width as ideal
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        let singleLineWidth = sizes.reduce(0) { $0 + $1.width }
-            + CGFloat(max(0, sizes.count - 1)) * horizontalSpacing
+    /// One resolved wrapping pass: which subview indices land on which row.
+    private struct Plan {
+        var rows: [[Int]]
+        var size: CGSize
+        var placedCount: Int
+    }
 
-        let containerWidth = proposal.width ?? singleLineWidth
-
+    private func plan(sizes: [CGSize], containerWidth: CGFloat) -> Plan {
+        var rows: [[Int]] = [[]]
+        var rowHeights: [CGFloat] = [0]
         var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
         var maxWidth: CGFloat = 0
+        var placed = 0
 
-        for size in sizes {
-            if currentX + size.width > containerWidth && currentX > 0 {
+        for (index, size) in sizes.enumerated() {
+            let needsWrap = currentX + size.width > containerWidth && currentX > 0
+            if needsWrap {
+                if let maxRows, rows.count >= maxRows {
+                    // Out of rows. Everything from here on is overflow.
+                    break
+                }
                 maxWidth = max(maxWidth, currentX - horizontalSpacing)
-                currentY += lineHeight + verticalSpacing
+                rows.append([])
+                rowHeights.append(0)
                 currentX = 0
-                lineHeight = 0
             }
+            rows[rows.count - 1].append(index)
+            rowHeights[rowHeights.count - 1] = max(rowHeights[rowHeights.count - 1], size.height)
             currentX += size.width + horizontalSpacing
-            lineHeight = max(lineHeight, size.height)
+            placed += 1
         }
         maxWidth = max(maxWidth, currentX - horizontalSpacing)
 
-        return CGSize(width: maxWidth, height: currentY + lineHeight)
+        let totalHeight = rowHeights.reduce(0, +)
+            + CGFloat(max(0, rowHeights.count - 1)) * verticalSpacing
+
+        return Plan(
+            rows: rows,
+            size: CGSize(width: max(0, maxWidth), height: totalHeight),
+            placedCount: placed
+        )
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let singleLineWidth = sizes.reduce(0) { $0 + $1.width }
+            + CGFloat(max(0, sizes.count - 1)) * horizontalSpacing
+        let containerWidth = proposal.width ?? singleLineWidth
+        return plan(sizes: sizes, containerWidth: containerWidth).size
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        // First pass: group subviews into lines
-        var lines: [(subviews: [LayoutSubviews.Element], sizes: [CGSize])] = [([], [])]
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let resolved = plan(sizes: sizes, containerWidth: bounds.width)
 
-        var currentX: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > bounds.width && currentX > 0 {
-                lines.append(([], []))
-                currentX = 0
+        // Writing during layout would mutate state mid-pass; defer a tick.
+        if let visibleCount {
+            let count = resolved.placedCount
+            if visibleCount.wrappedValue != count {
+                DispatchQueue.main.async { visibleCount.wrappedValue = count }
             }
-            lines[lines.count - 1].subviews.append(subview)
-            lines[lines.count - 1].sizes.append(size)
-            currentX += size.width + horizontalSpacing
         }
 
-        // Second pass: place each line centered
         var y = bounds.minY
-        for line in lines {
-            let lineWidth = line.sizes.reduce(0) { $0 + $1.width }
-                + CGFloat(max(0, line.sizes.count - 1)) * horizontalSpacing
-            let lineHeight = line.sizes.map(\.height).max() ?? 0
-            var x = bounds.minX + (bounds.width - lineWidth) / 2
-
-            for (i, subview) in line.subviews.enumerated() {
-                let size = line.sizes[i]
-                subview.place(
-                    at: CGPoint(x: x, y: y + (lineHeight - size.height) / 2),
+        for row in resolved.rows {
+            let rowHeight = row.map { sizes[$0].height }.max() ?? 0
+            var x = bounds.minX
+            for index in row {
+                let size = sizes[index]
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y + (rowHeight - size.height) / 2),
                     proposal: .unspecified
                 )
                 x += size.width + horizontalSpacing
             }
-            y += lineHeight + verticalSpacing
+            y += rowHeight + verticalSpacing
+        }
+
+        // Anything past the cap is parked off-screen rather than left at the origin,
+        // where it would stack on top of the first chip.
+        if resolved.placedCount < subviews.count {
+            for index in resolved.placedCount..<subviews.count {
+                subviews[index].place(
+                    at: CGPoint(x: bounds.minX, y: bounds.minY - 10_000),
+                    proposal: .unspecified
+                )
+            }
         }
     }
 }

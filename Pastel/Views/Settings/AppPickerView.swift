@@ -54,7 +54,7 @@ struct AppPickerView: View {
                 }
             }
             .padding(8)
-            .background(Color.white.opacity(0.06))
+            .background(PanelStyle.surface)
             .cornerRadius(8)
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
@@ -65,7 +65,7 @@ struct AppPickerView: View {
             if filteredApps.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "app.dashed")
-                        .font(.system(size: 24))
+                        .font(PanelStyle.Icon.content)
                         .foregroundStyle(.tertiary)
                     Text("No matching applications")
                         .font(.subheadline)

@@ -457,7 +457,6 @@ final class PanelController {
 
         // Build SwiftUI content
         let contentView = PanelContentView()
-            .environment(\.colorScheme, .dark)
             .environment(panelActions)
 
         let hostingView: NSView

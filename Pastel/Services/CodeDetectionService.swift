@@ -154,10 +154,19 @@ actor HighlightCache {
         cache[hash]
     }
 
-    /// Remove a specific entry from the cache (e.g., when user changes language).
+    /// Remove every entry for a content hash (e.g., when the user changes language).
+    ///
+    /// Keys are `"<contentHash>_<d|l>"` because a clip highlighted for dark and the
+    /// same clip highlighted for light are two different results. Callers only know
+    /// the content hash, so eviction has to clear both appearance variants or a stale
+    /// render survives the edit that was supposed to invalidate it.
     func evict(_ hash: String) {
-        cache.removeValue(forKey: hash)
-        insertionOrder.removeAll { $0 == hash }
+        let prefix = "\(hash)_"
+        let doomed = cache.keys.filter { $0 == hash || $0.hasPrefix(prefix) }
+        for key in doomed {
+            cache.removeValue(forKey: key)
+        }
+        insertionOrder.removeAll { doomed.contains($0) }
     }
 
     /// Store a highlighted AttributedString keyed by content hash.

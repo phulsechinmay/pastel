@@ -27,7 +27,6 @@ final class OnboardingWindowController {
             self?.window?.close()
             self?.window = nil
         })
-        .preferredColorScheme(.dark)
         .environment(appState)
 
         let hostingView = NSHostingView(rootView: onboardingView)
@@ -43,7 +42,6 @@ final class OnboardingWindowController {
         window.title = "Welcome to Pastel"
         window.center()
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: .darkAqua)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.window = window

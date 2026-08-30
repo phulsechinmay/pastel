@@ -76,8 +76,13 @@ struct EditItemView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                // Reuse CenteredFlowLayout from ChipBarView
-                CenteredFlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+                // Reuse WrappingFlowLayout from ChipBarView. Uncapped here: the edit
+                // sheet is not fighting for vertical space the way the panel is, and
+                // hiding assignable labels behind an overflow chip would be worse.
+                WrappingFlowLayout(
+                    horizontalSpacing: PanelLayout.chipSpacing,
+                    verticalSpacing: PanelLayout.chipRowSpacing
+                ) {
                     ForEach(allLabels) { label in
                         let isAssigned = item.safeLabels.contains {
                             $0.persistentModelID == label.persistentModelID
@@ -159,14 +164,14 @@ struct EditItemView: View {
                 .foregroundStyle(.secondary)
 
             TextEditor(text: $editedText)
-                .font(.system(size: 12, design: item.type == .code ? .monospaced : .default))
+                .font(item.type == .code ? PanelStyle.Text.body.monospaced() : PanelStyle.Text.body)
                 .scrollContentBackground(.hidden)
                 .padding(4)
                 .frame(height: 120)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+                .background(PanelStyle.surface, in: RoundedRectangle(cornerRadius: 6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                        .strokeBorder(PanelStyle.stroke, lineWidth: 1)
                 )
 
             if willDropFormatting {
@@ -273,14 +278,12 @@ enum EditItemWindow {
             isNewSnippet: isNewSnippet,
             draft: draft
         )
-        .environment(\.colorScheme, .dark)
         .modelContainer(modelContainer)
 
         let hostingView = NSHostingView(rootView: editView)
         panel.contentView = hostingView
         panel.title = isNewSnippet ? "New Snippet" : "Edit Item"
         panel.level = .floating
-        panel.appearance = NSAppearance(named: .darkAqua)
         panel.isReleasedWhenClosed = false
 
         // Use intrinsic size from the hosting view; fall back to a reasonable default
@@ -451,7 +454,7 @@ private struct ColorEditSection: View {
                     .labelsHidden()
 
                 Text("#\(item.detectedColorHex ?? "FFFFFF")")
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(PanelStyle.Text.body.monospaced())
                     .foregroundStyle(.secondary)
             }
             .onChange(of: editColor) { _, newColor in

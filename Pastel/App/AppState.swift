@@ -207,7 +207,6 @@ final class AppState {
         window.title = "Pastel"
         window.center()
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: .darkAqua)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.permissionPromptWindow = window

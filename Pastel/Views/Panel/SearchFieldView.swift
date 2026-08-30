@@ -26,7 +26,7 @@ struct SearchFieldView: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12))
+                .font(PanelStyle.Icon.control)
                 .foregroundStyle(.secondary)
 
             FocusableTextField(
@@ -40,10 +40,11 @@ struct SearchFieldView: View {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(PanelStyle.Icon.control)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .help("Clear search")
             }
 
             if let onToggleFilters {
@@ -56,17 +57,18 @@ struct SearchFieldView: View {
                     Image(systemName: isFilterActive
                           ? "line.3.horizontal.decrease.circle.fill"
                           : "line.3.horizontal.decrease.circle")
-                        .font(.system(size: 13))
+                        .font(PanelStyle.Icon.control)
                         .foregroundStyle(isFilterHighlighted ? Color.accentColor : Color.secondary)
                 }
                 .buttonStyle(.plain)
                 .help("Filter by Type, App, or Date")
             }
         }
+        .font(PanelStyle.Text.body)
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .background(
-            Color.white.opacity(0.06),
+            PanelStyle.surface,
             in: RoundedRectangle(cornerRadius: 8)
         )
     }

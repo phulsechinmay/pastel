@@ -14,7 +14,7 @@ struct AccessibilityRequiredView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "accessibility")
-                .font(.system(size: 48))
+                .font(PanelStyle.Icon.empty)
                 .foregroundStyle(.secondary)
 
             Text("Accessibility Permission Needed")
@@ -83,6 +83,5 @@ struct AccessibilityRequiredView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 }

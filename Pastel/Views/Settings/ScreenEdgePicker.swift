@@ -19,10 +19,10 @@ struct ScreenEdgePicker: View {
         ZStack {
             // Screen body
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.05))
+                .fill(PanelStyle.surfaceRecessed)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        .stroke(PanelStyle.strokeStrong, lineWidth: 1)
                 )
                 .frame(width: screenWidth, height: screenHeight)
 
@@ -54,7 +54,7 @@ struct ScreenEdgePicker: View {
     private func edgeBar(edge: PanelEdge) -> some View {
         let isSelected = selectedEdge == edge.rawValue
         return RoundedRectangle(cornerRadius: 3)
-            .fill(isSelected ? Color.accentColor : Color.white.opacity(0.15))
+            .fill(isSelected ? Color.accentColor : PanelStyle.surfaceRaised)
             .onTapGesture {
                 selectedEdge = edge.rawValue
             }

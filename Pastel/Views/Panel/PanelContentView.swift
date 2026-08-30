@@ -64,13 +64,11 @@ struct PanelContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             if isHorizontal {
-                // Horizontal mode: single inline row with header, search, chips, and gear
+                // Horizontal mode: single inline row with header, search, chips, and gear.
+                // No brand mark here: this is the tightest layout in the app and the
+                // user reached it with a hotkey, so identifying the app costs more
+                // than it returns. The vertical layout keeps a small one.
                 HStack(spacing: 8) {
-                    Image("PastelLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 38)
-
                     SearchFieldView(
                         searchText: $searchText,
                         focusRequestID: searchFocusRequestID,
@@ -116,10 +114,14 @@ struct PanelContentView: View {
             } else {
                 // Vertical mode: header on top, search and chips stacked below
                 HStack {
+                    // Was 38pt of full-colour wordmark, the largest and most saturated
+                    // element in a panel whose job is to disappear into a paste.
                     Image("PastelLogo")
                         .resizable()
                         .scaledToFit()
-                        .frame(height: 38)
+                        .frame(height: PanelLayout.brandMarkHeight)
+                        .opacity(0.9)
+                        .accessibilityHidden(true)
                     Spacer()
                     toolbarButtons
                 }
@@ -242,19 +244,23 @@ struct PanelContentView: View {
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
         }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Toolbar Buttons
 
     /// Color picker, position switcher, and settings gear — shared between both layouts.
+    ///
+    /// Each button now carries an explicit `toolbarButtonSize` frame and a hover fill.
+    /// They were bare 14pt glyphs with no chrome, so the effective hit area was roughly
+    /// the glyph's own bounds and nothing indicated they were pressable at all. Every
+    /// one also carries a `.help()` now; only the first one used to.
     private var toolbarButtons: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             Button {
                 EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 14))
+                    .font(PanelStyle.Icon.action)
                     .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
@@ -264,10 +270,11 @@ struct PanelContentView: View {
                 ColorToolController.shared.showColorPicker()
             } label: {
                 Image(systemName: "eyedropper")
-                    .font(.system(size: 14))
+                    .font(PanelStyle.Icon.action)
                     .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
+            .help("Pick a Colour from Screen")
 
             Menu {
                 ForEach(Array(PanelEdge.allCases), id: \.self) { (edge: PanelEdge) in
@@ -285,12 +292,14 @@ struct PanelContentView: View {
                 }
             } label: {
                 Image(systemName: "rectangle.leadinghalf.inset.filled.arrow.leading")
-                    .font(.system(size: 14))
+                    .font(PanelStyle.Icon.action)
                     .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .fixedSize()
+            .help("Panel Position")
 
             Button {
                 if let container = appState.modelContainer {
@@ -301,10 +310,11 @@ struct PanelContentView: View {
                 }
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 14))
+                    .font(PanelStyle.Icon.action)
                     .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
+            .help("Settings (\u{2318},)")
         }
     }
 
@@ -388,12 +398,25 @@ struct PanelContentView: View {
 
 /// Availability-gated button style: `.borderless` on macOS 26+ (outer NSGlassEffectView
 /// provides the glass backdrop; using `.glass` here would be glass-on-glass), `.plain` on older.
+///
+/// Also supplies the hit target and hover affordance the toolbar was missing.
 private struct AdaptiveGlassButtonStyle: ViewModifier {
+    @State private var isHovered = false
+
     func body(content: Content) -> some View {
         // Use `.plain` on all versions: `.borderless` applies control vibrancy that
         // dims the glyph relative to the position `Menu`, which renders undimmed.
         // `.plain` renders label content as-is, keeping all toolbar icons the same brightness.
-        content.buttonStyle(.plain)
+        content
+            .buttonStyle(.plain)
+            .frame(width: PanelLayout.toolbarButtonSize, height: PanelLayout.toolbarButtonSize)
+            .background(
+                isHovered ? PanelStyle.surfaceHover : .clear,
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .onHover { isHovered = $0 }
+            .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 }
 

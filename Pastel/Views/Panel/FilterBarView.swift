@@ -16,7 +16,7 @@ struct FilterBarView: View {
     let availableApps: [SourceAppOption]
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: PanelLayout.chipSpacing) {
             typeMenu
             appMenu
             dateMenu
@@ -28,7 +28,7 @@ struct FilterBarView: View {
                     }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(PanelStyle.Icon.control)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -209,30 +209,19 @@ struct FilterBarView: View {
                         }
                 } else {
                     Image(systemName: systemImage)
-                        .font(.system(size: 10))
+                        .font(PanelStyle.Icon.meta)
                 }
                 Text(title)
-                    .font(.system(size: 11, weight: isActive ? .semibold : .regular))
+                    .font(PanelStyle.Text.control.weight(isActive ? .semibold : .regular))
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(PanelStyle.Icon.meta.weight(.semibold))
                     .opacity(0.6)
             }
             .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule().fill(
-                    isActive
-                        ? Color.accentColor.opacity(0.18)
-                        : Color.white.opacity(0.07)
-                )
-            )
-            .overlay(
-                Capsule().strokeBorder(
-                    isActive ? Color.accentColor.opacity(0.5) : Color.white.opacity(0.10),
-                    lineWidth: 1
-                )
-            )
+            // The same chip capsule as the label bar directly above it. These two rows
+            // used to run different heights, paddings, and fills while sitting adjacent,
+            // which read as a mistake rather than as a distinction.
+            .chipChrome(isActive: isActive)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

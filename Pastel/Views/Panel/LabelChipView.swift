@@ -28,22 +28,15 @@ struct LabelChipView: View {
 
             if let emoji = label.emoji, !emoji.isEmpty {
                 Text(emoji)
-                    .font(.system(size: size == .compact ? 8 : 11))
+                    .font(PanelStyle.Text.meta)
             }
             Text(label.name)
-                .font(size == .compact ? .system(size: 9) : .system(size: 11))
+                // Compact chips used to drop to 8/9pt, below the platform's legibility
+                // floor. Both sizes now sit on the shared ladder.
+                .font(size == .compact ? PanelStyle.Text.meta : PanelStyle.Text.control)
                 .lineLimit(1)
         }
-        .padding(.horizontal, size == .compact ? 5 : 10)
-        .padding(.vertical, size == .compact ? 2 : 5)
-        .frame(height: size == .compact ? nil : PanelLayout.chipHeight)
-        .background(background, in: Capsule())
-        .overlay(
-            Capsule().strokeBorder(
-                isActive ? Color.accentColor.opacity(0.6) : Color.clear,
-                lineWidth: 1
-            )
-        )
+        .chipChrome(isActive: isActive, tintOverride: tintOverride, isCompact: size == .compact)
     }
 
     /// Color for the leading dot circle.
@@ -52,18 +45,5 @@ struct LabelChipView: View {
             return tint
         }
         return LabelColor(rawValue: label.colorName)?.color ?? .gray
-    }
-
-    /// Always-neutral background regardless of label color or emoji.
-    private var background: Color {
-        if let tint = tintOverride {
-            return tint.opacity(0.15)
-        }
-
-        if isActive {
-            return Color.accentColor.opacity(0.3)
-        } else {
-            return Color.white.opacity(0.1)
-        }
     }
 }

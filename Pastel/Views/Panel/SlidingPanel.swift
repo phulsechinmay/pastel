@@ -35,7 +35,10 @@ final class SlidingPanel: NSPanel {
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         isMovableByWindowBackground = false
-        appearance = NSAppearance(named: .darkAqua)
+        // Appearance deliberately left unset so the panel follows the system.
+        // It used to be pinned to .darkAqua, which is what made hardcoded white
+        // overlays safe throughout the panel; those are tokens now (PanelStyle)
+        // and invert on their own, so a light-mode user finally gets a light panel.
     }
 
     // MARK: - Key / Main Behavior

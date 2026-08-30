@@ -5,15 +5,15 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "clipboard")
-                .font(.system(size: 40))
+                .font(PanelStyle.Icon.empty)
                 .foregroundStyle(.secondary)
 
             Text("Copy something to get started")
-                .font(.headline)
+                .font(PanelStyle.Text.title)
                 .foregroundStyle(.secondary)
 
             Text("Your clipboard history will appear here")
-                .font(.caption)
+                .font(PanelStyle.Text.meta)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

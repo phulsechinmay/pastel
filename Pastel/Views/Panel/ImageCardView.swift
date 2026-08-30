@@ -16,11 +16,11 @@ struct ImageCardView: View {
         Group {
             if let imagePath = item.imagePath ?? item.thumbnailPath {
                 AsyncThumbnailView(filename: imagePath)
-                    .frame(maxWidth: .infinity, maxHeight: 140)
+                    .frame(maxWidth: .infinity, maxHeight: PanelLayout.cardImageMaxHeight)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 Image(systemName: "photo")
-                    .font(.system(size: 24))
+                    .font(PanelStyle.Icon.empty)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 60)
             }

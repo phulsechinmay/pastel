@@ -12,6 +12,7 @@
 		0705E8D7C6E0B9DFD944D17A /* DragItemProviderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311A67E5A6FA0C55F53F34D2 /* DragItemProviderService.swift */; };
 		0718766F684C890B0D3CC008 /* LabelColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A1A38C2FA151019789426E /* LabelColor.swift */; };
 		0DBAA351E86CE7AD5ACF5EA8 /* CheckForUpdatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D016E956757FC54451ADA9B /* CheckForUpdatesView.swift */; };
+		0FDD46E0A50066665C480CB8 /* DisplayURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F09108A8CFC87E5CBBC87C5 /* DisplayURL.swift */; };
 		109EFD935C1F151E8429118F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 4580FAE3C522852BCACE0008 /* PrivacyInfo.xcprivacy */; };
 		122737920FB08FD4C003C5FC /* AppPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79CFDAC2AF0FE47B9F09BCD5 /* AppPickerView.swift */; };
 		1B8747A27E4A24B8EC0C06E2 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F55BB63384017CEF138AB5BA /* SettingsWindowController.swift */; };
@@ -43,6 +44,7 @@
 		77A34F0C407E0CDC0D03AD39 /* PasteBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D583EE522FF0443CE93DFE6 /* PasteBehavior.swift */; };
 		7D6156B31DDB16BCAAA57090 /* AccessibilityRequiredView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296EC723938755F17A2F3802 /* AccessibilityRequiredView.swift */; };
 		7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA88123A30157392A4055111 /* SyncMonitor.swift */; };
+		818BABC4D7412724AE08A6C9 /* PanelStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DF906B7C379D759931F40F6 /* PanelStyle.swift */; };
 		8557CEFECB6460592724EA0E /* NSImage+Thumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6234E0274B828B16C2A57EA /* NSImage+Thumbnail.swift */; };
 		8991699CFB898E2E846DB670 /* URLCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E931197AB3A47AD6193B9FF1 /* URLCardView.swift */; };
 		8D3A1DE972AB5DED09F5C907 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018D70F413FB3449B315242B /* UpdaterService.swift */; };
@@ -130,6 +132,7 @@
 		5C923EFB4B78ABBB1E920841 /* ExpirationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpirationService.swift; sourceTree = "<group>"; };
 		61A1A38C2FA151019789426E /* LabelColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelColor.swift; sourceTree = "<group>"; };
 		6802DF0A84D98A037B3BC192 /* EditItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditItemView.swift; sourceTree = "<group>"; };
+		6DF906B7C379D759931F40F6 /* PanelStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelStyle.swift; sourceTree = "<group>"; };
 		71138AD30E90615916853DD4 /* StatusPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPopoverView.swift; sourceTree = "<group>"; };
 		71CA3F1D48AC3D60A2A1217B /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		72D7644ACF10CD4DC890BE9E /* CodeDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeDetectionService.swift; sourceTree = "<group>"; };
@@ -140,6 +143,7 @@
 		7B6FC5171BA6D8C3F714E834 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7CA38A9FD4344A6EBC84615B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8E4FC404F56DB93E075FCDEB /* ColorToolController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorToolController.swift; sourceTree = "<group>"; };
+		8F09108A8CFC87E5CBBC87C5 /* DisplayURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayURL.swift; sourceTree = "<group>"; };
 		9740741415D5FC006330A2D0 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		9C7F8E05C490820A909E5D51 /* Label.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Label.swift; sourceTree = "<group>"; };
 		A34B531FE14E94C513D7A73D /* DeviceIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentifier.swift; sourceTree = "<group>"; };
@@ -235,6 +239,7 @@
 			children = (
 				E2DBAFFC0300717000685459 /* AppRelaunchService.swift */,
 				A34B531FE14E94C513D7A73D /* DeviceIdentifier.swift */,
+				8F09108A8CFC87E5CBBC87C5 /* DisplayURL.swift */,
 				B95B96E88D3DBC7E6F3661B4 /* ThumbnailLoader.swift */,
 			);
 			path = Utilities;
@@ -338,6 +343,7 @@
 				A5FEF0FE3AC5B3076726EAEB /* PanelContentView.swift */,
 				E7A89B1626914331B041874D /* PanelController.swift */,
 				E518463722AA3C82269FBC5B /* PanelLayout.swift */,
+				6DF906B7C379D759931F40F6 /* PanelStyle.swift */,
 				E4BADC66322076CEB1E831B5 /* SearchFieldView.swift */,
 				D83722A01CB31BC92398C942 /* SlidingPanel.swift */,
 				E7628FEB0B879CD6BCCD59F6 /* TextCardView.swift */,
@@ -520,6 +526,7 @@
 				4DED4706DEA246882DE6D749 /* DeduplicationService.swift in Sources */,
 				67F8F8668E97A51739D6D69E /* DeletionManager.swift in Sources */,
 				311D38AA5AD215646217479E /* DeviceIdentifier.swift in Sources */,
+				0FDD46E0A50066665C480CB8 /* DisplayURL.swift in Sources */,
 				0705E8D7C6E0B9DFD944D17A /* DragItemProviderService.swift in Sources */,
 				3442E2E6EDB5B2E9A747C631 /* EditItemView.swift in Sources */,
 				D6F7C0FF5984EC498B94BCC3 /* EmptyStateView.swift in Sources */,
@@ -550,6 +557,7 @@
 				35B2B78C88F753B2D19BB929 /* PanelController.swift in Sources */,
 				C5DDC68198250D3A003DB9D7 /* PanelEdge.swift in Sources */,
 				8DBC176CDC96ACB4D5E1C831 /* PanelLayout.swift in Sources */,
+				818BABC4D7412724AE08A6C9 /* PanelStyle.swift in Sources */,
 				77A34F0C407E0CDC0D03AD39 /* PasteBehavior.swift in Sources */,
 				FC28C1E1511F71298087486A /* PasteService.swift in Sources */,
 				5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */,

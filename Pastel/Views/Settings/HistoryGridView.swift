@@ -38,8 +38,14 @@ struct HistoryGridView: View {
     private let onRequestBulkDelete: () -> Void
     private let onPastePlainText: (ClipboardItem) -> Void
 
+    /// The grid used to be `.adaptive(minimum: 280, maximum: 400)`. At the settings
+    /// window's default 820pt width, minus a ~200pt sidebar, the detail pane fits
+    /// exactly one 400pt column: a "grid" that rendered as a single centred column
+    /// with ~100pt of dead gutter on either side, showing less per screen than the
+    /// 320pt panel it was supposed to expand on. A 320pt ceiling fits two columns at
+    /// the default width and keeps filling out as the window grows.
     private let columns = [
-        GridItem(.adaptive(minimum: 280, maximum: 400), spacing: 12)
+        GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 12)
     ]
 
     init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, allLabels: [Label] = [], selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}, onPastePlainText: @escaping (ClipboardItem) -> Void = { _ in }) {
@@ -126,7 +132,7 @@ struct HistoryGridView: View {
             if memoizedFilteredItems.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 32))
+                        .font(PanelStyle.Icon.empty)
                         .foregroundStyle(.tertiary)
                     Text("No items found")
                         .font(.subheadline)
@@ -142,7 +148,15 @@ struct HistoryGridView: View {
                                 item: item,
                                 isSelected: isInSelection,
                                 allLabels: allLabels,
-                                hideContextMenu: true
+                                hideContextMenu: true,
+                                // Dropping a label on a card that is part of the current
+                                // selection labels the whole selection. Cmd-click a dozen
+                                // clips, drag one chip, done. Dropping on an unselected
+                                // card still hits only that card, so the gesture never
+                                // does more than what is visibly highlighted.
+                                labelDropTargets: {
+                                    isInSelection ? selectedItems() : [item]
+                                }
                             )
                             .onTapGesture {
                                 handleTap(item: item, index: index)
@@ -233,6 +247,11 @@ struct HistoryGridView: View {
     }
 
     // MARK: - Multi-Selection
+
+    /// The currently selected items, resolved from IDs against the filtered set.
+    private func selectedItems() -> [ClipboardItem] {
+        memoizedFilteredItems.filter { selectedIDs.contains($0.persistentModelID) }
+    }
 
     private func handleTap(item: ClipboardItem, index: Int) {
         let id = item.persistentModelID

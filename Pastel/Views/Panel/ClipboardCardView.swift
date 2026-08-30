@@ -28,6 +28,12 @@ struct ClipboardCardView: View {
     @State private var isHovered = false
     @State private var dominantColor: Color?
 
+    /// A label chip is hovering over this card, waiting to be dropped.
+    @State private var isLabelDropTargeted = false
+    /// A label was dropped that this card already carries. Briefly scales the chip it
+    /// already has, so the refusal names its own reason instead of just failing.
+    @State private var pulsingLabelID: PersistentIdentifier?
+
     private var isHorizontal: Bool {
         let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
         return !edge.isVertical
@@ -44,23 +50,27 @@ struct ClipboardCardView: View {
     /// 1-based position badge number (1-9), or nil to hide badge.
     var badgePosition: Int?
 
-    /// Whether a label chip is currently being dragged over this card.
-    var isDropTarget: Bool
-
     /// Whether the Shift key is currently held (for dynamic badge display).
     var isShiftHeld: Bool
 
     /// When true, the built-in context menu is suppressed (caller provides its own).
     var hideContextMenu: Bool
 
-    init(item: ClipboardItem, isSelected: Bool = false, allLabels: [Label] = [], badgePosition: Int? = nil, isDropTarget: Bool = false, isShiftHeld: Bool = false, hideContextMenu: Bool = false, onPaste: (() -> Void)? = nil) {
+    /// Which items a dropped label should be applied to. Defaults to this card alone.
+    ///
+    /// The History browser hands back its whole multi-selection when this card is part
+    /// of it, so one drop labels everything selected. That is the surface where people
+    /// go to organize in bulk, and doing it one card at a time there was busywork.
+    var labelDropTargets: (() -> [ClipboardItem])?
+
+    init(item: ClipboardItem, isSelected: Bool = false, allLabels: [Label] = [], badgePosition: Int? = nil, isShiftHeld: Bool = false, hideContextMenu: Bool = false, labelDropTargets: (() -> [ClipboardItem])? = nil, onPaste: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
         self.allLabels = allLabels
         self.badgePosition = badgePosition
-        self.isDropTarget = isDropTarget
         self.isShiftHeld = isShiftHeld
         self.hideContextMenu = hideContextMenu
+        self.labelDropTargets = labelDropTargets
         self.onPaste = onPaste
     }
 
@@ -70,34 +80,34 @@ struct ClipboardCardView: View {
             HStack(spacing: 4) {
                 sourceAppIcon
 
-                let visibleLabels = Array(item.safeLabels.prefix(3))
-                ForEach(visibleLabels) { label in
+                ForEach(headerLabels) { label in
                     LabelChipView(label: label, size: .compact, tintOverride: isColorCard ? colorCardTextColor : nil)
+                        // A freshly dropped label grows into place rather than popping
+                        // in. In the History browser, where a drop can hit an entire
+                        // selection, this is what makes twelve cards acknowledge at once.
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                        .scaleEffect(pulsingLabelID == label.persistentModelID ? 1.18 : 1)
                 }
                 if item.safeLabels.count > 3 {
                     Text("+\(item.safeLabels.count - 3)")
-                        .font(.caption2)
-                        .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(
-                            isColorCard ? colorCardTextColor.opacity(0.15) : Color.white.opacity(0.1),
-                            in: Capsule()
-                        )
+                        .font(PanelStyle.Text.meta)
+                        .foregroundStyle(metaForeground)
+                        .chipChrome(tintOverride: isColorCard ? colorCardTextColor : nil, isCompact: true)
                 }
 
                 Spacer()
 
                 if item.isPinned {
                     Image(systemName: "pin.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
+                        .font(PanelStyle.Icon.meta)
+                        .foregroundStyle(metaForeground)
                 }
 
                 // Abbreviated relative time
                 Text(relativeTimeString(for: item.timestamp))
-                    .font(.caption2)
-                    .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.7) : .secondary)
+                    .font(PanelStyle.Text.meta)
+                    .foregroundStyle(metaForeground)
+                    .monospacedDigit()
             }
 
             // Content preview (full-width)
@@ -113,7 +123,7 @@ struct ClipboardCardView: View {
                 HStack(spacing: 4) {
                     if let title = item.title, !title.isEmpty {
                         Text(title)
-                            .font(.caption.bold())
+                            .font(PanelStyle.Text.title)
                             .lineLimit(1)
                             .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
                     }
@@ -121,29 +131,41 @@ struct ClipboardCardView: View {
                     Spacer()
 
                     if let badgePosition {
-                        KeycapBadge(number: badgePosition, isShiftHeld: isShiftHeld)
+                        KeycapBadge(
+                            number: badgePosition,
+                            isShiftHeld: isShiftHeld,
+                            tint: isColorCard ? colorCardTextColor : nil
+                        )
                     }
                 }
             }
         }
         .padding(.horizontal, PanelLayout.cardHorizontalPadding)
         .padding(.vertical, PanelLayout.cardVerticalPadding)
-        .frame(maxWidth: .infinity, minHeight: cardMinHeight, maxHeight: PanelLayout.cardMaxHeight, alignment: .topLeading)
+        // In horizontal mode the list hands every card an identical slot sized to the
+        // space under the header, so the card must not also impose its own ceiling —
+        // the two caps fought and the shorter one won, leaving the dead band.
+        .frame(
+            maxWidth: .infinity,
+            minHeight: cardMinHeight,
+            maxHeight: isHorizontal ? .infinity : PanelLayout.cardMaxHeight,
+            alignment: .topLeading
+        )
         .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
         .background {
             ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: PanelLayout.cardCornerRadius)
                     .fill(cardBackground)
                 if !isColorCard, let dominantColor {
+                    // Confined to the header row and capped low. This is an app tint,
+                    // not a highlight — at its old 0.5 opacity across the top half of
+                    // the card it outranked the actual selection state.
                     LinearGradient(
-                        stops: [
-                            .init(color: dominantColor.opacity(0.5), location: 0.0),
-                            .init(color: .clear, location: 0.5)
-                        ],
+                        colors: [dominantColor.opacity(0.12), .clear],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardCornerRadius))
+                    .frame(height: PanelLayout.cardAppWashHeight)
                 }
             }
         }
@@ -152,6 +174,19 @@ struct ClipboardCardView: View {
                 .strokeBorder(cardBorderColor, lineWidth: 1.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardCornerRadius))
+        // Selection ring, drawn OUTSIDE the card in the layout gutter. Content cannot
+        // paint outside its own frame, so a `.color` clip that happens to be the accent
+        // colour can never counterfeit this — which it could, and did, when selection
+        // was just an accent fill.
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: PanelLayout.cardCornerRadius + PanelLayout.selectionRingInset,
+                style: .continuous
+            )
+            .strokeBorder(PanelStyle.selectionRing, lineWidth: PanelLayout.selectionRingWidth)
+            .padding(-PanelLayout.selectionRingInset)
+            .opacity(isSelected ? 1 : 0)
+        }
         .task {
             // Load dominant color for header gradient (deferred to avoid blocking panel open)
             if !isColorCard {
@@ -161,9 +196,19 @@ struct ClipboardCardView: View {
         .onHover { hovering in
             isHovered = hovering
         }
+        // Label drops are handled here rather than by the list that owns the card.
+        // The panel's list used to own it, which is why the History browser could not
+        // accept a label at all despite showing the same chip bar directly above the
+        // same cards.
+        .dropDestination(for: String.self) { strings, _ in
+            handleLabelDrop(strings)
+        } isTargeted: { targeted in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isLabelDropTargeted = targeted
+            }
+        }
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
-        .animation(.easeInOut(duration: 0.15), value: isDropTarget)
         .contextMenu(hideContextMenu ? nil : ContextMenu {
             if item.type == .image {
                 Button("View Image") {
@@ -283,6 +328,59 @@ struct ClipboardCardView: View {
         })
     }
 
+    // MARK: - Label Drops
+
+    /// The label chips that actually render in the header row.
+    private var headerLabels: [Label] {
+        Array(item.safeLabels.prefix(3))
+    }
+
+    /// Assign a dropped label, either to this card or to the caller's whole selection.
+    ///
+    /// Returns `false` when every target already carries the label, which lets the
+    /// system play its own snap-back. That is the platform's vocabulary for "not
+    /// accepted", and it is a great deal clearer than what this did before: report
+    /// success, change nothing, and leave the user unsure whether the drop registered.
+    private func handleLabelDrop(_ strings: [String]) -> Bool {
+        guard let encodedID = strings.first,
+              let labelID = PersistentIdentifier.fromTransferString(encodedID),
+              let label = try? modelContext.model(for: labelID) as? Label else {
+            return false
+        }
+
+        let targets = labelDropTargets?() ?? [item]
+        let needsLabel = targets.filter { target in
+            !target.safeLabels.contains { $0.persistentModelID == label.persistentModelID }
+        }
+
+        guard !needsLabel.isEmpty else {
+            pulseExistingChip(for: label)
+            return false
+        }
+
+        withAnimation(.easeOut(duration: 0.24)) {
+            for target in needsLabel {
+                target.safeLabels.append(label)
+                target.refreshLabelKey()
+            }
+        }
+        saveWithLogging(modelContext, operation: "label drop assignment")
+        return true
+    }
+
+    /// Briefly grow the chip the card already has, so a refused drop points at its
+    /// own reason. Skipped when that chip is folded into the "+N" overflow, where
+    /// there is nothing to point at and the snap-back has to carry the message alone.
+    private func pulseExistingChip(for label: Label) {
+        let id = label.persistentModelID
+        guard headerLabels.contains(where: { $0.persistentModelID == id }) else { return }
+
+        withAnimation(.easeOut(duration: 0.12)) { pulsingLabelID = id }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            withAnimation(.easeOut(duration: 0.24)) { pulsingLabelID = nil }
+        }
+    }
+
     // MARK: - Actions
 
     /// Copy a formatted string directly to the system clipboard.
@@ -381,8 +479,8 @@ struct ClipboardCardView: View {
             // this" instead of looking like a failed icon lookup, and `sourceAppName`
             // stays nil so no sentinel string leaks into search results.
             Image(systemName: "square.and.pencil")
-                .font(.system(size: 15))
-                .foregroundStyle(isColorCard ? colorCardTextColor.opacity(0.8) : .secondary)
+                .font(PanelStyle.Icon.content)
+                .foregroundStyle(metaForeground)
                 .frame(width: 24, height: 24)
         } else if let bundleID = item.sourceAppBundleID,
            let icon = AppIconCache.shared.icon(forBundleID: bundleID) {
@@ -392,7 +490,7 @@ struct ClipboardCardView: View {
                 .clipShape(Circle())
         } else {
             Image(systemName: "app")
-                .font(.system(size: 18))
+                .font(PanelStyle.Icon.content)
                 .foregroundStyle(.secondary)
                 .frame(width: 24, height: 24)
         }
@@ -416,31 +514,40 @@ struct ClipboardCardView: View {
         }
     }
 
-    /// Card background: detected color for `.color` items, standard dark chrome otherwise.
+    /// Card background: the detected colour for `.color` items, the surface ramp otherwise.
+    ///
+    /// Note what is *absent*: selection no longer changes a colour card's fill. The
+    /// swatch stays true to its value and the outset ring carries the state instead.
     private var cardBackground: AnyShapeStyle {
         if isColorCard {
             return AnyShapeStyle(colorFromHex(item.detectedColorHex))
-        } else if isDropTarget {
-            return AnyShapeStyle(Color.accentColor.opacity(0.15))   // Subtle accent highlight
+        } else if isLabelDropTargeted {
+            return AnyShapeStyle(PanelStyle.dropTargetFill)
         } else if isSelected {
-            return AnyShapeStyle(Color.accentColor.opacity(0.3))
+            return AnyShapeStyle(PanelStyle.selectionFill)
         } else if isHovered {
-            return AnyShapeStyle(Color.white.opacity(0.12))
+            return AnyShapeStyle(PanelStyle.surfaceHover)
         } else {
-            return AnyShapeStyle(Color.white.opacity(0.06))
+            return AnyShapeStyle(PanelStyle.surface)
         }
     }
 
-    /// Card border: accent when drop target or selected, subtle white for color cards, clear otherwise.
+    /// Inset border. Drop targets get it (interior geometry); selection deliberately
+    /// does not, so the two states stay visually separable when a card is both.
     private var cardBorderColor: Color {
-        if isDropTarget {
-            return Color.accentColor          // Bright accent border during drag hover
-        } else if isSelected {
-            return Color.accentColor.opacity(0.5)
+        if isLabelDropTargeted {
+            return PanelStyle.dropTargetStroke
         } else if isColorCard {
-            return Color.white.opacity(0.15)
+            return PanelStyle.strokeStrong
         }
-        return Color.clear
+        return .clear
+    }
+
+    /// Foreground for header metadata, resolved against whichever surface it lands on.
+    private var metaForeground: AnyShapeStyle {
+        isColorCard
+            ? AnyShapeStyle(PanelStyle.onColor(colorCardTextColor, secondary: true))
+            : AnyShapeStyle(HierarchicalShapeStyle.secondary)
     }
 
     private var cardMinHeight: CGFloat {
@@ -453,11 +560,18 @@ struct ClipboardCardView: View {
 
 // MARK: - KeycapBadge
 
-/// Text-only badge showing a quick paste shortcut (e.g., "\u{2318}1" or "\u{2318}\u{21E7}1").
+/// Badge showing a quick paste shortcut (e.g., "\u{2318}1" or "\u{2318}\u{21E7}1").
 /// Dynamically shows the Shift symbol when the Shift key is held.
+///
+/// Rendered as an actual keycap (raised surface, capsule) rather than loose text.
+/// It previously sat at `white.opacity(0.5)` on a `white.opacity(0.06)` card, which
+/// is well under 4.5:1 — a legibility problem on the one affordance in the panel
+/// whose entire job is to teach a shortcut.
 struct KeycapBadge: View {
     let number: Int  // 1-9
     var isShiftHeld: Bool = false
+    /// Contrast colour when the badge sits on an arbitrary user colour (colour cards).
+    var tint: Color?
 
     var body: some View {
         HStack(spacing: 1) {
@@ -467,7 +581,14 @@ struct KeycapBadge: View {
             }
             Text("\(number)")
         }
-        .font(.system(size: 10, weight: .medium, design: .rounded))
-        .foregroundStyle(.white.opacity(0.5))
+        .font(PanelStyle.Text.meta.weight(.medium))
+        .monospacedDigit()
+        .foregroundStyle(tint.map { PanelStyle.onColor($0) } ?? .secondary)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(
+            tint.map { PanelStyle.surfaceOnColor($0) } ?? PanelStyle.surfaceRaised,
+            in: Capsule()
+        )
     }
 }

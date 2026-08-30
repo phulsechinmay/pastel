@@ -4,9 +4,15 @@ import AppKit
 /// Card content for `.url` clipboard items with rich metadata preview.
 ///
 /// Displays three possible states based on `urlMetadataFetched`:
-/// - **Loading** (nil): Plain URL card with globe icon + blue text and a subtle spinner
-/// - **Enriched** (true): og:image banner + favicon + page title row (raw URL hidden)
-/// - **Failed** (false): Plain URL fallback (globe icon + blue text, no spinner)
+/// - **Loading** (nil): the URL, plus a spinner for the metadata still in flight
+/// - **Enriched** (true): og:image banner + favicon + page title + the URL beneath it
+/// - **Failed** (false): the URL alone
+///
+/// All three render the URL through `DisplayURL` at the same size and weights, so the
+/// card gains a picture and a title when metadata lands rather than restyling its
+/// text. The enriched state used to hide the raw URL entirely, which meant two links
+/// to the same site were indistinguishable: same favicon, same og:image, and titles
+/// that differ by an issue number the tail-truncation then cut off.
 ///
 /// Images (favicon, og:image) are loaded from disk via ImageStorageService.
 /// The shared header row (source app icon + timestamp) is rendered by ClipboardCardView
@@ -14,27 +20,25 @@ import AppKit
 struct URLCardView: View {
 
     let item: ClipboardItem
-    @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
 
     @State private var bannerImage: NSImage?
     @State private var faviconImage: NSImage?
 
-    private var isHorizontal: Bool {
-        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
-        return !edge.isVertical
-    }
+    // The panel edge is no longer read here. It used to switch the raw URL between a
+    // 2-line and a 4-line wrap, which only mattered while the card was printing an
+    // unstripped URL that needed four lines to say anything.
 
     var body: some View {
         Group {
             switch item.urlMetadataFetched {
             case nil:
-                // State 1: Loading -- plain card with spinner
+                // State 1: Loading -- URL with a spinner
                 loadingState
             case true:
-                // State 2: Enriched -- og:image banner + favicon + title
+                // State 2: Enriched -- og:image banner + favicon + title + URL
                 enrichedState
             case false:
-                // State 3: Failed -- plain URL fallback
+                // State 3: Failed -- URL alone
                 plainURLRow
             default:
                 plainURLRow
@@ -51,21 +55,34 @@ struct URLCardView: View {
         }
     }
 
+    // MARK: - Parsed Content
+
+    /// The copied URL split into its site half and its page half, or nil when the
+    /// string will not parse and the raw text has to stand in.
+    private var displayURL: DisplayURL? {
+        DisplayURL(item.textContent ?? "")
+    }
+
+    /// The fetched page title, treating whitespace-only as absent. Sites do return
+    /// `<title> </title>`, and an empty title slot with a URL line beneath it looks
+    /// like a rendering bug rather than a site with nothing to say.
+    private var pageTitle: String? {
+        guard let title = item.urlTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !title.isEmpty
+        else { return nil }
+        return title
+    }
+
     // MARK: - State Views
 
-    /// Loading state: plain URL row with a trailing spinner
+    /// Loading state: the URL with a trailing spinner.
     private var loadingState: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "globe")
-                .font(.system(size: 16))
-                .foregroundStyle(Color.blue)
+        HStack(spacing: PanelLayout.urlGlyphSpacing) {
+            globeGlyph
 
-            Text(item.textContent ?? "")
-                .font(.system(.callout, design: .default))
-                .lineLimit(isHorizontal ? 4 : 2)
-                .foregroundStyle(Color.blue)
+            urlHeadline(lineLimit: 2)
 
-            Spacer()
+            Spacer(minLength: PanelLayout.urlGlyphSpacing)
 
             ProgressView()
                 .controlSize(.mini)
@@ -81,25 +98,20 @@ struct URLCardView: View {
         return img.size.width >= 200 && img.size.height >= 100
     }
 
-    /// Enriched state: og:image banner (if available) + favicon + title row
+    /// Enriched state: og:image banner (if available) + the metadata block.
     private var enrichedState: some View {
         VStack(alignment: .leading, spacing: 6) {
             if hasBannerSizedImage, let bannerImage {
-                // Full-width banner for large og:images
-                GeometryReader { geo in
-                    let w = geo.size.width
-                    let h = w / 2
-                    ZStack {
-                        Image(nsImage: bannerImage)
-                            .resizable()
-                            .scaledToFill()
-                    }
-                    .frame(width: w, height: h)
-                    .clipped()
-                }
-                .aspectRatio(2 / 1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .transition(.opacity)
+                Image(nsImage: bannerImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: PanelLayout.cardURLBannerHeight,
+                        maxHeight: PanelLayout.cardURLBannerHeight
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardURLBannerCornerRadius))
+                    .transition(.opacity)
             } else if bannerImage != nil || faviconImage != nil {
                 // Small og:image or favicon only — show centered at natural size
                 let displayImage = faviconImage ?? bannerImage
@@ -109,7 +121,10 @@ struct URLCardView: View {
                         Image(nsImage: displayImage)
                             .resizable()
                             .scaledToFit()
-                            .frame(maxWidth: 64, maxHeight: 64)
+                            .frame(
+                                maxWidth: PanelLayout.cardURLSmallImageSize,
+                                maxHeight: PanelLayout.cardURLSmallImageSize
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         Spacer()
                     }
@@ -119,46 +134,124 @@ struct URLCardView: View {
                 }
             }
 
-            // Favicon + title row (always shown when enriched)
-            HStack(spacing: 6) {
-                if hasBannerSizedImage, let faviconImage {
-                    // Show favicon only when we have a proper banner above
-                    Image(nsImage: faviconImage)
-                        .resizable()
-                        .frame(width: 16, height: 16)
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
-                } else if !hasBannerSizedImage {
-                    // No banner — use globe as prefix icon
-                    Image(systemName: "globe")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16, height: 16)
-                }
-
-                Text(item.urlTitle ?? item.textContent ?? "")
-                    .font(.callout)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .foregroundStyle(.primary)
-            }
+            metadataBlock
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .transition(.opacity)
     }
 
-    /// Plain URL row: globe icon + URL text in blue (no spinner)
-    private var plainURLRow: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "globe")
-                .font(.system(size: 16))
-                .foregroundStyle(Color.blue)
+    /// Favicon/globe + page title, with the URL on a second line beneath it.
+    ///
+    /// The URL sits *below* the title rather than above it because that is where every
+    /// native link preview on this platform puts it (Messages, Notes, Safari's own
+    /// bookmark rows), so it reads as a subtitle rather than an eyebrow.
+    ///
+    /// When there is no page title the URL is promoted into the title slot and the
+    /// second line is dropped. One piece of information, one row.
+    private var metadataBlock: some View {
+        VStack(alignment: .leading, spacing: PanelLayout.urlMetadataLineSpacing) {
+            HStack(spacing: PanelLayout.urlGlyphSpacing) {
+                if hasBannerSizedImage, let faviconImage {
+                    // Show favicon only when we have a proper banner above
+                    Image(nsImage: faviconImage)
+                        .resizable()
+                        .frame(width: PanelLayout.urlGlyphSize, height: PanelLayout.urlGlyphSize)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                } else if !hasBannerSizedImage {
+                    // No banner — use globe as prefix icon
+                    globeGlyph
+                }
 
-            Text(item.textContent ?? "")
-                .font(.system(.callout, design: .default))
-                .lineLimit(isHorizontal ? 4 : 2)
-                .foregroundStyle(Color.blue)
+                if let pageTitle {
+                    Text(pageTitle)
+                        .font(PanelStyle.Text.body)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .foregroundStyle(.primary)
+                } else {
+                    urlHeadline(lineLimit: 1)
+                }
+            }
+
+            if pageTitle != nil, let displayURL {
+                urlSubtitle(displayURL)
+                    // Inset to the title's text edge, not the card's, so the two rows
+                    // read as one block instead of a list of two things.
+                    .padding(.leading, PanelLayout.urlGlyphSize + PanelLayout.urlGlyphSpacing)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Failed state: the URL alone, no spinner.
+    private var plainURLRow: some View {
+        HStack(spacing: PanelLayout.urlGlyphSpacing) {
+            globeGlyph
+
+            urlHeadline(lineLimit: 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - URL Rendering
+
+    private var globeGlyph: some View {
+        Image(systemName: "globe")
+            .font(PanelStyle.Icon.control)
+            .foregroundStyle(.secondary)
+            .frame(width: PanelLayout.urlGlyphSize, height: PanelLayout.urlGlyphSize)
+    }
+
+    /// The URL acting as the card's headline, when there is no page title to be one.
+    ///
+    /// Deliberately not blue. Blue link-coloured text is a browser idiom, and rendering
+    /// it inside a native panel was the card admitting it had nothing but a raw string
+    /// to show. The domain carries the emphasis instead.
+    @ViewBuilder
+    private func urlHeadline(lineLimit: Int) -> some View {
+        if let displayURL {
+            (
+                Text(displayURL.domain)
+                    .font(PanelStyle.Text.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                + Text(displayURL.remainder)
+                    .font(PanelStyle.Text.body)
+                    .foregroundStyle(.secondary)
+            )
+            .lineLimit(lineLimit)
+            .truncationMode(.middle)
+            .help(displayURL.combined)
+        } else {
+            Text(item.textContent ?? "")
+                .font(PanelStyle.Text.body)
+                .lineLimit(lineLimit)
+                .truncationMode(.middle)
+                .foregroundStyle(.primary)
+        }
+    }
+
+    /// The URL acting as a subtitle under a page title.
+    ///
+    /// `.truncationMode(.middle)` is the whole point of this row. The default `.tail`
+    /// renders `github.com/pastel-app/pastel/pu…` and cuts off precisely the `/4821`
+    /// that tells this card apart from the one below it; `.head` eats the domain.
+    /// Middle truncation keeps both ends and drops the run in between, which is the
+    /// only part neither question needs.
+    ///
+    /// `Text.control` rather than `Text.meta`: a path you cannot read is chrome, and
+    /// this row exists to be read.
+    private func urlSubtitle(_ displayURL: DisplayURL) -> some View {
+        (
+            Text(displayURL.domain)
+                .font(PanelStyle.Text.control.weight(.medium))
+                .foregroundStyle(.secondary)
+            + Text(displayURL.remainder)
+                .font(PanelStyle.Text.control)
+                .foregroundStyle(.tertiary)
+        )
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .help(displayURL.combined)
     }
 
     // MARK: - Helpers

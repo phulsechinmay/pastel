@@ -17,7 +17,7 @@ struct TextCardView: View {
 
     var body: some View {
         Text(item.textContent ?? "")
-            .font(.system(.callout, design: .default))
+            .font(PanelStyle.Text.body)
             .lineLimit(isHorizontal ? 8 : 4)
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)

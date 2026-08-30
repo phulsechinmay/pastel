@@ -58,11 +58,27 @@ struct LabelSettingsView: View {
                 labelPendingDeletion = nil
             }
         } message: { label in
-            Text("\u{201C}\(label.name)\u{201D} will be removed from any clipboard items it's attached to.")
+            // States the actual number. "any clipboard items it's attached to" asked the
+            // user to authorise a consequence whose size only the database knew.
+            Text(deletionWarning(for: label))
         }
     }
 
     // MARK: - Actions
+
+    /// Delete confirmation copy, sized to what the label is actually holding.
+    private func deletionWarning(for label: Label) -> String {
+        let count = label.safeItems.count
+        let name = "\u{201C}\(label.name)\u{201D}"
+        switch count {
+        case 0:
+            return "\(name) isn't attached to anything. The clips themselves are not affected."
+        case 1:
+            return "\(name) will be removed from 1 clip. The clip itself is kept."
+        default:
+            return "\(name) will be removed from \(count) clips. The clips themselves are kept."
+        }
+    }
 
     private func createLabel() {
         let maxOrder = labels.map(\.sortOrder).max() ?? -1
@@ -90,22 +106,19 @@ struct LabelSettingsView: View {
 
 // MARK: - Label Row
 
-/// A single label row with always-editable name, swatch popover, and trash button.
+/// A single label row with always-editable name, swatch popover, usage count, and a
+/// delete button that stays out of the way until the pointer is on the row.
 private struct LabelRow: View {
 
     @Bindable var label: Label
     @Environment(\.modelContext) private var modelContext
     @State private var showingPalette = false
+    @State private var isHovered = false
 
     var onRequestDelete: () -> Void
 
-    /// Curated label-friendly emojis for quick selection.
-    private static let curatedEmojis: [String] = [
-        "📌", "📎", "📝", "📋", "📂", "💡",
-        "⭐", "❤️", "🔥", "🎯", "🏷️", "🔖",
-        "✅", "❌", "⚡", "🎨", "🔧", "🐛",
-        "💬", "📧", "🔒", "🌟", "💎", "🚀"
-    ]
+    /// How many clips carry this label, read straight off the inverse relationship.
+    private var usageCount: Int { label.safeItems.count }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -116,7 +129,19 @@ private struct LabelRow: View {
             }
             .buttonStyle(.plain)
             .popover(isPresented: $showingPalette, arrowEdge: .leading) {
-                colorEmojiPalette
+                // The shared selector, not a second hand-rolled palette. This row used
+                // to carry its own copy of the colour grid, the emoji list, and the
+                // curated emoji array, tuned to different spacing than the one the chip
+                // bar and the edit palette use. Three pickers, one job, three looks.
+                LabelStyleSelector(colorName: $label.colorName, emoji: $label.emoji)
+                    .padding(12)
+                    .frame(width: 220)
+                    .onChange(of: label.colorName) { _, _ in
+                        saveWithLogging(modelContext, operation: "update label color")
+                    }
+                    .onChange(of: label.emoji) { _, _ in
+                        saveWithLogging(modelContext, operation: "update label emoji")
+                    }
             }
 
             TextField("Label name", text: $label.name)
@@ -127,22 +152,42 @@ private struct LabelRow: View {
 
             Spacer()
 
+            // Answers "is this label doing anything?" without a trip to the History
+            // tab, and gives the delete button beside it some weight.
+            Text(usageCount == 1 ? "1 clip" : "\(usageCount) clips")
+                .font(PanelStyle.Text.meta)
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
+
+            // Revealed on hover. Every row used to show its own trash, so a list of
+            // eight labels was also a column of eight delete buttons. The context menu
+            // below keeps the action reachable without the pointer.
             Button(role: .destructive, action: onRequestDelete) {
                 Image(systemName: "trash")
-                    .font(.system(size: 12))
+                    .font(PanelStyle.Icon.control)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
             .help("Delete label")
+            .opacity(isHovered ? 1 : 0)
+            .allowsHitTesting(isHovered)
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .contextMenu {
+            Button("Edit Style") { showingPalette = true }
+            Divider()
+            Button("Delete Label", role: .destructive, action: onRequestDelete)
+        }
     }
 
     private var swatch: some View {
         Group {
             if let emoji = label.emoji, !emoji.isEmpty {
                 Text(emoji)
-                    .font(.system(size: 14))
+                    .font(PanelStyle.Icon.control)
             } else {
                 Circle()
                     .fill(LabelColor(rawValue: label.colorName)?.color ?? .gray)
@@ -152,69 +197,12 @@ private struct LabelRow: View {
         .frame(width: 22, height: 22)
         .background(
             RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(Color.white.opacity(0.06))
+                .fill(PanelStyle.surface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                .strokeBorder(PanelStyle.stroke, lineWidth: 1)
         )
     }
 
-    // MARK: - Color + Emoji Palette Popover
-
-    private var colorEmojiPalette: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Color")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            let columns = Array(repeating: GridItem(.fixed(22), spacing: 6), count: 6)
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(LabelColor.allCases, id: \.self) { labelColor in
-                    Circle()
-                        .fill(labelColor.color)
-                        .frame(width: 20, height: 20)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(
-                                    label.colorName == labelColor.rawValue && label.emoji == nil
-                                        ? Color.white : Color.clear,
-                                    lineWidth: 2
-                                )
-                        )
-                        .onTapGesture {
-                            label.colorName = labelColor.rawValue
-                            label.emoji = nil
-                            saveWithLogging(modelContext, operation: "update label color")
-                            showingPalette = false
-                        }
-                }
-            }
-
-            Divider()
-
-            Text("Emoji")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(Self.curatedEmojis, id: \.self) { emoji in
-                    Text(emoji)
-                        .font(.system(size: 16))
-                        .frame(width: 22, height: 22)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(label.emoji == emoji ? Color.white.opacity(0.18) : Color.clear)
-                        )
-                        .onTapGesture {
-                            label.emoji = emoji
-                            saveWithLogging(modelContext, operation: "update label emoji")
-                            showingPalette = false
-                        }
-                }
-            }
-        }
-        .padding(12)
-        .frame(width: 188)
-    }
 }

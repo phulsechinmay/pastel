@@ -48,7 +48,6 @@ final class SettingsWindowController {
         }
 
         let baseView = SettingsView(initialTab: initialTab)
-            .preferredColorScheme(.dark)
             .modelContainer(modelContainer)
             .environment(appState)
             .environment(syncMonitor)
@@ -69,8 +68,12 @@ final class SettingsWindowController {
         let hostingView = NSHostingView(rootView: settingsView)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
+        // 1000pt, not 820. The History tab's card grid is the widest thing in this
+        // window, and at 820pt (minus the ~200pt sidebar) it could only fit a single
+        // column, which made the "browse everything" surface show less per screen
+        // than the 320pt panel. Every other tab is content-light and unaffected.
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 820, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 640),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: true
@@ -80,7 +83,6 @@ final class SettingsWindowController {
         window.center()
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 680, height: 500)
-        window.appearance = NSAppearance(named: .darkAqua)
         window.titlebarSeparatorStyle = .automatic
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

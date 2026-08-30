@@ -102,12 +102,12 @@ struct ImageViewerView: View {
             .disabled(effectiveScale <= minScale && offset == .zero)
         }
         .buttonStyle(.plain)
-        .font(.system(size: 14, weight: .medium))
+        .font(PanelStyle.Text.title)
         .foregroundStyle(.primary)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12)))
+        .overlay(Capsule().strokeBorder(PanelStyle.stroke))
     }
 
     // MARK: - Gestures
@@ -173,12 +173,10 @@ enum ImageViewerWindow {
         let view = ImageViewerView(item: item, onDone: {
             panel.close()
         })
-        .environment(\.colorScheme, .dark)
 
         panel.contentView = NSHostingView(rootView: view)
         panel.title = (item.title?.isEmpty == false) ? item.title! : "View Image"
         panel.level = .floating
-        panel.appearance = NSAppearance(named: .darkAqua)
         panel.isReleasedWhenClosed = false
         panel.minSize = NSSize(width: 360, height: 280)
         panel.center()
