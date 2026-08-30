@@ -485,9 +485,14 @@ final class PasteService {
             return false
         }
 
-        // Suppress local keyboard events during paste to avoid interference
+        // Permit *all* local events during the suppression interval that follows a post.
+        //
+        // This used to omit `.permitLocalKeyboardEvents`, which meant every paste
+        // installed a short window where the user's own keystrokes were dropped —
+        // type immediately after pasting and lose the first characters. There is no
+        // interference to suppress: the ⌘V we post is self-contained.
         source.setLocalEventsFilterDuringSuppressionState(
-            [.permitLocalMouseEvents, .permitSystemDefinedEvents],
+            [.permitLocalMouseEvents, .permitLocalKeyboardEvents, .permitSystemDefinedEvents],
             state: .eventSuppressionStateSuppressionInterval
         )
 
