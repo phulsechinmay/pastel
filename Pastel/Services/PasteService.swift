@@ -87,9 +87,13 @@ final class PasteService {
         /// clicking Copy in a browser you are working in should not close it.
         let finishWithoutPosting: () -> Void
 
-        /// Hands control back once no Pastel window holds keyboard focus, so ⌘V can
-        /// be posted safely.
-        let beforePosting: (@escaping () -> Void) -> Void
+        /// Hands control back once Pastel no longer stands between the posted ⌘V and
+        /// the app the user is aiming at.
+        ///
+        /// The `Bool` is whether that actually happened. `false` means the hand-off
+        /// could not be confirmed and posting would fire into the dark — the content
+        /// is already on the clipboard, so the caller says so rather than guessing.
+        let beforePosting: (@escaping (Bool) -> Void) -> Void
     }
 
     private func dismissal(for origin: PasteOrigin) -> Dismissal {
@@ -97,17 +101,15 @@ final class PasteService {
         case .panel(let panelController):
             return Dismissal(
                 finishWithoutPosting: { panelController.hide() },
-                beforePosting: { post in panelController.hideForPaste(completion: post) }
+                // The panel never took focus from the user's app, so hiding it is the
+                // whole hand-off and it cannot fail.
+                beforePosting: { ready in panelController.hideForPaste { ready(true) } }
             )
         case .settings:
             return Dismissal(
                 finishWithoutPosting: {},
-                beforePosting: { post in
-                    // Settings is a normal window and its `orderOut` is synchronous,
-                    // but AppKit hands key status to the next window on the following
-                    // turn of the run loop — post after that, not inside it.
-                    SettingsWindowController.shared.hide()
-                    DispatchQueue.main.async { post() }
+                beforePosting: { ready in
+                    SettingsWindowController.shared.hideYieldingActivation(completion: ready)
                 }
             )
         }
@@ -179,7 +181,17 @@ final class PasteService {
         }
 
         pasteLog("[PASTE] dismissing, will post ⌘V when clear (source=\(source))")
-        dismissal.beforePosting {
+        dismissal.beforePosting { ready in
+            guard ready else {
+                pasteLog("[PASTE] no app took focus (source=\(source)) — not posting")
+                self.logger.warning("Dismissal did not yield focus -- wrote to pasteboard only")
+                Self.showFailureAlert(
+                    title: "Nothing to Paste Into",
+                    message: "Pastel could not hand keyboard focus back to another app, so it did not simulate ⌘V.\n\nThe content is on your clipboard — switch to the app you want and paste it with ⌘V."
+                )
+                return
+            }
+
             let frontmost = NSWorkspace.shared.frontmostApplication
             pasteLog("[PASTE] posting now. frontmostApp=\(frontmost?.localizedName ?? "nil") bundle=\(frontmost?.bundleIdentifier ?? "nil") pid=\(frontmost?.processIdentifier ?? -1)")
             guard Self.simulatePaste() else {
