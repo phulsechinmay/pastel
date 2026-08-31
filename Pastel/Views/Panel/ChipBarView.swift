@@ -161,7 +161,10 @@ struct ChipBarView: View {
             onSelectAllHistory?()
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: "arrow.counterclockwise.circle.fill")
+                // `arrow.counterclockwise.circle.fill` reads as Reload. The clock face
+                // is what makes this glyph mean History — same icon as the Settings
+                // History tab.
+                Image(systemName: "clock.arrow.circlepath")
                     .font(PanelStyle.Text.control)
                 Text("All History")
                     .font(PanelStyle.Text.control)
