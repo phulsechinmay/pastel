@@ -116,15 +116,8 @@ struct HistoryGridView: View {
         }
         guard !selectedLabelIDs.isEmpty else { return syncFiltered }
 
-        let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
-        return syncFiltered.filter { item in
-            itemMatchesSelectedLabels(
-                item,
-                selectedLabelIDs: selectedLabelIDs,
-                allLabels: allLabels,
-                knownStableIDs: knownStableIDs
-            )
-        }
+        let labelMatch = LabelMatchPlan(selectedLabelIDs: selectedLabelIDs, allLabels: allLabels)
+        return syncFiltered.filter { labelMatch.matches($0) }
     }
 
     var body: some View {

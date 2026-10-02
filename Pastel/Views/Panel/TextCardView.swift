@@ -16,7 +16,7 @@ struct TextCardView: View {
     }
 
     var body: some View {
-        Text(item.textContent ?? "")
+        Text(TextWorkBudget.cardPreview(item.textContent))
             .font(PanelStyle.Text.body)
             .lineLimit(isHorizontal ? 8 : 4)
             .foregroundStyle(.primary)

@@ -56,7 +56,7 @@ struct CodeCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             // Plain text fallback while highlighting loads
-            Text(item.textContent ?? "")
+            Text(TextWorkBudget.cardPreview(item.textContent))
                 .font(PanelStyle.Text.meta.monospaced())
                 .lineLimit(lineLimit)
                 .foregroundStyle(.primary)
@@ -68,17 +68,19 @@ struct CodeCardView: View {
 
     /// Load syntax highlighting from cache or compute it.
     private func loadHighlighting() async {
-        let code = item.textContent ?? ""
+        highlightedText = nil
+        let code = TextWorkBudget.cardPreview(item.textContent)
         guard !code.isEmpty else { return }
 
         // The scheme is part of the key: the same clip highlighted for dark and for
         // light are two different results, and without this the first one rendered
         // would stick around after the user switched appearance.
         let scheme: HighlightColors = colorScheme == .dark ? .dark(.atomOne) : .light(.atomOne)
-        let cacheKey = "\(item.contentHash)_\(colorScheme == .dark ? "d" : "l")"
+        let cacheKey = "\(item.contentHash)_\(item.detectedLanguage ?? "auto")_\(colorScheme == .dark ? "d" : "l")"
 
         // Check cache first
         if let cached = await HighlightCache.shared.get(cacheKey) {
+            guard !Task.isCancelled else { return }
             highlightedText = cached
             return
         }
@@ -101,7 +103,9 @@ struct CodeCardView: View {
             }
 
             // Cache and display
+            guard !Task.isCancelled else { return }
             await HighlightCache.shared.set(cacheKey, value: result)
+            guard !Task.isCancelled else { return }
             highlightedText = result
         } catch {
             // On error, keep showing plain text fallback (highlightedText stays nil)

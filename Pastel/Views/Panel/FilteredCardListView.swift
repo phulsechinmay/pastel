@@ -136,15 +136,8 @@ struct FilteredCardListView: View {
 
         guard !selectedLabelIDs.isEmpty else { return pinnedFirst(attributeFiltered) }
 
-        let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
-        let labelFiltered = attributeFiltered.filter { item in
-            itemMatchesSelectedLabels(
-                item,
-                selectedLabelIDs: selectedLabelIDs,
-                allLabels: allLabels,
-                knownStableIDs: knownStableIDs
-            )
-        }
+        let labelMatch = LabelMatchPlan(selectedLabelIDs: selectedLabelIDs, allLabels: allLabels)
+        let labelFiltered = attributeFiltered.filter { labelMatch.matches($0) }
         return pinnedFirst(labelFiltered)
     }
 

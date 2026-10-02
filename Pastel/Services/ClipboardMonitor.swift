@@ -311,7 +311,8 @@ final class ClipboardMonitor {
         // Skip detection for concealed items (password managers)
         if !isConcealed {
             // Color detection first (prevents rgb() from matching as code)
-            if let colorHex = ColorDetectionService.detectColor(primaryContent) {
+            if primaryContent.utf8.count <= 128,
+               let colorHex = ColorDetectionService.detectColor(primaryContent) {
                 detectedContentType = .color
                 detectedColorHex = colorHex
             }
@@ -380,7 +381,7 @@ final class ClipboardMonitor {
             // Fire-and-forget async language detection for code items
             if detectedContentType == .code {
                 let itemID = item.persistentModelID
-                let textForDetection = primaryContent
+                let textForDetection = TextWorkBudget.codeSample(primaryContent)
                 Task {
                     guard let result = await CodeDetectionService.detectLanguage(textForDetection) else { return }
                     guard let savedItem = self.modelContext.model(for: itemID) as? ClipboardItem else { return }
