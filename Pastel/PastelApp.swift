@@ -112,6 +112,9 @@ struct PastelApp: App {
         if syncEnabled {
             let monitor = SyncMonitor()
             monitor.configure(modelContext: container.mainContext)
+            monitor.onImportFinished = { [weak state] in
+                state?.refreshSearchIndexAfterSync()
+            }
             monitor.startMonitoring()
             SettingsWindowController.shared.syncMonitor = monitor
             self._syncMonitor = State(initialValue: monitor)

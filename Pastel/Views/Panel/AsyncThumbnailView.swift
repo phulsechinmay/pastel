@@ -38,5 +38,6 @@ struct AsyncThumbnailView: View {
                 image = await ThumbnailLoader.shared.load(filename: filename, maxPixelSize: maxPixelSize)
             }
         }
+        .onDisappear { image = nil }
     }
 }

@@ -24,12 +24,12 @@ enum DragItemProviderService {
         switch item.type {
         case .text, .code, .color:
             // NSString conforms to NSItemProviderWriting, auto-registers .plainText
-            return NSItemProvider(object: (item.textContent ?? "") as NSString)
+            return NSItemProvider(object: (item.fullTextContent ?? "") as NSString)
 
         case .richText:
             let provider = NSItemProvider()
             // Register RTF FIRST so richer representation takes priority
-            if let rtfData = item.rtfData {
+            if let rtfData = item.fullRTFData {
                 provider.registerDataRepresentation(
                     forTypeIdentifier: UTType.rtf.identifier,
                     visibility: .all
@@ -39,16 +39,16 @@ enum DragItemProviderService {
                 }
             }
             // Always register plain text fallback
-            provider.registerObject((item.textContent ?? "") as NSString, visibility: .all)
+            provider.registerObject((item.fullTextContent ?? "") as NSString, visibility: .all)
             return provider
 
         case .url:
             // NSURL conforms to NSItemProviderWriting, auto-registers .url and .plainText
-            if let urlString = item.textContent, let url = URL(string: urlString) {
+            if let urlString = item.fullTextContent, let url = URL(string: urlString) {
                 return NSItemProvider(object: url as NSURL)
             }
             // Fallback: if URL parsing fails, provide as plain text
-            return NSItemProvider(object: (item.textContent ?? "") as NSString)
+            return NSItemProvider(object: (item.fullTextContent ?? "") as NSString)
 
         case .image:
             guard let imagePath = item.imagePath else {
@@ -63,7 +63,7 @@ enum DragItemProviderService {
             return NSItemProvider(contentsOf: fileURL) ?? NSItemProvider()
 
         case .file:
-            guard let filePath = item.textContent else {
+            guard let filePath = item.fullTextContent else {
                 return NSItemProvider()
             }
             let fileURL = URL(fileURLWithPath: filePath)

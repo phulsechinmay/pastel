@@ -3,12 +3,18 @@ import SwiftData
 /// Precomputed label membership check backed by ClipboardItem.labelKey.
 /// A nonempty, current labelKey avoids relationship faults; legacy or stale keys
 /// still use the authoritative relationship.
-struct LabelMatchPlan {
+struct LabelMatchPlan: Sendable {
     private let selectedLabelIDs: Set<PersistentIdentifier>
     private let stableNeedles: [String]
     private let selectedLabelsAllIndexed: Bool
     private let knownStableIDs: Set<String>
     private let hasSelectedLabels: Bool
+
+    var indexedStableIDs: [String]? {
+        guard hasSelectedLabels, selectedLabelsAllIndexed,
+              stableNeedles.count == selectedLabelIDs.count else { return nil }
+        return stableNeedles.map { String($0.dropFirst().dropLast()) }
+    }
 
     init(selectedLabelIDs: Set<PersistentIdentifier>, allLabels: [Label]) {
         self.selectedLabelIDs = selectedLabelIDs
@@ -42,4 +48,3 @@ struct LabelMatchPlan {
         }
     }
 }
-

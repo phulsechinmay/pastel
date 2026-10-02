@@ -3,14 +3,64 @@ import SwiftData
 
 @Model
 final class ClipboardItem {
-    /// Plain text content, URL string, or file path
+    /// Plain text (a bounded preview for large clips), URL string, or file path.
     var textContent: String?
+
+    /// Full UTF-8 payload for large clips. Kept outside the SQLite row by
+    /// SwiftData so a card-page fetch need not materialize megabytes per item.
+    @Attribute(.externalStorage) var largeTextData: Data?
+
+    static let inlineTextLimit = 64 * 1024
+
+    var fullTextContent: String? {
+        if let largeTextData { return String(data: largeTextData, encoding: .utf8) }
+        return textContent
+    }
+
+    func setStoredText(_ value: String?) {
+        if let value, Self.canExternalize(contentType) && value.utf8.count > Self.inlineTextLimit {
+            largeTextData = Data(value.utf8)
+            textContent = TextWorkBudget.cardPreview(value)
+        } else {
+            largeTextData = nil
+            textContent = value
+        }
+    }
 
     /// HTML representation when available
     var htmlContent: String?
+    @Attribute(.externalStorage) var largeHTMLData: Data?
 
     /// RTF data when available
     var rtfData: Data?
+    @Attribute(.externalStorage) var largeRTFData: Data?
+
+    var fullHTMLContent: String? {
+        if let largeHTMLData { return String(data: largeHTMLData, encoding: .utf8) }
+        return htmlContent
+    }
+
+    var fullRTFData: Data? { largeRTFData ?? rtfData }
+
+    func setStoredHTML(_ value: String?) {
+        if let value, value.utf8.count > Self.inlineTextLimit {
+            largeHTMLData = Data(value.utf8)
+            htmlContent = nil
+        } else {
+            largeHTMLData = nil
+            htmlContent = value
+        }
+    }
+
+    func setStoredRTF(_ value: Data?) {
+        if let value, value.count > Self.inlineTextLimit {
+            largeRTFData = value
+            rtfData = nil
+        } else {
+            largeRTFData = nil
+            rtfData = value
+        }
+    }
 
     /// Raw value of ContentType enum (stored as String for SwiftData predicate compatibility)
     var contentType: String = ContentType.text.rawValue
@@ -148,9 +198,28 @@ final class ClipboardItem {
         expiresAt: Date? = nil,
         contentHash: String
     ) {
-        self.textContent = textContent
-        self.htmlContent = htmlContent
-        self.rtfData = rtfData
+        if let textContent, Self.canExternalize(contentType.rawValue),
+           textContent.utf8.count > Self.inlineTextLimit {
+            self.textContent = TextWorkBudget.cardPreview(textContent)
+            self.largeTextData = Data(textContent.utf8)
+        } else {
+            self.textContent = textContent
+            self.largeTextData = nil
+        }
+        if let htmlContent, htmlContent.utf8.count > Self.inlineTextLimit {
+            self.htmlContent = nil
+            self.largeHTMLData = Data(htmlContent.utf8)
+        } else {
+            self.htmlContent = htmlContent
+            self.largeHTMLData = nil
+        }
+        if let rtfData, rtfData.count > Self.inlineTextLimit {
+            self.rtfData = nil
+            self.largeRTFData = rtfData
+        } else {
+            self.rtfData = rtfData
+            self.largeRTFData = nil
+        }
         self.contentType = contentType.rawValue
         self.timestamp = timestamp
         self.sourceAppBundleID = sourceAppBundleID
@@ -171,5 +240,10 @@ final class ClipboardItem {
         // backfill batch. See ClipboardItem.refreshLabelKey / backfillLabelIndex.
         self.labelKey = "|"
         self.originDeviceID = DeviceIdentifier.current
+    }
+
+    private static func canExternalize(_ rawType: String) -> Bool {
+        rawType == ContentType.text.rawValue || rawType == ContentType.richText.rawValue ||
+        rawType == ContentType.code.rawValue
     }
 }

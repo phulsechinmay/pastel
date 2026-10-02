@@ -33,6 +33,8 @@ final class ThumbnailLoader: @unchecked Sendable {
 
     /// Thread-safe; access is unsynchronized by design.
     private let cache = NSCache<NSString, NSImage>()
+    private let inFlightLock = NSLock()
+    private var inFlight: [String: [CheckedContinuation<NSImage?, Never>]] = [:]
 
     /// Keep simultaneous decodes bounded when many cards enter the viewport.
     private let queue: OperationQueue = {
@@ -52,7 +54,7 @@ final class ThumbnailLoader: @unchecked Sendable {
     /// Lets callers avoid a placeholder flash when the image is already warm.
     func cached(filename: String, maxPixelSize: Int) -> NSImage? {
         guard maxPixelSize <= Self.cardPreviewMaxPixelSize else { return nil }
-        return cache.object(forKey: Self.cacheKey(filename, maxPixelSize))
+        return cache.object(forKey: Self.cacheKey(filename, maxPixelSize) as NSString)
     }
 
     /// Load a fully-decoded, size-capped image for `filename`, decoding on a
@@ -60,25 +62,36 @@ final class ThumbnailLoader: @unchecked Sendable {
     func load(filename: String, maxPixelSize: Int) async -> NSImage? {
         let key = Self.cacheKey(filename, maxPixelSize)
         if maxPixelSize <= Self.cardPreviewMaxPixelSize,
-           let hit = cache.object(forKey: key) { return hit }
+           let hit = cache.object(forKey: key as NSString) { return hit }
 
-        let url = ImageStorageService.shared.resolveImageURL(filename)
-        let decoded: (image: NSImage, cost: Int)? = await withCheckedContinuation { continuation in
-            queue.addOperation {
-                continuation.resume(returning: Self.decode(url: url, maxPixelSize: maxPixelSize))
+        return await withCheckedContinuation { continuation in
+            inFlightLock.lock()
+            if inFlight[key] != nil {
+                inFlight[key]?.append(continuation)
+                inFlightLock.unlock()
+                return
+            }
+            inFlight[key] = [continuation]
+            inFlightLock.unlock()
+
+            let url = ImageStorageService.shared.resolveImageURL(filename)
+            queue.addOperation { [self] in
+                let decoded = Self.decode(url: url, maxPixelSize: maxPixelSize)
+                if maxPixelSize <= Self.cardPreviewMaxPixelSize, let decoded {
+                    cache.setObject(decoded.image, forKey: key as NSString, cost: decoded.cost)
+                }
+                inFlightLock.lock()
+                let waiters = inFlight.removeValue(forKey: key) ?? []
+                inFlightLock.unlock()
+                for waiter in waiters { waiter.resume(returning: decoded?.image) }
             }
         }
-        guard let decoded else { return nil }
-        if maxPixelSize <= Self.cardPreviewMaxPixelSize {
-            cache.setObject(decoded.image, forKey: key, cost: decoded.cost)
-        }
-        return decoded.image
     }
 
     // MARK: - Private
 
-    private static func cacheKey(_ filename: String, _ maxPixelSize: Int) -> NSString {
-        "\(filename)@\(maxPixelSize)" as NSString
+    private static func cacheKey(_ filename: String, _ maxPixelSize: Int) -> String {
+        "\(filename)@\(maxPixelSize)"
     }
 
     /// Decode a downsampled, fully-rendered image using CGImageSource.

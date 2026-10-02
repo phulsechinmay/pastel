@@ -8,12 +8,8 @@ import SwiftData
 /// `SearchFieldView` and `ChipBarView` components from the panel,
 /// with the same 200ms debounce pattern.
 ///
-/// The `.id()` modifier forces SwiftUI to destroy and recreate
-/// `HistoryGridView` only when the @Query predicate changes (search text).
-/// Label filtering is in-memory, so label chip changes flow through
-/// HistoryGridView's onChange(of: selectedLabelIDs) instead — preserving the
-/// existing @Query (and its reactivity to inserts/edits/deletes) and scroll
-/// position across chip taps.
+/// `HistoryGridView` loads bounded pages through the shared result service.
+/// Search text recreates the grid; chip changes reload its page cursor.
 /// Selection state lives here (not in the grid) so it persists across
 /// recreations, but is cleared on filter changes to avoid stale IDs.
 ///
@@ -51,6 +47,13 @@ struct HistoryBrowserView: View {
             .padding(.bottom, 8)
 
             Divider()
+
+            if appState.searchIndexBuilding && !debouncedSearchText.isEmpty {
+                Text("Indexing older clips; more matches may appear")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+            }
 
             // Responsive card grid with multi-selection
             HistoryGridView(
@@ -107,7 +110,7 @@ struct HistoryBrowserView: View {
             // The count rolls between values instead of being replaced. Cmd-clicking
             // through a dozen cards is a counting task, and the digits now behave like
             // a counter rather than like a label that keeps getting rewritten.
-            Text("\(selectedIDs.count) item\(selectedIDs.count == 1 ? "" : "s") selected")
+            Text("\(selectedIDs.count) loaded item\(selectedIDs.count == 1 ? "" : "s") selected")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()

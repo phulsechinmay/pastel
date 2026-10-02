@@ -248,6 +248,7 @@ final class ClipboardMonitor {
 
     /// Process the current pasteboard content: classify, deduplicate, and persist.
     private func processPasteboardContent() {
+        let captureStarted = ContinuousClock.now
         // Classify content type
         guard let (contentType, isConcealed) = pasteboard.classifyContent() else {
             return // Empty, transient, or auto-generated -- skip
@@ -306,7 +307,7 @@ final class ClipboardMonitor {
         // --- Content detection: color first, then code ---
         var detectedContentType = contentType
         var detectedColorHex: String? = nil
-        var detectedLanguage: String? = nil
+        let detectedLanguage: String? = nil
 
         // Skip detection for concealed items (password managers)
         if !isConcealed {
@@ -365,7 +366,8 @@ final class ClipboardMonitor {
         do {
             try modelContext.save()
             itemCount += 1
-            Self.logger.info("Captured \(detectedContentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes)")
+            let elapsed = captureStarted.duration(to: .now)
+            Self.logger.info("Captured \(detectedContentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes, \(String(describing: elapsed)))")
 
             // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
             if let bundleID = sourceAppBundleID {

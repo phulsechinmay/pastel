@@ -169,20 +169,20 @@ extension ClipboardItem {
     ///   it, or `nil` when the text was unchanged and nothing was written.
     @discardableResult
     func applyEditedText(_ newText: String) -> String? {
-        let original = textContent ?? ""
+        let original = fullTextContent ?? ""
         guard newText != original else { return nil }
         let supersededHash = contentHash
 
-        textContent = newText
+        setStoredText(newText)
         characterCount = newText.count
         byteCount = Data(newText.utf8).count
         contentHash = ContentHash.hash(text: newText)
         modifiedAt = .now
 
         // Rich representations describe the text as it was captured, not as it is now.
-        if htmlContent != nil || rtfData != nil {
-            htmlContent = nil
-            rtfData = nil
+        if htmlContent != nil || largeHTMLData != nil || rtfData != nil || largeRTFData != nil {
+            setStoredHTML(nil)
+            setStoredRTF(nil)
             if type == .richText { type = .text }
         }
 

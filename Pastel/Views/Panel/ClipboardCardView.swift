@@ -260,7 +260,7 @@ struct ClipboardCardView: View {
                         Section(group.rawValue) {
                             ForEach(TextTransformService.transforms(in: group)) { transform in
                                 Button(transform.name) {
-                                    applyTransform(transform, to: text)
+                                    applyTransform(transform, to: item.fullTextContent ?? text)
                                 }
                                 // Disabled rather than hidden: a stable menu is easier to
                                 // learn than one whose contents shift per clip.

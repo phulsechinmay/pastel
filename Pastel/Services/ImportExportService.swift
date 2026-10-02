@@ -206,9 +206,9 @@ final class ImportExportService {
         // Map to export structs
         let exportedItems = items.map { item in
             ExportedItem(
-                textContent: item.textContent,
-                htmlContent: item.htmlContent,
-                rtfData: item.rtfData,
+                textContent: item.fullTextContent,
+                htmlContent: item.fullHTMLContent,
+                rtfData: item.fullRTFData,
                 contentType: item.contentType,
                 timestamp: item.timestamp,
                 sourceAppBundleID: item.sourceAppBundleID,

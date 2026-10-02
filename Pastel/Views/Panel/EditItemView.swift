@@ -54,7 +54,7 @@ struct EditItemView: View {
 
     /// Whether the item still carries a rich representation that editing will drop.
     private var willDropFormatting: Bool {
-        item.htmlContent != nil || item.rtfData != nil
+        item.htmlContent != nil || item.largeHTMLData != nil || item.rtfData != nil || item.largeRTFData != nil
     }
 
     var body: some View {
@@ -126,7 +126,7 @@ struct EditItemView: View {
         .onExitCommand { closeSelf() }
         .onAppear {
             // Seed the content editor's working copy
-            editedText = item.textContent ?? ""
+            editedText = item.fullTextContent ?? ""
             draft?.text = editedText
             hasLoadedContent = true
 
@@ -270,7 +270,7 @@ enum EditItemWindow {
 
         // Pre-seeded so a flush is a no-op if the window closes before the view appears.
         let draft = EditDraft()
-        draft.text = item.textContent ?? ""
+        draft.text = item.fullTextContent ?? ""
 
         let editView = EditItemView(
             item: item,
@@ -326,7 +326,7 @@ enum EditItemWindow {
                 // A draft closed with nothing in it was never a snippet — drop the
                 // placeholder row rather than leave a blank card in the history.
                 // Decide *before* tearing anything down, while `item` is still valid.
-                guard isNewSnippet, (item.textContent ?? "").isEmpty, item.title == nil else { return }
+                guard isNewSnippet, (item.fullTextContent ?? "").isEmpty, item.title == nil else { return }
 
                 // Drop the SwiftUI view before deleting the model it is bound to.
                 // `willClose` fires while the hosting view is still installed, and
@@ -421,7 +421,7 @@ private struct CodeEditSection: View {
             Button("Remove code formatting", role: .destructive) {
                 item.detectedLanguage = nil
                 // Revert to richText if RTF data exists, otherwise plain text
-                item.contentType = (item.rtfData != nil)
+                item.contentType = (item.rtfData != nil || item.largeRTFData != nil)
                     ? ContentType.richText.rawValue
                     : ContentType.text.rawValue
 

@@ -11,6 +11,7 @@ final class RetentionService {
 
     private let modelContext: ModelContext
     private var timer: Timer?
+    private var purgeTask: Task<Void, Never>?
 
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "app.pastel.Pastel",
@@ -37,6 +38,11 @@ final class RetentionService {
     /// Reads `historyRetention` from UserDefaults each time so changes
     /// take effect without restarting the app.
     func purgeExpiredItems() {
+        purgeTask?.cancel()
+        purgeTask = Task { await purgeExpiredItemsInBatches() }
+    }
+
+    private func purgeExpiredItemsInBatches() async {
         let retentionDays = UserDefaults.standard.integer(forKey: "historyRetention")
 
         // 0 means "Forever" -- no purge
@@ -50,43 +56,50 @@ final class RetentionService {
             return
         }
 
-        do {
-            // Fetch items older than the cutoff
-            let descriptor = FetchDescriptor<ClipboardItem>(
-                predicate: #Predicate<ClipboardItem> { item in
-                    item.timestamp < cutoffDate
+        var offset = 0
+        var purged = 0
+        var kept = 0
+        while !Task.isCancelled {
+            do {
+                var descriptor = FetchDescriptor<ClipboardItem>(
+                    predicate: #Predicate<ClipboardItem> { $0.timestamp < cutoffDate },
+                    sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+                )
+                descriptor.fetchLimit = 25
+                descriptor.fetchOffset = offset
+                let batch = try modelContext.fetch(descriptor)
+                if batch.isEmpty { break }
+                var retainedInBatch = 0
+                var deletedInBatch = 0
+                for item in batch {
+                    if item.safeLabels.isEmpty && !item.isPinned && !item.isUserCreated {
+                        deleteClipboardItemWithCleanup(item, from: modelContext)
+                        deletedInBatch += 1
+                    } else {
+                        retainedInBatch += 1
+                    }
                 }
-            )
-            let expiredItems = try modelContext.fetch(descriptor)
-
-            // Items are kept regardless of age when the user opted into permanence:
-            // by labeling them, by pinning them, or by authoring them by hand.
-            let purgeable = expiredItems.filter {
-                $0.safeLabels.isEmpty && !$0.isPinned && !$0.isUserCreated
-            }
-
-            guard !purgeable.isEmpty else {
-                logger.debug("No expired items to purge (cutoff: \(cutoffDate), kept: \(expiredItems.count))")
+                if deletedInBatch > 0 { try modelContext.save() }
+                purged += deletedInBatch
+                kept += retainedInBatch
+                // Deleted rows leave the query; retained rows remain before the
+                // cursor and must be skipped on the next bounded fetch.
+                offset += retainedInBatch
+                await Task.yield()
+            } catch {
+                modelContext.rollback()
+                logger.error("Failed to purge expired items: \(error.localizedDescription)")
                 return
             }
-
-            // Delete expired items with full cleanup (images, labels, model)
-            for item in purgeable {
-                deleteClipboardItemWithCleanup(item, from: modelContext)
-            }
-            try modelContext.save()
-
-            let keptCount = expiredItems.count - purgeable.count
-            logger.info("Purged \(purgeable.count) items older than \(retentionDays) days (kept \(keptCount) labeled/pinned)")
-        } catch {
-            modelContext.rollback()
-            logger.error("Failed to purge expired items: \(error.localizedDescription)")
         }
+        logger.info("Purged \(purged) items older than \(retentionDays) days (kept \(kept) labeled/pinned)")
     }
 
     /// Stop the periodic purge timer.
     func stop() {
         timer?.invalidate()
         timer = nil
+        purgeTask?.cancel()
+        purgeTask = nil
     }
 }

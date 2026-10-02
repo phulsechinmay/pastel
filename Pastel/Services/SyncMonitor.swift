@@ -43,6 +43,7 @@ final class SyncMonitor {
 
     /// Number of items imported during the last sync cycle
     var lastImportedCount: Int = 0
+    var onImportFinished: (() -> Void)?
 
     /// Number of items exported during the last sync cycle
     var lastExportedCount: Int = 0
@@ -175,6 +176,7 @@ final class SyncMonitor {
                 lastImportedCount += max(0, postCount - preImportItemCount)
                 preImportItemCount = 0
                 hasCompletedFirstImport = true
+                onImportFinished?()
 
             case .export:
                 lastExportedCount = countLocalItemsSince(lastExportEndDate)
