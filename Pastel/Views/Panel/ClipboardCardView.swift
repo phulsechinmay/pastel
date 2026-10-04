@@ -26,6 +26,7 @@ struct ClipboardCardView: View {
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
 
     @State private var isHovered = false
+    @State private var sourceIcon: NSImage?
     @State private var dominantColor: Color?
 
     /// A label chip is hovering over this card, waiting to be dropped.
@@ -187,11 +188,19 @@ struct ClipboardCardView: View {
             .padding(-PanelLayout.selectionRingInset)
             .opacity(isSelected ? 1 : 0)
         }
-        .task {
-            // Load dominant color for header gradient (deferred to avoid blocking panel open)
-            if !isColorCard {
-                dominantColor = AppIconColorService.shared.dominantColor(forBundleID: item.sourceAppBundleID)
-            }
+        .task(id: item.sourceAppBundleID) {
+            sourceIcon = nil
+            dominantColor = nil
+            guard let bundleID = item.sourceAppBundleID else { return }
+            // App icon lookup and tint are decorative. A card replaced by the
+            // next query never needs their main-thread AppKit lookup.
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            sourceIcon = AppIconCache.shared.icon(forBundleID: bundleID)
+            guard !isColorCard else { return }
+            let color = await AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+            guard !Task.isCancelled else { return }
+            dominantColor = color
         }
         .onHover { hovering in
             isHovered = hovering
@@ -482,8 +491,7 @@ struct ClipboardCardView: View {
                 .font(PanelStyle.Icon.content)
                 .foregroundStyle(metaForeground)
                 .frame(width: 24, height: 24)
-        } else if let bundleID = item.sourceAppBundleID,
-           let icon = AppIconCache.shared.icon(forBundleID: bundleID) {
+        } else if let icon = sourceIcon {
             Image(nsImage: icon)
                 .resizable()
                 .frame(width: 24, height: 24)

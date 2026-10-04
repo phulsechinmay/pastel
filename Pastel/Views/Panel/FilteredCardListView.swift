@@ -25,6 +25,7 @@ struct FilteredCardListView: View {
     @State private var windowStart = 0
     @State private var loadError: String?
     private let pageSize = HistoryPageLoader.pageSize
+    private let firstPageSize = 12
     private let maxResidentItems = 150
 
     /// Anchor index for Shift+arrow range selection. `nil` means single selection
@@ -103,7 +104,8 @@ struct FilteredCardListView: View {
                     in: modelContext, cursor: &nextCursor, searchText: searchText,
                     selectedLabelIDs: selectedLabelIDs, allLabels: allLabels,
                     filters: searchFilters, softDeletedIDs: appState.deletionManager.softDeletedIDs,
-                    searchIndex: appState.searchIndex, worker: appState.historyPageWorker, pageSize: pageSize
+                    searchIndex: appState.searchIndex, worker: appState.historyPageWorker,
+                    pageSize: filteredItems.isEmpty ? firstPageSize : pageSize
                 )
                 guard !Task.isCancelled, generation == queryGeneration else { return }
                 cursor = nextCursor
@@ -286,6 +288,11 @@ struct FilteredCardListView: View {
             selectedIndex = nil
             selectionAnchor = nil
         }
+        .onChange(of: searchText) { _, _ in
+            reload()
+            selectedIndex = nil
+            selectionAnchor = nil
+        }
         .onChange(of: selectedLabelIDs) { _, _ in
             reload()
             selectedIndex = nil
@@ -354,7 +361,7 @@ struct FilteredCardListView: View {
             removal: .move(edge: .leading).combined(with: .opacity)
         ))
         .onAppear {
-            if index >= filteredItems.count - 10 { loadMore() }
+            if index >= filteredItems.count - 3 { loadMore() }
         }
         .id(item.persistentModelID)
     }

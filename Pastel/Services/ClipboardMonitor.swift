@@ -372,7 +372,9 @@ final class ClipboardMonitor {
             // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
             if let bundleID = sourceAppBundleID {
                 _ = AppIconCache.shared.icon(forBundleID: bundleID)
-                _ = AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                Task(priority: .utility) {
+                    _ = await AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                }
             }
 
             // Schedule expiration for concealed items (password managers)
@@ -495,7 +497,9 @@ final class ClipboardMonitor {
                 // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
                 if let bundleID = sourceAppBundleID {
                     _ = AppIconCache.shared.icon(forBundleID: bundleID)
-                    _ = AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                    Task(priority: .utility) {
+                        _ = await AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                    }
                 }
 
                 // Schedule expiration for concealed items

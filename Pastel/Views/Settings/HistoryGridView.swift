@@ -27,6 +27,7 @@ struct HistoryGridView: View {
     @State private var windowStart = 0
     @State private var loadError: String?
     private let pageSize = 100
+    private let firstPageSize = 12
     private let maxResidentItems = 300
     private let searchText: String
 
@@ -95,7 +96,8 @@ struct HistoryGridView: View {
                     in: modelContext, cursor: &nextCursor, searchText: searchText,
                     selectedLabelIDs: selectedLabelIDs, allLabels: allLabels,
                     softDeletedIDs: appState.deletionManager.softDeletedIDs,
-                    searchIndex: appState.searchIndex, worker: appState.historyPageWorker, pinsFirst: false, pageSize: pageSize
+                    searchIndex: appState.searchIndex, worker: appState.historyPageWorker,
+                    pinsFirst: false, pageSize: memoizedFilteredItems.isEmpty ? firstPageSize : pageSize
                 )
                 guard !Task.isCancelled, generation == queryGeneration else { return }
                 cursor = nextCursor
@@ -162,7 +164,7 @@ struct HistoryGridView: View {
                                 handleTap(item: item, index: index)
                             }
                             .onAppear {
-                                if index >= memoizedFilteredItems.count - 10 { loadMore() }
+                                if index >= memoizedFilteredItems.count - 6 { loadMore() }
                             }
                             .contextMenu {
                                 if isInSelection && selectedIDs.count > 1 {
@@ -228,6 +230,7 @@ struct HistoryGridView: View {
         .onChange(of: appState.itemCount) { _, _ in reload() }
         .onChange(of: appState.pinRevision) { _, _ in reload() }
         .onChange(of: appState.searchIndexRevision) { _, _ in reload() }
+        .onChange(of: searchText) { _, _ in reload() }
         .onChange(of: appState.deletionManager.softDeletedIDs) { _, _ in reload() }
         .onChange(of: selectedLabelIDs) { _, _ in reload() }
         .onChange(of: labelFilterSignature) { _, _ in reload() }

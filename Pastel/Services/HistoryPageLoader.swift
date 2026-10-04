@@ -78,9 +78,14 @@ actor HistoryPageWorker {
             if !filters.matches(item, cutoff: cutoff) { return false }
             if let labelPlan, !labelPlan.matches(item) { return false }
             if needsFullTextScan {
-                let found = item.fullTextContent?.localizedStandardContains(searchText) == true ||
+                // Preview and metadata are cheap. Fault an external large-text
+                // payload only when these cannot already satisfy the query.
+                let found = item.textContent?.localizedStandardContains(searchText) == true ||
                     item.sourceAppName?.localizedStandardContains(searchText) == true ||
-                    item.title?.localizedStandardContains(searchText) == true
+                    item.title?.localizedStandardContains(searchText) == true ||
+                    ((item.byteCount > ClipboardItem.inlineTextLimit ||
+                      item.characterCount > ClipboardItem.inlineTextLimit) &&
+                     item.fullTextContent?.localizedStandardContains(searchText) == true)
                 if !found { return false }
             }
             return true
@@ -101,6 +106,7 @@ actor HistoryPageWorker {
                     try Task.checkCancellation()
                     var examined = 0
                     for id in batchIDs {
+                        try Task.checkCancellation()
                         examined += 1
                         if softDeletedIDs.contains(id) { continue }
                         guard let item = pageContext.model(for: id) as? ClipboardItem,
@@ -136,6 +142,7 @@ actor HistoryPageWorker {
                     try Task.checkCancellation()
                     var examined = 0
                     for id in batchIDs {
+                        try Task.checkCancellation()
                         examined += 1
                         if softDeletedIDs.contains(id) { continue }
                         guard let item = pageContext.model(for: id) as? ClipboardItem,
@@ -167,26 +174,10 @@ actor HistoryPageWorker {
             let pinned = !cursor.pinnedExhausted
             let offset = pinned ? cursor.pinnedOffset : cursor.ordinaryOffset
             let predicate: Predicate<ClipboardItem>
-            if (searchText.isEmpty || needsFullTextScan) && !pinsFirst {
+            if !pinsFirst {
                 predicate = #Predicate<ClipboardItem> { !$0.isConcealed }
-            } else if searchText.isEmpty || needsFullTextScan {
-                predicate = #Predicate<ClipboardItem> { $0.isPinned == pinned && !$0.isConcealed }
-            } else if !pinsFirst {
-                let search = searchText
-                predicate = #Predicate<ClipboardItem> { item in
-                    !item.isConcealed &&
-                    (item.textContent?.localizedStandardContains(search) == true ||
-                     item.sourceAppName?.localizedStandardContains(search) == true ||
-                     item.title?.localizedStandardContains(search) == true)
-                }
             } else {
-                let search = searchText
-                predicate = #Predicate<ClipboardItem> { item in
-                    item.isPinned == pinned && !item.isConcealed &&
-                    (item.textContent?.localizedStandardContains(search) == true ||
-                     item.sourceAppName?.localizedStandardContains(search) == true ||
-                     item.title?.localizedStandardContains(search) == true)
-                }
+                predicate = #Predicate<ClipboardItem> { $0.isPinned == pinned && !$0.isConcealed }
             }
             var descriptor = FetchDescriptor<ClipboardItem>(predicate: predicate)
             descriptor.sortBy = pinned
@@ -202,6 +193,7 @@ actor HistoryPageWorker {
             }
             var examined = 0
             for item in batch {
+                try Task.checkCancellation()
                 examined += 1
                 if accepts(item) { ids.append(item.persistentModelID) }
                 if ids.count == pageSize { break }
@@ -223,7 +215,7 @@ actor HistoryPageWorker {
 
 @MainActor
 enum HistoryPageLoader {
-    static let pageSize = 50
+    nonisolated static let pageSize = 50
 
     static func nextPage(
         in context: ModelContext,
@@ -247,6 +239,15 @@ enum HistoryPageLoader {
             pinsFirst: pinsFirst, pageSize: pageSize
         )
         cursor = page.cursor
-        return page.ids.compactMap { context.model(for: $0) as? ClipboardItem }
+        var items: [ClipboardItem] = []
+        items.reserveCapacity(page.ids.count)
+        for (index, id) in page.ids.enumerated() {
+            try Task.checkCancellation()
+            if let item = context.model(for: id) as? ClipboardItem { items.append(item) }
+            // Model resolution can fault SQLite rows. Give AppKit a chance to
+            // process key events between small groups of results.
+            if index % 8 == 7 { await Task.yield() }
+        }
+        return items
     }
 }

@@ -189,9 +189,8 @@ struct PanelContentView: View {
                 }
             )
             .focused($panelFocus, equals: .cardList)
-            // Recreate only for a new debounced search; label and metadata filters
-            // reset the bounded page cursor inside FilteredCardListView.
-            .id(debouncedSearchText)
+            // Keep the result view alive while typing. It resets its cursor when
+            // the debounced query changes, without rebuilding its focus/scroll tree.
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)

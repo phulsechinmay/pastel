@@ -68,7 +68,6 @@ struct HistoryBrowserView: View {
                 onPastePlainText: { item in singlePastePlainText(item) }
             )
             .environment(PanelActions())
-            .id(debouncedSearchText)
 
             // Bottom action bar (visible when items are selected).
             //
