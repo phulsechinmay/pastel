@@ -188,6 +188,7 @@ struct PanelContentView: View {
                     searchFocusRequestID &+= 1
                 }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .focused($panelFocus, equals: .cardList)
             // Keep the result view alive while typing. It resets its cursor when
             // the debounced query changes, without rebuilding its focus/scroll tree.

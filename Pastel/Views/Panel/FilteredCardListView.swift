@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import OSLog
 
 /// Paged card list. The search/label service scans off the UI thread and returns
 /// only IDs for the current page; at most three pages of card models stay resident.
@@ -20,6 +21,9 @@ struct FilteredCardListView: View {
     @State private var filteredItems: [ClipboardItem] = []
     @State private var cursor = HistoryPageCursor()
     @State private var isLoading = false
+    @State private var isReplacingResults = false
+    @State private var showRefreshIndicator = false
+    @State private var refreshIndicatorTask: Task<Void, Never>?
     @State private var pageTask: Task<Void, Never>?
     @State private var queryGeneration = 0
     @State private var windowStart = 0
@@ -27,6 +31,7 @@ struct FilteredCardListView: View {
     private let pageSize = HistoryPageLoader.pageSize
     private let firstPageSize = 12
     private let maxResidentItems = 150
+    private let logger = Logger(subsystem: "app.pastel.Pastel", category: "PanelResults")
 
     /// Anchor index for Shift+arrow range selection. `nil` means single selection
     /// (only `selectedIndex`). When set, the selection is the contiguous range
@@ -61,7 +66,9 @@ struct FilteredCardListView: View {
     private let searchFilters: SearchFilters
     private let searchText: String
 
-    private var visibleItems: [ClipboardItem] { filteredItems }
+    // Old cards can remain on screen during a filter transition, but must not
+    // remain keyboard targets for a paste from the newly selected filter.
+    private var visibleItems: [ClipboardItem] { isReplacingResults ? [] : filteredItems }
 
     /// Indices (into `visibleItems`) currently selected. A single cursor when
     /// `selectionAnchor` is nil, otherwise the contiguous anchor…cursor range.
@@ -85,18 +92,31 @@ struct FilteredCardListView: View {
 
     private func reload() {
         pageTask?.cancel()
+        refreshIndicatorTask?.cancel()
         queryGeneration &+= 1
         isLoading = false
-        filteredItems.removeAll(keepingCapacity: false)
+        isReplacingResults = !filteredItems.isEmpty
+        showRefreshIndicator = false
         windowStart = 0
         cursor = HistoryPageCursor()
         loadMore()
     }
 
     private func loadMore() {
-        guard !isLoading, !cursor.isExhausted, filteredItems.count < maxResidentItems else { return }
+        guard !isLoading, !cursor.isExhausted,
+              isReplacingResults || filteredItems.count < maxResidentItems else { return }
         isLoading = true
         let generation = queryGeneration
+        let replacing = isReplacingResults
+        let firstPage = replacing || filteredItems.isEmpty
+        let started = ContinuousClock.now
+        if firstPage {
+            refreshIndicatorTask = Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled, generation == queryGeneration, isLoading else { return }
+                showRefreshIndicator = true
+            }
+        }
         var nextCursor = cursor
         pageTask = Task {
             do {
@@ -105,16 +125,37 @@ struct FilteredCardListView: View {
                     selectedLabelIDs: selectedLabelIDs, allLabels: allLabels,
                     filters: searchFilters, softDeletedIDs: appState.deletionManager.softDeletedIDs,
                     searchIndex: appState.searchIndex, worker: appState.historyPageWorker,
-                    pageSize: filteredItems.isEmpty ? firstPageSize : pageSize
+                    pageSize: firstPage ? firstPageSize : pageSize
                 )
                 guard !Task.isCancelled, generation == queryGeneration else { return }
                 cursor = nextCursor
-                filteredItems.append(contentsOf: page)
+                if replacing {
+                    filteredItems = page
+                    isReplacingResults = false
+                } else {
+                    filteredItems.append(contentsOf: page)
+                }
                 loadError = nil
+                if firstPage {
+                    let elapsed = started.duration(to: .now)
+                    let milliseconds = elapsed.components.seconds * 1000 +
+                        elapsed.components.attoseconds / 1_000_000_000_000_000
+                    logger.info("Panel first page ready in \(milliseconds, privacy: .public) ms; \(page.count, privacy: .public) clips; labels selected: \(!selectedLabelIDs.isEmpty, privacy: .public)")
+                }
             } catch {
-                if generation == queryGeneration { loadError = error.localizedDescription }
+                if generation == queryGeneration && !Task.isCancelled {
+                    if replacing {
+                        filteredItems.removeAll(keepingCapacity: false)
+                        isReplacingResults = false
+                    }
+                    loadError = error.localizedDescription
+                }
             }
-            if generation == queryGeneration { isLoading = false }
+            if generation == queryGeneration {
+                refreshIndicatorTask?.cancel()
+                showRefreshIndicator = false
+                isLoading = false
+            }
         }
     }
 
@@ -183,14 +224,22 @@ struct FilteredCardListView: View {
 
     var body: some View {
         Group {
-            if visibleItems.isEmpty && isLoading {
-                ProgressView("Loading clips…")
-                    .frame(maxWidth: .infinity)
-            } else if let loadError, visibleItems.isEmpty {
+            if filteredItems.isEmpty && isLoading {
+                Group {
+                    if showRefreshIndicator {
+                        ProgressView("Loading clips…")
+                            .controlSize(.small)
+                            .font(.caption)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else if let loadError, filteredItems.isEmpty {
                 Text("Could not load clips: \(loadError)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if visibleItems.isEmpty {
+            } else if filteredItems.isEmpty {
                     SwiftUI.Label("No matching items", systemImage: "magnifyingglass")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -204,7 +253,7 @@ struct FilteredCardListView: View {
                             if windowStart > 0 {
                                 Button("Newest results") { reload() }
                             }
-                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
                                     // Height is whatever is left under the header row, not a
                                     // hardcoded 200. The panel is a fixed height, so a fixed
@@ -236,7 +285,7 @@ struct FilteredCardListView: View {
                             if windowStart > 0 {
                                 Button("Newest results") { reload() }
                             }
-                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
                             }
                             if filteredItems.count >= maxResidentItems && !cursor.isExhausted {
@@ -253,6 +302,16 @@ struct FilteredCardListView: View {
                         }
                     }
                 }
+            }
+        }
+        .allowsHitTesting(!isReplacingResults)
+        .overlay {
+            if isReplacingResults && showRefreshIndicator {
+                ProgressView("Loading clips…")
+                    .controlSize(.small)
+                    .font(.caption)
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             }
         }
         .focusable()
@@ -312,6 +371,7 @@ struct FilteredCardListView: View {
         }
         .onDisappear {
             pageTask?.cancel()
+            refreshIndicatorTask?.cancel()
             filteredItems.removeAll(keepingCapacity: false)
             if let monitor = keyMonitor {
                 NSEvent.removeMonitor(monitor)
