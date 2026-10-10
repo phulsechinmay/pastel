@@ -16,7 +16,7 @@ enum PanelLayout {
     static let verticalPanelWidth: CGFloat = 320
 
     // Horizontal panel (top/bottom edges)
-    static let horizontalPanelHeight: CGFloat = 252
+    static let horizontalPanelHeight: CGFloat = 270
     static let horizontalCardWidth: CGFloat = 260
 
     // Section spacing (between header, search, chips, cards)
