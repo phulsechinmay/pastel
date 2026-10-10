@@ -20,6 +20,7 @@
   .chip { border-radius: 20px; background: #343943; color: #c5cad3; padding: 7px 11px; font-size: 11px; line-height: 1; }
   .toolbar-spacer { flex: 1; }
   .toolbar-icon { font-size: 18px; color: #a6afbc; width: 25px; text-align: center; }
+  .mode-status { display: none; color: #c5cfdd; font-size: 11px; font-weight: 650; padding: 6px 8px; }
   .grid { display: grid; grid-template-columns: repeat(3, 260px); gap: 31px; justify-content: center; }
   .sample-name { color: #aeb6c2; font-size: 10px; letter-spacing: .12em; font-weight: 700; margin: 0 0 9px 2px; text-transform: uppercase; }
   .card { width: 260px; height: 202px; border-radius: 11px; background: #30333b; color: #f3f5f8; padding: 10px 14px; position: relative; outline: 2px solid #7fa8fb; outline-offset: 3px; overflow: visible; }
@@ -83,6 +84,15 @@
   .quiet .header-hint { margin-left: auto; color: #e5eaf1; font-size: 10px; font-weight: 650; background: #424a58; border-radius: 6px; height: 28px; padding: 8px 7px; }
   .quiet .header-hint + .more { margin-left: 2px; }
   .quiet .card.color .header-hint { color: #fff6e8; background: #36312b; }
+  .minimal .mode-status { display: block; }
+  .minimal .card .quick, .minimal .card .photo-quick, .minimal .card .inline-meta { display: none; }
+  .minimal .card-header .label { margin-left: 3px; }
+  .minimal .card-header .more { margin-left: auto; }
+  .panel-more { display: none; height: 28px; width: 28px; align-items: center; justify-content: center; border-radius: 6px; background: #434a56; color: #eef1f6; font-size: 14px; font-weight: 750; letter-spacing: 1px; }
+  .clean .mode-status, .clean .panel-more { display: flex; }
+  .clean .card .quick, .clean .card .photo-quick, .clean .card .inline-meta, .clean .card .more { display: none; }
+  .clean .card-header .label { margin-left: 3px; }
+  .clean .card-header .time { margin-left: auto; }
 </style>
 </head>
 <body>
@@ -99,7 +109,7 @@
     <div class="panel-top">
       <div class="search">⌕ &nbsp; Search clips</div>
       <div class="chip">All History</div><div class="chip">Work</div><div class="chip">Design</div>
-      <div class="toolbar-spacer"></div><div class="toolbar-icon">☷</div><div class="toolbar-icon">⚙</div>
+      <div class="toolbar-spacer"></div><div class="mode-status">↵ &nbsp; Paste</div><div class="panel-more">···</div><div class="toolbar-icon">☷</div><div class="toolbar-icon">⚙</div>
     </div>
     <div class="grid" id="grid-first"></div>
   </div>
@@ -107,23 +117,31 @@
     <div class="panel-top">
       <div class="search">⌕ &nbsp; Search clips</div>
       <div class="chip">All History</div><div class="chip">Work</div><div class="chip">Design</div>
-      <div class="toolbar-spacer"></div><div class="toolbar-icon">☷</div><div class="toolbar-icon">⚙</div>
+      <div class="toolbar-spacer"></div><div class="mode-status">↵ &nbsp; Paste</div><div class="panel-more">···</div><div class="toolbar-icon">☷</div><div class="toolbar-icon">⚙</div>
     </div>
     <div class="grid" id="grid-second"></div>
   </div>
-  <div class="small-caption"><span>Two separate panel examples show six clip types. Each real horizontal panel has one scrolling row.</span><span>260 × 202 pt card specimens</span></div>
+  <div class="small-caption"><span id="caption">Two separate panel examples show six clip types. Each real horizontal panel has one scrolling row.</span><span>260 × 202 pt card specimens</span></div>
 </div>
 <script>
- const variant = new URLSearchParams(location.search).get('variant') === 'b' ? 'b' : 'a';
+ const requested = new URLSearchParams(location.search).get('variant');
+ const variant = ['b', 'c', 'd'].includes(requested) ? requested : 'a';
  document.body.classList.toggle('quiet', variant === 'b');
- document.getElementById('title').textContent = variant === 'a' ? 'Option A · Action in the selected header' : 'Option B · Quiet selected header';
+ document.body.classList.toggle('minimal', variant === 'c');
+ document.body.classList.toggle('clean', variant === 'd');
+ document.getElementById('title').textContent = variant === 'a' ? 'Option A · Action in the selected header' : variant === 'b' ? 'Option B · Quiet selected header' : variant === 'c' ? 'Option C · Contextual card menu' : 'Option D · Panel-level actions';
  document.getElementById('subtitle').textContent = variant === 'a'
    ? 'A named Paste action and More replace low-priority header metadata on the focused clip. The content area stays intact.'
-   : 'Keep source, label, and recency in the header. A compact More control reveals explicit actions; Return still performs the primary action.';
+   : variant === 'b' ? 'Keep source, label, and recency in the header. A compact More control reveals explicit actions; Return still performs the primary action.'
+   : variant === 'c' ? 'The card carries its content and one contextual More control. A quiet panel-level cue says what Return does; the full destination lives in the menu and preview.'
+   : 'Cards show content, source, and recency. A single panel-level More control follows selection, with Return shown nearby.';
+ if (variant === 'c') document.getElementById('caption').textContent = 'More appears on selected or hovered cards; the numbered shortcuts appear while Command is held. Each real panel has one scrolling row.';
+ if (variant === 'd') document.getElementById('caption').textContent = 'One panel-level More menu follows the current selection; right-click and Command-K reach the same actions. Each real panel has one scrolling row.';
  const app = (cls, text) => `<div class="app ${cls}">${text}</div>`;
  const header = (cls, icon, time, label = '') => variant === 'a'
    ? `<div class="card-header">${app(cls, icon)}<span class="time">${time}</span><span class="grow"></span><span class="primary">Paste → Notes<span class="return">↵</span></span><span class="more">···</span></div>`
-   : `<div class="card-header">${app(cls, icon)}${label ? `<span class="label">${label}</span>` : ''}<span class="time">${time}</span><span class="header-hint">Paste ↵</span><span class="more">···</span></div>`;
+   : variant === 'b' ? `<div class="card-header">${app(cls, icon)}${label ? `<span class="label">${label}</span>` : ''}<span class="time">${time}</span><span class="header-hint">Paste ↵</span><span class="more">···</span></div>`
+   : `<div class="card-header">${app(cls, icon)}${label ? `<span class="label">${label}</span>` : ''}<span class="time">${time}</span><span class="more">···</span></div>`;
  const cards = [
    ['Text', 'notes', 'N', '2m', 'Work', `<div class="body"><div class="text-headline">Project handoff</div><div class="text-body">Send the final review by Friday.<br>Include the screenshots and the<br>open questions from design.<br><span class="dim">The first build is ready for…</span></div></div><div class="inline-meta">Text · <b>142 characters</b></div><div class="quick">⌘1</div>`],
    ['Link', 'safari', '✦', '8m', 'Design', `<div class="body"><div class="link-art"><span class="link-art-label">FIELDNOTES</span></div><div class="link-title">Design systems for smaller teams</div><div class="link-url">fieldnotes.design/notes/system-42</div></div><div class="quick">⌘2</div>`],
