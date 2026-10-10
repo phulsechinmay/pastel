@@ -118,6 +118,33 @@ struct PerformanceUpgradeSmoke {
         check(found?.contains(huge.persistentModelID) == true, "deep large-text search")
         let accentMatches = try await index.matchingIDs("cafe", offset: 0, limit: 20, pinsFirst: true)
         check(accentMatches?.contains(accented.persistentModelID) == true, "diacritic-insensitive search")
+        let shortDeepMatches = try await index.matchingIDs("🦄", offset: 0, limit: 20, pinsFirst: true)
+        check(shortDeepMatches?.contains(huge.persistentModelID) == true,
+              "short search reaches externally stored full text")
+        let shortAccentMatches = try await index.matchingIDs("fé", offset: 0, limit: 20, pinsFirst: true)
+        check(shortAccentMatches?.contains(accented.persistentModelID) == true,
+              "short search preserves Unicode folding")
+        let shortMissing = try await index.matchingIDs("💥", offset: 0, limit: 20, pinsFirst: true)
+        check(shortMissing?.isEmpty == true, "short no-result search")
+        var shortCursor = HistoryPageCursor()
+        let shortPage = try await HistoryPageLoader.nextPage(
+            in: context, cursor: &shortCursor, searchText: "🦄",
+            selectedLabelIDs: [], allLabels: [label], searchIndex: index
+        )
+        check(shortPage.map(\.persistentModelID) == [huge.persistentModelID],
+              "short indexed page resolves large clip without fallback scan")
+        if itemCount >= 10_000 {
+            let cancelledSearch = Task {
+                try await index.matchingIDs("zz", offset: 0, limit: 20, pinsFirst: true)
+            }
+            cancelledSearch.cancel()
+            do {
+                _ = try await cancelledSearch.value
+                check(false, "superseded short search must cancel")
+            } catch is CancellationError {
+                // The SQLite progress handler stopped the old query.
+            }
+        }
         try await index.externalizeLegacyLargeClips()
         let migrated = ModelContext(container).model(for: legacy.persistentModelID) as? ClipboardItem
         check(migrated?.largeTextData != nil && migrated?.fullTextContent == legacyText,

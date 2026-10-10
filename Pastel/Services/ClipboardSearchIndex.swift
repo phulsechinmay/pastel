@@ -9,6 +9,7 @@ import SwiftData
 actor ClipboardSearchIndex {
     private var database: OpaquePointer?
     private var ready = false
+    private var isRebuilding = false
     private var databaseURLOverride: URL?
     private let smallClipLimit = 64 * 1024
     private let logger = Logger(subsystem: "app.pastel.Pastel", category: "SearchIndex")
@@ -27,6 +28,9 @@ actor ClipboardSearchIndex {
         let path = url.path
         guard sqlite3_open(path, &database) == SQLITE_OK else { throw IndexError.database }
         try execute("PRAGMA journal_mode=WAL")
+        // The index is disposable and checked against SwiftData on startup.
+        // Avoid an fsync for each resumable backfill transaction.
+        try execute("PRAGMA synchronous=NORMAL")
         try execute("PRAGMA busy_timeout=3000")
         if try schemaVersion() < 6 {
             try execute("DROP TABLE IF EXISTS clips")
@@ -64,7 +68,7 @@ actor ClipboardSearchIndex {
     }
 
     /// Rebuild in small transactions. Ordinary clips become searchable before large
-    /// clips; callers keep the authoritative SwiftData fallback until completion.
+    /// clips; the UI marks partial results until completion.
     func rebuild() async throws {
         let started = ContinuousClock.now
         try open()
@@ -78,6 +82,8 @@ actor ClipboardSearchIndex {
             initial = ("small", 0)
         }
         ready = false
+        isRebuilding = true
+        defer { isRebuilding = false }
         for largePass in [false, true] {
             if !largePass && initial.phase == "large" { continue }
             var offset = largePass && initial.phase == "small" ? 0 : initial.offset
@@ -94,24 +100,31 @@ actor ClipboardSearchIndex {
                 descriptor.sortBy = [SortDescriptor(\.timestamp, order: .reverse)]
                 // Amortize SQLite/SwiftData round trips for small clips while
                 // keeping giant payloads in a separate two-item batch.
-                descriptor.fetchLimit = large ? 2 : 64
+                descriptor.fetchLimit = large ? 2 : 128
                 descriptor.fetchOffset = offset
-                let batchContext = ModelContext(modelContainer)
-                let batch = try batchContext.fetch(descriptor)
-                if batch.isEmpty {
+                // SwiftData/Core Data may autorelease model and SQLite bridge
+                // objects. Drain them each batch instead of carrying them across
+                // an entire 100,000-item rebuild.
+                let processed = try autoreleasepool { () throws -> Int in
+                    let batchContext = ModelContext(modelContainer)
+                    let batch = try batchContext.fetch(descriptor)
+                    if batch.isEmpty { return 0 }
+                    try execute("BEGIN IMMEDIATE")
+                    do {
+                        for item in batch { try upsert(item) }
+                        try execute("UPDATE build_state SET phase='\(large ? "large" : "small")', next_offset=\(offset + batch.count)")
+                        try execute("COMMIT")
+                    } catch {
+                        try? execute("ROLLBACK")
+                        throw error
+                    }
+                    return batch.count
+                }
+                if processed == 0 {
                     try execute("UPDATE build_state SET phase='\(large ? "complete" : "large")', next_offset=0")
                     break
                 }
-                try execute("BEGIN IMMEDIATE")
-                do {
-                    for item in batch { try upsert(item) }
-                    try execute("UPDATE build_state SET phase='\(large ? "large" : "small")', next_offset=\(offset + batch.count)")
-                    try execute("COMMIT")
-                } catch {
-                    try? execute("ROLLBACK")
-                    throw error
-                }
-                offset += batch.count
+                offset += processed
                 await Task.yield()
             }
             if Task.isCancelled { return }
@@ -227,19 +240,44 @@ actor ClipboardSearchIndex {
 
     func matchingIDs(_ search: String, offset: Int, limit: Int, pinsFirst: Bool) throws -> [PersistentIdentifier]? {
         let normalized = Self.normalize(search)
-        guard ready, normalized.unicodeScalars.count >= 3 else { return nil }
+        // During backfill, return the indexed subset immediately. The UI marks
+        // results as incomplete and refreshes when the rebuild finishes. A short
+        // query on a completed index scans SQLite text rather than faulting every
+        // SwiftData model and large external payload into the worker context.
+        guard ready || isRebuilding, !normalized.isEmpty else { return nil }
         try open()
+        // The short-query scan can visit many rows. Allow a superseded search
+        // task to stop it instead of holding the index actor for the full scan.
+        sqlite3_progress_handler(database, 2_000, { _ in
+            Task<Never, Never>.isCancelled ? 1 : 0
+        }, nil)
+        defer { sqlite3_progress_handler(database, 0, nil, nil) }
         var statement: OpaquePointer?
         let order = pinsFirst
             ? "clip_keys.pinned DESC, clip_keys.pinRank DESC, clip_keys.timestamp DESC, clip_keys.id DESC"
             : "clip_keys.timestamp DESC, clip_keys.id DESC"
-        let sql = "SELECT clip_keys.id FROM clips JOIN clip_keys ON clips.rowid = clip_keys.rowid WHERE clips MATCH ? ORDER BY \(order) LIMIT ? OFFSET ?"
+        let isShortQuery = normalized.unicodeScalars.count < 3
+        let matchCondition = isShortQuery
+            ? "(instr(clips.body, ?) > 0 OR instr(clips.title, ?) > 0 OR instr(clips.app, ?) > 0)"
+            : "clips MATCH ?"
+        // A single character is usually common: stop after its first ordered
+        // page. A two-character query is often sparse, so scan the FTS content
+        // sequentially instead of doing a random row lookup for every clip.
+        let source = normalized.unicodeScalars.count == 1
+            ? "clip_keys INDEXED BY \(pinsFirst ? "clip_keys_by_pin" : "clip_keys_by_time") CROSS JOIN clips ON clips.rowid = clip_keys.rowid"
+            : "clips JOIN clip_keys ON clips.rowid = clip_keys.rowid"
+        let sql = "SELECT clip_keys.id FROM \(source) WHERE \(matchCondition) ORDER BY \(order) LIMIT ? OFFSET ?"
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { throw IndexError.database }
         defer { sqlite3_finalize(statement) }
-        let phrase = "\"" + normalized.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-        bind(phrase, at: 1, in: statement)
-        sqlite3_bind_int(statement, 2, Int32(limit))
-        sqlite3_bind_int(statement, 3, Int32(offset))
+        if isShortQuery {
+            for position in 1...3 { bind(normalized, at: Int32(position), in: statement) }
+        } else {
+            let phrase = "\"" + normalized.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+            bind(phrase, at: 1, in: statement)
+        }
+        let limitPosition: Int32 = isShortQuery ? 4 : 2
+        sqlite3_bind_int(statement, limitPosition, Int32(limit))
+        sqlite3_bind_int(statement, limitPosition + 1, Int32(offset))
         var ids: [PersistentIdentifier] = []
         var step = sqlite3_step(statement)
         while step == SQLITE_ROW {
@@ -249,6 +287,7 @@ actor ClipboardSearchIndex {
             }
             step = sqlite3_step(statement)
         }
+        if step == SQLITE_INTERRUPT { throw CancellationError() }
         guard step == SQLITE_DONE else { throw IndexError.database }
         return ids
     }
@@ -262,6 +301,10 @@ actor ClipboardSearchIndex {
     ) throws -> [PersistentIdentifier]? {
         guard ready else { return nil }
         try open()
+        sqlite3_progress_handler(database, 2_000, { _ in
+            Task<Never, Never>.isCancelled ? 1 : 0
+        }, nil)
+        defer { sqlite3_progress_handler(database, 0, nil, nil) }
         var clauses = [
             "(originDeviceID = ? OR originDeviceID = '' OR contentType NOT IN ('image','file'))"
         ]
@@ -304,6 +347,7 @@ actor ClipboardSearchIndex {
             }
             step = sqlite3_step(statement)
         }
+        if step == SQLITE_INTERRUPT { throw CancellationError() }
         guard step == SQLITE_DONE else { throw IndexError.database }
         return ids
     }

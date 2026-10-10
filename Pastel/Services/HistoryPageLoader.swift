@@ -66,9 +66,10 @@ actor HistoryPageWorker {
         }
         let localDeviceID = DeviceIdentifier.current
         let cutoff = filters.dateRange?.cutoff()
-        // Until FTS is complete, the preview column cannot answer a deep-text
-        // query. Scan the full payload off the UI actor for correctness.
-        var needsFullTextScan = !searchText.isEmpty && searchText.unicodeScalars.count < 3
+        // A failed or unavailable index falls back to a full-payload scan off
+        // the UI actor. An index in backfill serves its indexed subset first;
+        // the UI marks those results as incomplete until the rebuild finishes.
+        var needsFullTextScan = false
 
         func accepts(_ item: ClipboardItem) -> Bool {
             let id = item.persistentModelID

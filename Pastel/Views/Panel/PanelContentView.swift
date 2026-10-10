@@ -243,7 +243,11 @@ struct PanelContentView: View {
             appState.panelController.handleEdgeChange(reopen: true)
         }
         .task(id: searchText) {
-            try? await Task.sleep(for: .milliseconds(200))
+            // A one- or two-character query scans the normalized SQLite text.
+            // Give a continuing keystroke a little more time before doing that work.
+            let delay = searchText.unicodeScalars.count > 0 && searchText.unicodeScalars.count < 3
+                ? 350 : 200
+            try? await Task.sleep(for: .milliseconds(delay))
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
         }

@@ -113,7 +113,7 @@ final class AppState {
         historyPageWorker = HistoryPageWorker(modelContainer: modelContext.container)
         searchIndexBuilding = true
         let wasDirty = UserDefaults.standard.bool(forKey: Self.indexDirtyKey)
-        Task { [weak self] in
+        Task(priority: .utility) { [weak self] in
             do {
                 if wasDirty { try await index.resetAndRebuild() }
                 else { try await index.rebuild() }
@@ -191,7 +191,7 @@ final class AppState {
             return
         }
         searchIndexBuilding = true
-        Task { [weak self] in
+        Task(priority: .utility) { [weak self] in
             do {
                 try await index.resetAndRebuild()
                 self?.searchIndexRevision &+= 1

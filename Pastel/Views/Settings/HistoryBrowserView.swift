@@ -85,7 +85,9 @@ struct HistoryBrowserView: View {
         }
         .animation(.easeOut(duration: 0.2), value: selectedIDs.isEmpty)
         .task(id: searchText) {
-            try? await Task.sleep(for: .milliseconds(200))
+            let delay = searchText.unicodeScalars.count > 0 && searchText.unicodeScalars.count < 3
+                ? 350 : 200
+            try? await Task.sleep(for: .milliseconds(delay))
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
         }

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import OSLog
 
 /// Responsive card grid for the History tab in Settings.
 ///
@@ -22,6 +23,9 @@ struct HistoryGridView: View {
     @State private var memoizedFilteredItems: [ClipboardItem] = []
     @State private var cursor = HistoryPageCursor(pinnedExhausted: true)
     @State private var isLoading = false
+    @State private var isReplacingResults = false
+    @State private var showRefreshIndicator = false
+    @State private var refreshIndicatorTask: Task<Void, Never>?
     @State private var pageTask: Task<Void, Never>?
     @State private var queryGeneration = 0
     @State private var windowStart = 0
@@ -29,6 +33,7 @@ struct HistoryGridView: View {
     private let pageSize = 100
     private let firstPageSize = 12
     private let maxResidentItems = 300
+    private let logger = Logger(subsystem: "app.pastel.Pastel", category: "HistoryResults")
     private let searchText: String
 
     // Labels passed from parent for ClipboardCardView context menus
@@ -64,7 +69,7 @@ struct HistoryGridView: View {
         self.onPastePlainText = onPastePlainText
     }
 
-    private var visibleItems: [ClipboardItem] { memoizedFilteredItems }
+    private var visibleItems: [ClipboardItem] { isReplacingResults ? [] : memoizedFilteredItems }
 
     /// Compact signature for label metadata that affects labelKey filtering.
     private var labelFilterSignature: String {
@@ -75,9 +80,11 @@ struct HistoryGridView: View {
 
     private func reload() {
         pageTask?.cancel()
+        refreshIndicatorTask?.cancel()
         queryGeneration &+= 1
         isLoading = false
-        memoizedFilteredItems.removeAll(keepingCapacity: false)
+        isReplacingResults = !memoizedFilteredItems.isEmpty
+        showRefreshIndicator = false
         windowStart = 0
         resolvedItems.removeAll(keepingCapacity: false)
         cursor = HistoryPageCursor(pinnedExhausted: true)
@@ -86,9 +93,19 @@ struct HistoryGridView: View {
 
     private func loadMore() {
         guard !isLoading, !cursor.isExhausted,
-              memoizedFilteredItems.count < maxResidentItems else { return }
+              isReplacingResults || memoizedFilteredItems.count < maxResidentItems else { return }
         isLoading = true
         let generation = queryGeneration
+        let replacing = isReplacingResults
+        let firstPage = replacing || memoizedFilteredItems.isEmpty
+        let started = ContinuousClock.now
+        if firstPage {
+            refreshIndicatorTask = Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled, generation == queryGeneration, isLoading else { return }
+                showRefreshIndicator = true
+            }
+        }
         var nextCursor = cursor
         pageTask = Task {
             do {
@@ -97,17 +114,38 @@ struct HistoryGridView: View {
                     selectedLabelIDs: selectedLabelIDs, allLabels: allLabels,
                     softDeletedIDs: appState.deletionManager.softDeletedIDs,
                     searchIndex: appState.searchIndex, worker: appState.historyPageWorker,
-                    pinsFirst: false, pageSize: memoizedFilteredItems.isEmpty ? firstPageSize : pageSize
+                    pinsFirst: false, pageSize: firstPage ? firstPageSize : pageSize
                 )
                 guard !Task.isCancelled, generation == queryGeneration else { return }
                 cursor = nextCursor
-                memoizedFilteredItems.append(contentsOf: page)
+                if replacing {
+                    memoizedFilteredItems = page
+                    isReplacingResults = false
+                } else {
+                    memoizedFilteredItems.append(contentsOf: page)
+                }
                 resolvedItems = memoizedFilteredItems
                 loadError = nil
+                if firstPage {
+                    let elapsed = started.duration(to: .now)
+                    let milliseconds = elapsed.components.seconds * 1000 +
+                        elapsed.components.attoseconds / 1_000_000_000_000_000
+                    logger.info("History first page ready in \(milliseconds, privacy: .public) ms; \(page.count, privacy: .public) clips")
+                }
             } catch {
-                if generation == queryGeneration { loadError = error.localizedDescription }
+                if generation == queryGeneration && !Task.isCancelled {
+                    if replacing {
+                        memoizedFilteredItems.removeAll(keepingCapacity: false)
+                        isReplacingResults = false
+                    }
+                    loadError = error.localizedDescription
+                }
             }
-            if generation == queryGeneration { isLoading = false }
+            if generation == queryGeneration {
+                refreshIndicatorTask?.cancel()
+                showRefreshIndicator = false
+                isLoading = false
+            }
         }
     }
 
@@ -123,8 +161,16 @@ struct HistoryGridView: View {
     var body: some View {
         Group {
             if memoizedFilteredItems.isEmpty && isLoading {
-                ProgressView("Loading history…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Group {
+                    if showRefreshIndicator {
+                        ProgressView("Loading history…")
+                            .controlSize(.small)
+                            .font(.caption)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let loadError, memoizedFilteredItems.isEmpty {
                 Text("Could not load history: \(loadError)")
                     .foregroundStyle(.secondary)
@@ -144,7 +190,7 @@ struct HistoryGridView: View {
                         if windowStart > 0 {
                             Button("Newest results") { reload() }
                         }
-                        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                        ForEach(Array(memoizedFilteredItems.enumerated()), id: \.element.id) { index, item in
                             let isInSelection = selectedIDs.contains(item.persistentModelID)
                             ClipboardCardView(
                                 item: item,
@@ -212,12 +258,22 @@ struct HistoryGridView: View {
                 }
             }
         }
+        .allowsHitTesting(!isReplacingResults)
+        .overlay {
+            if isReplacingResults && showRefreshIndicator {
+                ProgressView("Loading history…")
+                    .controlSize(.small)
+                    .font(.caption)
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(characters: .init(charactersIn: "aA")) { keyPress in
             // Cmd+A selects the loaded window; distant pages are not kept in memory.
             guard keyPress.modifiers.contains(.command) else { return .ignored }
-            selectedIDs = Set(memoizedFilteredItems.map(\.persistentModelID))
+            selectedIDs = Set(visibleItems.map(\.persistentModelID))
             return .handled
         }
         .onKeyPress(.escape) {
@@ -236,6 +292,7 @@ struct HistoryGridView: View {
         .onChange(of: labelFilterSignature) { _, _ in reload() }
         .onDisappear {
             pageTask?.cancel()
+            refreshIndicatorTask?.cancel()
             memoizedFilteredItems.removeAll(keepingCapacity: false)
             resolvedItems.removeAll(keepingCapacity: false)
         }

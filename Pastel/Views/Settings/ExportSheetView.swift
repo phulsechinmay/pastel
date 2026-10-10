@@ -95,6 +95,11 @@ struct ExportSheetView: View {
                     .foregroundStyle(.blue)
                 }
 
+                Text("Leave all labels unchecked to include unlabeled items. Selecting labels exports only items with any selected label.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 if labels.isEmpty {
                     Text("No labels created yet.")
                         .font(.caption)
@@ -138,7 +143,7 @@ struct ExportSheetView: View {
 
             // Date Filter
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Export data since", isOn: $filterByDate)
+                Toggle("Limit to a time range", isOn: $filterByDate)
                     .toggleStyle(.checkbox)
 
                 if filterByDate {
@@ -152,9 +157,10 @@ struct ExportSheetView: View {
                     .frame(maxWidth: 200)
                 }
 
-                Text("When unchecked, only items with selected labels are exported.")
+                Text("When unchecked, all saved dates are included. Content type and label filters apply regardless of the time range.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if importExportService.isProcessing {
