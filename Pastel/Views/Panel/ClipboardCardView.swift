@@ -2,6 +2,12 @@ import SwiftUI
 import SwiftData
 import AppKit
 
+enum ClipboardCardPresentation {
+    case panelStrip
+    case panelList
+    case historyGrid
+}
+
 /// Dispatcher card view that wraps each clipboard item in shared chrome
 /// (source app icon, content preview, relative timestamp) and routes to
 /// the appropriate type-specific subview.
@@ -15,6 +21,7 @@ import AppKit
 struct ClipboardCardView: View {
 
     let item: ClipboardItem
+    var presentation: ClipboardCardPresentation
     var isSelected: Bool
     var onPaste: (() -> Void)?
     var onPreview: (() -> Void)?
@@ -23,8 +30,6 @@ struct ClipboardCardView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PanelActions.self) private var panelActions
     @Environment(AppState.self) private var appState
-
-    @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
 
     @State private var isHovered = false
     @State private var sourceIcon: NSImage?
@@ -37,8 +42,7 @@ struct ClipboardCardView: View {
     @State private var pulsingLabelID: PersistentIdentifier?
 
     private var isHorizontal: Bool {
-        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
-        return !edge.isVertical
+        presentation == .panelStrip
     }
 
     /// Whether this card is a color item (entire card uses the detected color).
@@ -65,8 +69,9 @@ struct ClipboardCardView: View {
     /// go to organize in bulk, and doing it one card at a time there was busywork.
     var labelDropTargets: (() -> [ClipboardItem])?
 
-    init(item: ClipboardItem, isSelected: Bool = false, allLabels: [Label] = [], badgePosition: Int? = nil, isShiftHeld: Bool = false, hideContextMenu: Bool = false, labelDropTargets: (() -> [ClipboardItem])? = nil, onPaste: (() -> Void)? = nil, onPreview: (() -> Void)? = nil) {
+    init(item: ClipboardItem, presentation: ClipboardCardPresentation = .historyGrid, isSelected: Bool = false, allLabels: [Label] = [], badgePosition: Int? = nil, isShiftHeld: Bool = false, hideContextMenu: Bool = false, labelDropTargets: (() -> [ClipboardItem])? = nil, onPaste: (() -> Void)? = nil, onPreview: (() -> Void)? = nil) {
         self.item = item
+        self.presentation = presentation
         self.isSelected = isSelected
         self.allLabels = allLabels
         self.badgePosition = badgePosition
@@ -79,7 +84,7 @@ struct ClipboardCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header row: source app icon + label chips (max 3) + overflow + timestamp
+            // Header row: source app icon + labels + timestamp
             HStack(spacing: 4) {
                 sourceAppIcon
 
@@ -91,8 +96,8 @@ struct ClipboardCardView: View {
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                         .scaleEffect(pulsingLabelID == label.persistentModelID ? 1.18 : 1)
                 }
-                if item.safeLabels.count > 3 {
-                    Text("+\(item.safeLabels.count - 3)")
+                if item.safeLabels.count > headerLabels.count {
+                    Text("+\(item.safeLabels.count - headerLabels.count)")
                         .font(PanelStyle.Text.meta)
                         .foregroundStyle(metaForeground)
                         .chipChrome(tintOverride: isColorCard ? colorCardTextColor : nil, isCompact: true)
@@ -113,33 +118,23 @@ struct ClipboardCardView: View {
                     .monospacedDigit()
             }
 
-            // Content preview (full-width)
-            contentPreview
-
-            // In horizontal mode, push footer to card bottom for uniform alignment
-            if isHorizontal {
-                Spacer(minLength: 0)
+            if isHorizontal, let title = item.title, !title.isEmpty {
+                Text(title)
+                    .font(PanelStyle.Text.title)
+                    .lineLimit(1)
             }
 
-            // Footer row: title (bold) + keycap badge
-            if (item.title != nil && !(item.title?.isEmpty ?? true)) || badgePosition != nil {
-                HStack(spacing: 4) {
-                    if let title = item.title, !title.isEmpty {
-                        Text(title)
-                            .font(PanelStyle.Text.title)
-                            .lineLimit(1)
-                            .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
-                    }
-
-                    Spacer()
-
-                    if let badgePosition {
-                        KeycapBadge(
-                            number: badgePosition,
-                            isShiftHeld: isShiftHeld,
-                            tint: isColorCard ? colorCardTextColor : nil
-                        )
-                    }
+            if isHorizontal && item.type == .image {
+                contentPreview
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(alignment: .bottom) { cardFooter }
+            } else {
+                contentPreview
+                if isHorizontal { Spacer(minLength: 0) }
+                if isHorizontal {
+                    cardFooter
+                } else if (item.title != nil && !(item.title?.isEmpty ?? true)) || badgePosition != nil {
+                    legacyFooter
                 }
             }
         }
@@ -352,7 +347,79 @@ struct ClipboardCardView: View {
 
     /// The label chips that actually render in the header row.
     private var headerLabels: [Label] {
-        Array(item.safeLabels.prefix(3))
+        Array(item.safeLabels.prefix(isHorizontal ? 1 : 3))
+    }
+
+    private var footerDetail: String? {
+        switch item.type {
+        case .text, .richText:
+            let kind = item.type == .richText ? "Rich text" : "Text"
+            let count = item.characterCount > 0 ? item.characterCount : (item.textContent?.count ?? 0)
+            return count > 0 ? "\(kind) · \(count) characters" : kind
+        case .url:
+            let hasTitle = !(item.urlTitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            return hasTitle ? item.textContent : nil
+        case .image:
+            return item.byteCount > 0
+                ? "Image · \(ByteCountFormatter.string(fromByteCount: Int64(item.byteCount), countStyle: .file))"
+                : "Image"
+        case .file:
+            let ext = ((item.textContent ?? "") as NSString).pathExtension.uppercased()
+            return ext.isEmpty ? "File" : "\(ext) file"
+        case .code:
+            let language = item.detectedLanguage?.capitalized ?? "Code"
+            guard let content = item.textContent, !content.isEmpty else { return language }
+            let lines = content.split(separator: "\n", omittingEmptySubsequences: false).count
+            let visibleLines = min(lines, item.title?.isEmpty == false ? 6 : 7)
+            return "\(language) · \(visibleLines) \(visibleLines == 1 ? "line" : "lines") shown"
+        case .color:
+            let original = item.textContent?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !original.isEmpty else { return nil }
+            let hex = item.detectedColorHex ?? ""
+            return original.replacingOccurrences(of: "#", with: "").caseInsensitiveCompare(hex) == .orderedSame
+                ? nil : original
+        }
+    }
+
+    private var cardFooter: some View {
+        HStack(spacing: 4) {
+            if let detail = footerDetail, !detail.isEmpty {
+                Text(detail)
+                    .font(PanelStyle.Text.meta)
+                    .lineLimit(1)
+                    .truncationMode(item.type == .url ? .middle : .tail)
+                    .foregroundStyle(item.type == .image ? Color.white :
+                                     (isColorCard ? colorCardTextColor : Color.secondary))
+                    .help(detail)
+            }
+            Spacer(minLength: 0)
+            if let badgePosition {
+                KeycapBadge(number: badgePosition, isShiftHeld: isShiftHeld,
+                            tint: item.type == .image ? .white : (isColorCard ? colorCardTextColor : nil))
+            }
+        }
+        .padding(item.type == .image ? 4 : 0)
+        .background {
+            if item.type == .image {
+                RoundedRectangle(cornerRadius: 5).fill(Color.black.opacity(0.78))
+            }
+        }
+    }
+
+    private var legacyFooter: some View {
+        HStack(spacing: 4) {
+            if let title = item.title, !title.isEmpty {
+                Text(title)
+                    .font(PanelStyle.Text.title)
+                    .lineLimit(1)
+                    .foregroundStyle(isColorCard ? colorCardTextColor : .primary)
+            }
+            Spacer()
+            if let badgePosition {
+                KeycapBadge(number: badgePosition, isShiftHeld: isShiftHeld,
+                            tint: isColorCard ? colorCardTextColor : nil)
+            }
+        }
     }
 
     /// Assign a dropped label, either to this card or to the caller's whole selection.
@@ -519,17 +586,17 @@ struct ClipboardCardView: View {
     private var contentPreview: some View {
         switch item.type {
         case .text, .richText:
-            TextCardView(item: item)
+            TextCardView(item: item, isCompactStrip: isHorizontal)
         case .url:
-            URLCardView(item: item)
+            URLCardView(item: item, isCompactStrip: isHorizontal)
         case .image:
-            ImageCardView(item: item)
+            ImageCardView(item: item, isCompactStrip: isHorizontal)
         case .file:
-            FileCardView(item: item)
+            FileCardView(item: item, isCompactStrip: isHorizontal)
         case .code:
-            CodeCardView(item: item)
+            CodeCardView(item: item, isCompactStrip: isHorizontal)
         case .color:
-            ColorCardView(item: item)
+            ColorCardView(item: item, isCompactStrip: isHorizontal)
         }
     }
 

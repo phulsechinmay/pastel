@@ -9,6 +9,7 @@ import SwiftUI
 struct ColorCardView: View {
 
     let item: ClipboardItem
+    var isCompactStrip = false
 
     /// Whether the original text differs from the current detected hex.
     private var showsOriginalSubtitle: Bool {
@@ -37,10 +38,9 @@ struct ColorCardView: View {
                 .font(PanelStyle.Text.display.weight(.bold).monospaced())
 
             // Original format subtitle (for rgb/hsl or edited hex)
-            if showsOriginalSubtitle {
+            if !isCompactStrip && showsOriginalSubtitle {
                 Text(originalWasHex ? "Original: \(item.textContent ?? "")" : item.textContent ?? "")
                     .font(PanelStyle.Text.meta.monospaced())
-                    .opacity(0.7)
                     .lineLimit(1)
             }
         }
@@ -72,6 +72,10 @@ func contrastingColor(forHex hex: String?) -> Color {
     let r = Double((rgb >> 16) & 0xFF) / 255.0
     let g = Double((rgb >> 8) & 0xFF) / 255.0
     let b = Double(rgb & 0xFF) / 255.0
-    let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-    return luminance > 0.5 ? .black : .white
+    func linear(_ value: Double) -> Double {
+        value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+    }
+    let luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+    // Choose whichever foreground has the stronger WCAG contrast ratio.
+    return luminance > 0.179 ? .black : .white
 }

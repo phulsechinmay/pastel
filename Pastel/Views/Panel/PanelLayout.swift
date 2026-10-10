@@ -16,7 +16,7 @@ enum PanelLayout {
     static let verticalPanelWidth: CGFloat = 320
 
     // Horizontal panel (top/bottom edges)
-    static let horizontalPanelHeight: CGFloat = 270
+    static let horizontalPanelHeight: CGFloat = 244
     static let horizontalCardWidth: CGFloat = 260
 
     // Section spacing (between header, search, chips, cards)
@@ -78,8 +78,8 @@ enum PanelLayout {
     /// selected when it was not.
     static let cardAppWashHeight: CGFloat = 44
 
-    /// Ceiling on an image card's preview. Keeps one tall screenshot from dominating
-    /// a grid row in the History browser while still filling the card in the panel.
+    /// Ceiling outside the compact strip. Keeps a tall screenshot from dominating
+    /// a History grid row; compact strip images fit their remaining card area.
     static let cardImageMaxHeight: CGFloat = 120
 
     // URL cards
@@ -102,6 +102,7 @@ enum PanelLayout {
     /// The banner absorbs the slack because it is the only element here that can
     /// change size without changing what the card says.
     static let cardURLBannerHeight: CGFloat = 106
+    static let cardURLCompactBannerHeight: CGFloat = 70
     static let cardURLBannerCornerRadius: CGFloat = 6
     /// Favicon that stands in for a banner when the site's og:image is favicon-sized.
     /// Centred inside a full-height `cardURLBannerHeight` slot rather than shrinking

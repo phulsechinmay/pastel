@@ -148,7 +148,8 @@ enum PanelStyle {
     /// `.primary` and `.secondary` cannot be trusted. `tint` is the contrast colour
     /// already computed from the swatch's luminance.
     static func onColor(_ tint: Color, secondary: Bool = false) -> Color {
-        secondary ? tint.opacity(0.70) : tint
+        // Small metadata on arbitrary swatches needs the full contrasting foreground.
+        tint
     }
 
     /// Surface for a chip or badge drawn on an arbitrary user colour.

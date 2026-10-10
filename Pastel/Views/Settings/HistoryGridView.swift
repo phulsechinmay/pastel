@@ -194,6 +194,7 @@ struct HistoryGridView: View {
                             let isInSelection = selectedIDs.contains(item.persistentModelID)
                             ClipboardCardView(
                                 item: item,
+                                presentation: .historyGrid,
                                 isSelected: isInSelection,
                                 allLabels: allLabels,
                                 hideContextMenu: true,

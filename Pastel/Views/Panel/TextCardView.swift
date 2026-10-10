@@ -2,23 +2,17 @@ import SwiftUI
 
 /// Card content for `.text` and `.richText` clipboard items.
 ///
-/// Displays up to 4 lines of the item's text content with standard body font.
-/// In horizontal panel mode (top/bottom edges), increases to 8 lines to fill
-/// the taller fixed-height cards.
+/// Displays up to 4 lines outside the compact strip. Strip previews reserve a
+/// stable bottom metadata/shortcut baseline and use fewer lines when titled.
 struct TextCardView: View {
 
     let item: ClipboardItem
-    @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
-
-    private var isHorizontal: Bool {
-        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
-        return !edge.isVertical
-    }
+    var isCompactStrip = false
 
     var body: some View {
         Text(TextWorkBudget.cardPreview(item.textContent))
             .font(PanelStyle.Text.body)
-            .lineLimit(isHorizontal ? 8 : 4)
+            .lineLimit(isCompactStrip ? ((item.title?.isEmpty == false) ? 5 : 6) : 4)
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

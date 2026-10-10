@@ -11,12 +11,14 @@ import SwiftUI
 struct ImageCardView: View {
 
     let item: ClipboardItem
+    var isCompactStrip = false
 
     var body: some View {
         Group {
             if let imagePath = item.imagePath ?? item.thumbnailPath {
                 AsyncThumbnailView(filename: imagePath)
-                    .frame(maxWidth: .infinity, maxHeight: PanelLayout.cardImageMaxHeight)
+                    .frame(maxWidth: .infinity,
+                           maxHeight: isCompactStrip ? .infinity : PanelLayout.cardImageMaxHeight)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
                 Image(systemName: "photo")

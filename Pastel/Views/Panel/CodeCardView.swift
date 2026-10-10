@@ -2,31 +2,26 @@
 import SwiftUI
 
 /// Card content for `.code` clipboard items with syntax-highlighted text
-/// and a language badge.
+/// and a language badge outside the compact panel strip.
 ///
 /// Highlights code asynchronously using HighlightSwift and caches the result
 /// in `HighlightCache` so re-scrolling does not re-highlight. Falls back to
 /// plain monospaced text while the async highlighting loads.
 ///
-/// Line limits adapt to panel orientation: 6 lines for vertical (left/right),
-/// 10 lines for horizontal (top/bottom).
+/// The compact strip uses a bounded preview so its bottom metadata and shortcut
+/// stay visible; Space opens the full code preview.
 struct CodeCardView: View {
 
     let item: ClipboardItem
-    @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
+    var isCompactStrip = false
     /// Syntax colours have to follow the appearance now that the panel is no longer
     /// pinned to dark. An atom-one dark palette on a light glass panel is unreadable.
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var highlightedText: AttributedString?
 
-    private var isHorizontal: Bool {
-        let edge = PanelEdge(rawValue: panelEdgeRaw) ?? .right
-        return !edge.isVertical
-    }
-
     private var lineLimit: Int {
-        isHorizontal ? 10 : 6
+        isCompactStrip ? ((item.title?.isEmpty == false) ? 6 : 7) : 6
     }
 
     var body: some View {
@@ -35,7 +30,7 @@ struct CodeCardView: View {
             codePreview
 
             // Language badge (shown when detected)
-            if let language = item.detectedLanguage, !language.isEmpty {
+            if !isCompactStrip, let language = item.detectedLanguage, !language.isEmpty {
                 LanguageBadge(language: language)
             }
         }

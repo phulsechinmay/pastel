@@ -6,7 +6,7 @@ Reviewed 2026-10-10 against the current SwiftUI source on `ux-learnings`. These 
 
 ![Option C: contextual More control on the selected card](card-layout-option-c.png)
 
-The editable mockup source is [card-layout-options.html](card-layout-options.html). **Option D is the revised recommendation** after feedback that action text makes the cards feel crowded. Earlier [Option A](card-layout-option-a.png) and [Option B](card-layout-option-b.png) remain comparison points, not the target.
+The editable mockup source is [card-layout-options.html](card-layout-options.html). **Option D is now implemented in source**, with rendered visual and accessibility checks pending. The boards remain illustrative, not captures of the built app. Earlier [Option A](card-layout-option-a.png) and [Option B](card-layout-option-b.png) remain comparison points.
 
 ## Decision on action text and the ellipsis
 
@@ -75,12 +75,14 @@ The plan also recommends explicit presentation contexts, larger control targets,
 | Next product pass | History as a library | History currently lives inside Settings. A dedicated resizable History workspace with List/Grid choice would make scanning, organizing, and larger previews practical without turning the quick panel into a library window. This is a larger separate change from card density. |
 | Cross-cutting | Keyboard and accessibility | Give History full arrows/Return/Space navigation; preserve visible focus independently from selection. Fix arbitrary-color text contrast, verify VoiceOver menu/button names, enlarge hit targets, and check text enlargement and Reduce Motion. These gaps are documented in the supplied UI/UX plan and need live validation. |
 
-## Suggested implementation and review order
+## Implementation and review order
 
 1. Separate panel-strip versus History card presentation. Preserve the existing ring, source tint, paste routing, and History appearance.
 2. Correct color-card contrast and confirm backed action controls remain legible for vivid, dark, and near-white colors.
 3. Prototype Option D with a real primary button and More menu in the panel top row. Remove only the horizontal panel-wide strip, then tune panel height against the tallest link, image, code, and enlarged-text cases. Compare Option C if toolbar crowding or selection association is a problem.
 4. Apply the compact content rules by type, beginning with URL favicon-only states and image sizing. Retain full content through Space preview.
 5. Compare D and C in a current build at top and bottom edges, light/dark, busy backdrops, long destination names and labels, keyboard/VoiceOver/Full Keyboard Access, multi-selection, and Copy mode. Verify that selecting or deselecting cards never shifts the content row or causes accidental activation. Test whether people find More without first being told about right-click.
+
+Steps 1–4 have an initial source implementation on `ux-learnings`. Both macOS build variants compile; step 5 remains pending because UI inspection timed out. The current card footer shows image byte size and file kind where the earlier concept board used illustrative dimensions and file size.
 
 Apple's relevant principles are also in [Collections](https://developer.apple.com/design/human-interface-guidelines/collections) (make items easy to choose), [Menus](https://developer.apple.com/design/human-interface-guidelines/menus) (name commands clearly), and [Focus and selection](https://developer.apple.com/design/human-interface-guidelines/focus-and-selection) (keep focus predictable). The visual treatments and their exact measurements are Pastel design judgments, not prescribed Apple layouts.

@@ -493,6 +493,7 @@ struct FilteredCardListView: View {
         let badge: Int? = quickPasteEnabled && index < 9 ? index + 1 : nil
         ClipboardCardView(
             item: item,
+            presentation: isHorizontal ? .panelStrip : .panelList,
             isSelected: selectedIndices.contains(index),
             allLabels: allLabels,
             badgePosition: badge,

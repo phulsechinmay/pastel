@@ -5,14 +5,12 @@ import AppKit
 ///
 /// Displays three possible states based on `urlMetadataFetched`:
 /// - **Loading** (nil): the URL, plus a spinner for the metadata still in flight
-/// - **Enriched** (true): og:image banner + favicon + page title + the URL beneath it
+/// - **Enriched** (true): og:image banner or favicon + page title + URL
 /// - **Failed** (false): the URL alone
 ///
-/// All three render the URL through `DisplayURL` at the same size and weights, so the
-/// card gains a picture and a title when metadata lands rather than restyling its
-/// text. The enriched state used to hide the raw URL entirely, which meant two links
-/// to the same site were indistinguishable: same favicon, same og:image, and titles
-/// that differ by an issue number the tail-truncation then cut off.
+/// The compact panel strip uses a shorter real banner, places favicon-only imagery
+/// beside the title, and lets the shared card footer carry the URL. Other surfaces
+/// retain the aligned larger image well and title/URL block.
 ///
 /// Images (favicon, og:image) are loaded from disk via ImageStorageService.
 /// The shared header row (source app icon + timestamp) is rendered by ClipboardCardView
@@ -20,6 +18,7 @@ import AppKit
 struct URLCardView: View {
 
     let item: ClipboardItem
+    var isCompactStrip = false
 
     @State private var bannerImage: NSImage?
     @State private var faviconImage: NSImage?
@@ -102,15 +101,15 @@ struct URLCardView: View {
     private var enrichedState: some View {
         VStack(alignment: .leading, spacing: 6) {
             if hasBannerSizedImage, let bannerImage {
-                imageSlot {
+                imageSlot(height: isCompactStrip ? PanelLayout.cardURLCompactBannerHeight : PanelLayout.cardURLBannerHeight) {
                     Image(nsImage: bannerImage)
                         .resizable()
                         .scaledToFill()
                 }
-            } else if let smallImage = faviconImage ?? bannerImage {
+            } else if !isCompactStrip, let smallImage = faviconImage ?? bannerImage {
                 // The site gave us a favicon or a favicon-sized og:image. Centre it at
                 // its natural size rather than scaling it up into mush.
-                imageSlot {
+                imageSlot(height: PanelLayout.cardURLBannerHeight) {
                     Image(nsImage: smallImage)
                         .resizable()
                         .scaledToFit()
@@ -131,23 +130,20 @@ struct URLCardView: View {
     /// Fixed-height slot for whatever image the site handed back, with its content
     /// centred on both axes.
     ///
-    /// Both image branches go through here, which is the whole point. A site that
-    /// returns a proper og:image and a site that returns only a 64pt favicon now
-    /// produce cards whose title, URL, and footer sit at the same heights. Before
-    /// this the small-image branch measured 80pt against the banner's 106, so its
-    /// text floated up and the ⌘1-9 badges lost their shared baseline down the list,
-    /// which is exactly the alignment those badges are scanned by.
+    /// The standard card keeps one aligned media well for both image branches.
+    /// The compact strip skips this well for favicon-only links and relies on its
+    /// separate fixed footer baseline to align shortcuts.
     ///
     /// The recessed well is only ever visible in the small-image case: a full banner
     /// covers it completely. That is why the background lives on the slot rather than
     /// on the branch, and it is what keeps a lone favicon reading as "this is all the
     /// site gave us" instead of as a layout that failed to fill itself.
-    private func imageSlot<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func imageSlot<Content: View>(height: CGFloat, @ViewBuilder content: () -> Content) -> some View {
         PanelStyle.surfaceRecessed
             .frame(
                 maxWidth: .infinity,
-                minHeight: PanelLayout.cardURLBannerHeight,
-                maxHeight: PanelLayout.cardURLBannerHeight
+                minHeight: height,
+                maxHeight: height
             )
             .overlay { content() }
             .clipShape(RoundedRectangle(cornerRadius: PanelLayout.cardURLBannerCornerRadius))
@@ -172,8 +168,14 @@ struct URLCardView: View {
                         .frame(width: PanelLayout.urlGlyphSize, height: PanelLayout.urlGlyphSize)
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                 } else if !hasBannerSizedImage {
-                    // No banner — use globe as prefix icon
-                    globeGlyph
+                    if isCompactStrip, let siteIcon = faviconImage ?? bannerImage {
+                        Image(nsImage: siteIcon)
+                            .resizable()
+                            .frame(width: PanelLayout.urlGlyphSize, height: PanelLayout.urlGlyphSize)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    } else {
+                        globeGlyph
+                    }
                 }
 
                 if let pageTitle {
@@ -187,7 +189,7 @@ struct URLCardView: View {
                 }
             }
 
-            if pageTitle != nil, let displayURL {
+            if !isCompactStrip, pageTitle != nil, let displayURL {
                 urlSubtitle(displayURL)
                     // Inset to the title's text edge, not the card's, so the two rows
                     // read as one block instead of a list of two things.

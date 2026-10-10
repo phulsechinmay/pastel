@@ -87,7 +87,8 @@ struct PanelContentView: View {
                         onSubmit: submitSearch,
                         onTab: focusResults
                     )
-                    .frame(maxWidth: 240)
+                    .frame(minWidth: 190, idealWidth: 230, maxWidth: 240)
+                    .layoutPriority(2)
 
                     ChipBarView(
                         labels: labels,
@@ -95,6 +96,7 @@ struct PanelContentView: View {
                         isAllHistoryActive: selectedLabelIDs.isEmpty,
                         onSelectAllHistory: { selectedLabelIDs.removeAll() }
                     )
+                    .frame(maxWidth: 420, alignment: .leading)
                     // Grow the horizontal panel by a row when the chips wrap to two lines.
                     .onGeometryChange(for: CGFloat.self) { proxy in
                         proxy.size.height
@@ -105,7 +107,8 @@ struct PanelContentView: View {
 
                     Spacer()
 
-                    toolbarButtons
+                    horizontalActions
+                    horizontalToolbarButtons
                 }
                 .padding(.bottom, PanelLayout.sectionSpacing)
 
@@ -219,7 +222,9 @@ struct PanelContentView: View {
             // Keep the result view alive while typing. It resets its cursor when
             // the debounced query changes, without rebuilding its focus/scroll tree.
 
-            actionBar
+            if !isHorizontal {
+                actionBar
+            }
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)
@@ -322,6 +327,7 @@ struct PanelContentView: View {
             $0.type != .image && $0.type != .file
         } ?? false
         if count > 1 {
+            if bulkTextCount == 0 { return "No text clips in selection" }
             let verb = isCopy || !hasDestination ? "Copy" : "Paste"
             return bulkTextCount == count
                 ? "\(verb) \(count) clips as Text"
@@ -332,7 +338,70 @@ struct PanelContentView: View {
         }
         let destination = appState.panelController.pasteTargetName
         let verb = isShiftHeld && canUsePlainText ? "Paste Plain Text" : "Paste"
-        return destination.map { "\(verb) into \($0)" } ?? "Copy to Clipboard"
+        return destination.map { "\(verb) into \($0)" } ?? "\(verb) into active app"
+    }
+
+    private var compactPrimaryTitle: String {
+        let verb = PasteBehavior.resolved(pasteBehaviorRaw) == .copy ||
+            appState.panelController.pasteTargetPID == nil ? "Copy" : "Paste"
+        if selectedItems.count > 1 {
+            if bulkTextCount == 0 { return "\(selectedItems.count) selected" }
+            return "\(verb) \(bulkTextCount)/\(selectedItems.count)"
+        }
+        let supportsPlainText = selectedItems.first.map { $0.type != .image && $0.type != .file } ?? false
+        return isShiftHeld && supportsPlainText ? "\(verb) Text" : verb
+    }
+
+    private var explicitCopyTitle: String {
+        let count = selectedItems.count
+        guard count > 1 else { return "Copy" }
+        return bulkTextCount == count
+            ? "Copy \(count) clips as Text"
+            : "Copy \(bulkTextCount) of \(count) as Text"
+    }
+
+    private var explicitPasteTitle: String {
+        let count = selectedItems.count
+        if count > 1 {
+            return bulkTextCount == count
+                ? "Paste \(count) clips as Text"
+                : "Paste \(bulkTextCount) of \(count) as Text"
+        }
+        return appState.panelController.pasteTargetName.map { "Paste into \($0)" } ?? "Paste"
+    }
+
+    private var horizontalActions: some View {
+        HStack(spacing: 2) {
+            Button(action: activateSelection) {
+                HStack(spacing: 4) {
+                    Text("↵").foregroundStyle(.secondary)
+                    Text(compactPrimaryTitle).lineLimit(1)
+                }
+                .font(PanelStyle.Text.control.weight(.medium))
+                .padding(.horizontal, 6)
+                .frame(height: PanelLayout.toolbarButtonSize)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!actionReady)
+            .accessibilityLabel(primaryActionTitle)
+            .help(actionReady ? primaryActionTitle : "Select a matching clip to continue")
+
+            Button { showActions = true } label: {
+                Image(systemName: "ellipsis")
+                    .font(PanelStyle.Icon.action)
+                    .frame(width: PanelLayout.toolbarButtonSize, height: PanelLayout.toolbarButtonSize)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+            .disabled(selectedItems.isEmpty || searchText != debouncedSearchText)
+            .accessibilityLabel(selectedItems.count > 1
+                ? "More actions for \(selectedItems.count) selected clips"
+                : "More actions for selected clip")
+            .help("Actions (⌘K)")
+            .popover(isPresented: $showActions, arrowEdge: .bottom) { actionsPopover }
+        }
+        .fixedSize()
+        .layoutPriority(2)
     }
 
     private var actionBar: some View {
@@ -378,13 +447,15 @@ struct PanelContentView: View {
     private var actionsPopover: some View {
         VStack(alignment: .leading, spacing: PanelLayout.sectionSpacing) {
             Button(primaryActionTitle) { activateSelection() }
+                .disabled(!actionReady)
             Divider()
-            Button("Copy") { panelActions.copyItems?(selectedItems) }
+            Button(explicitCopyTitle) { panelActions.copyItems?(selectedItems) }
+                .disabled(!actionReady)
             if selectedItems.count == 1, let item = selectedItems.first, item.type == .richText {
                 Button("Copy as Plain Text") { panelActions.copyPlainTextItem?(item) }
             }
-            Button("Paste") { explicitPasteSelection() }
-                .disabled(appState.panelController.pasteTargetPID == nil)
+            Button(explicitPasteTitle) { explicitPasteSelection() }
+                .disabled(!actionReady || appState.panelController.pasteTargetPID == nil)
             if selectedItems.count == 1, let item = selectedItems.first {
                 Button("Paste as Plain Text") { panelActions.pastePlainTextItem?(item) }
                     .disabled(appState.panelController.pasteTargetPID == nil ||
@@ -485,6 +556,61 @@ struct PanelContentView: View {
     /// They were bare 14pt glyphs with no chrome, so the effective hit area was roughly
     /// the glyph's own bounds and nothing indicated they were pressable at all. Every
     /// one also carries a `.help()` now; only the first one used to.
+    private var horizontalToolbarButtons: some View {
+        HStack(spacing: 2) {
+            Button {
+                activationCancelID &+= 1
+                EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
+            } label: {
+                Image(systemName: "plus")
+                    .font(PanelStyle.Icon.action)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+            .help("New Snippet (⌘N)")
+
+            Menu {
+                Button("Pick a Colour from Screen", systemImage: "eyedropper") {
+                    ColorToolController.shared.showColorPicker()
+                }
+                Menu("Panel Position") {
+                    ForEach(Array(PanelEdge.allCases), id: \.self) { edge in
+                        Button {
+                            panelEdgeRaw = edge.rawValue
+                        } label: {
+                            HStack {
+                                Text(edge.rawValue.capitalized)
+                                if edge.rawValue == panelEdgeRaw {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(PanelStyle.Icon.action)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("Panel Tools")
+
+            Button {
+                activationCancelID &+= 1
+                if let container = appState.modelContainer {
+                    SettingsWindowController.shared.showSettings(
+                        modelContainer: container, appState: appState)
+                }
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(PanelStyle.Icon.action)
+            }
+            .modifier(AdaptiveGlassButtonStyle())
+            .help("Settings (⌘,)")
+        }
+        .fixedSize()
+    }
+
     private var toolbarButtons: some View {
         HStack(spacing: 2) {
             Button {
