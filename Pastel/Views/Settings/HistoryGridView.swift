@@ -204,6 +204,10 @@ struct HistoryGridView: View {
                                 // does more than what is visibly highlighted.
                                 labelDropTargets: {
                                     isInSelection ? selectedItems() : [item]
+                                },
+                                onPaste: {
+                                    selectedIDs = [item.persistentModelID]
+                                    onBulkPaste()
                                 }
                             )
                             .onTapGesture {

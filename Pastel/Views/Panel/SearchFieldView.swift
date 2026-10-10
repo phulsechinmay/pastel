@@ -9,6 +9,7 @@ struct SearchFieldView: View {
     @Binding var searchText: String
     /// Monotonic focus request token. See `FocusableTextField.focusRequestID`.
     var focusRequestID: Int = 0
+    var isPanelSearch = false
 
     /// Whether the Type/App/Date filter row is currently revealed.
     var isFilterExpanded: Bool = false
@@ -17,6 +18,7 @@ struct SearchFieldView: View {
     /// Toggles the filter row. When nil, the filter button is not shown at all.
     var onToggleFilters: (() -> Void)?
     var onSubmit: (() -> Void)?
+    var onTab: (() -> Void)?
 
     /// Lit whenever filters are doing something or the row is open, so the control
     /// never looks inert while it is affecting what the user sees.
@@ -34,7 +36,9 @@ struct SearchFieldView: View {
                 text: $searchText,
                 placeholder: "Search...",
                 focusRequestID: focusRequestID,
-                onSubmit: onSubmit
+                isPanelSearch: isPanelSearch,
+                onSubmit: onSubmit,
+                onTab: onTab
             )
 
             if !searchText.isEmpty {

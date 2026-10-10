@@ -44,6 +44,7 @@
 		69779D6C716BFFD410BA8F34 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E8102D1B1A6E4F5BCCF0A6 /* OnboardingWindowController.swift */; };
 		6AF5D219C387B0CA3EF35ED8 /* ImageCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F339BF74219A6B2629B2C42 /* ImageCardView.swift */; };
 		77A34F0C407E0CDC0D03AD39 /* PasteBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D583EE522FF0443CE93DFE6 /* PasteBehavior.swift */; };
+		A65F2348C1994A20A43D1111 /* SelectionReconciliation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A65F2348C1994A20A43D1112 /* SelectionReconciliation.swift */; };
 		7D6156B31DDB16BCAAA57090 /* AccessibilityRequiredView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296EC723938755F17A2F3802 /* AccessibilityRequiredView.swift */; };
 		7ED8B3B22F39F4EDECCEF28A /* SyncMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA88123A30157392A4055111 /* SyncMonitor.swift */; };
 		818BABC4D7412724AE08A6C9 /* PanelStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DF906B7C379D759931F40F6 /* PanelStyle.swift */; };
@@ -130,6 +131,7 @@
 		48DC4B0F54EF97DFD2C5F416 /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		4B6F49C8E5B7C1C1C28BC17F /* PasteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteService.swift; sourceTree = "<group>"; };
 		4D583EE522FF0443CE93DFE6 /* PasteBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteBehavior.swift; sourceTree = "<group>"; };
+		A65F2348C1994A20A43D1112 /* SelectionReconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionReconciliation.swift; sourceTree = "<group>"; };
 		4E12D1FF5C4B00F62F48B0F4 /* LabelChipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelChipView.swift; sourceTree = "<group>"; };
 		543EE2EEFDD439C620E6A0A0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		595BAEC04C890C9BF73C4F5D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -292,6 +294,7 @@
 				61A1A38C2FA151019789426E /* LabelColor.swift */,
 				76EB886434FC096E9A770705 /* PanelEdge.swift */,
 				4D583EE522FF0443CE93DFE6 /* PasteBehavior.swift */,
+				A65F2348C1994A20A43D1112 /* SelectionReconciliation.swift */,
 				AA2DE75E5F1F22D0149E093B /* SearchFilters.swift */,
 			);
 			path = Models;
@@ -578,6 +581,7 @@
 				8DBC176CDC96ACB4D5E1C831 /* PanelLayout.swift in Sources */,
 				818BABC4D7412724AE08A6C9 /* PanelStyle.swift in Sources */,
 				77A34F0C407E0CDC0D03AD39 /* PasteBehavior.swift in Sources */,
+				A65F2348C1994A20A43D1111 /* SelectionReconciliation.swift in Sources */,
 				FC28C1E1511F71298087486A /* PasteService.swift in Sources */,
 				5EEA1FE776D677FEEA3A0C62 /* PastelApp.swift in Sources */,
 				385A012F3E35FA4E4AA1F74B /* PersistentIdentifier+Transfer.swift in Sources */,

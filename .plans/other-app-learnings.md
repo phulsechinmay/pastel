@@ -1,13 +1,17 @@
 # Other App Learnings
 
-Date: 2026-10-09
-Status: Implementation started on `ux-learnings`. Items 1 and 2 are the first delivery steps. The user accepted Space-to-preview as item 3, to follow them. The user explicitly requires competitor screenshot inspiration while retaining a distinct Pastel appearance and the familiar core interaction.
+Date: 2026-10-10
+Status: Items 1–3 implemented on `ux-learnings`; build and model checks pass. Live interaction and accessibility verification remain before release. Items 4–7 are later opportunities, outside this delivery. Competitor screenshots below are inspiration; Pastel keeps its own visual design and the familiar Space-to-preview interaction.
 
-## Implementation progress (2026-10-09)
+## Implementation progress (2026-10-10)
 
-The first code slice is on `ux-learnings`: first-page results receive an initial selection; passive refreshes attempt to retain the selected clip by persistent identity; search-field Return flushes debounce and waits for results for the submitted query; result shortcuts yield to the AppKit text editor; and activation now differs from the explicit Paste command. The old `copyAndPaste` preference is normalized to Paste, and settings present two primary-action choices.
+**Item 1 — retrieval:** The first loaded result is selected; refreshes reconcile the selected clip and Shift range by persistent identity; an exact-query Return waits for matching results and activates once; stale cards cannot be activated during a query replacement. Typing from results hands the full key event to the native search editor, with Tab to move focus back to results. Search commands stay with the text editor.
 
-These are foundations, not acceptance of items 1 and 2. Next: preserve identity through deeper-page refreshes and range selection; transfer full composed input from results to search; add the visible primary-action strip and keyboard-accessible Actions surface; capture and revalidate the paste destination; provide truthful fallback feedback; and manually verify focus, accessibility, and all panel orientations. Begin item 3 only after those flows are reviewed.
+**Item 2 — actions:** A visible action bar names the configured primary action and, when available, its destination. Command-K opens Actions with explicit Copy, Paste, Paste as Plain Text, Preview, and item-management commands. Default activation, explicit Copy, and explicit Paste now have distinct intent; the panel captures the target app when opened and checks it again before posting a paste. A changed or absent target leaves the requested clip on the clipboard with clear feedback. The legacy `copyAndPaste` preference resolves to Paste.
+
+**Item 3 — preview:** Space from results opens a single adjacent read-only preview; Space or Escape closes it. The panel and selected clip remain in place. The preview supports text, code, rich text, image, URL, color, and local files (using Quick Look when available), with unavailable states for missing content. It shares the primary action, supports scoped arrow navigation, and closes with the panel. Its adaptive, quiet header/content/footer uses Pastel's own styling rather than a competitor layout.
+
+**Verification:** Both App Store and Sparkle macOS schemes build without code-signing, and standalone action-policy and selection-reconciliation smoke checks pass. Source and build verification cannot establish live focus behavior, paste delivery, VoiceOver order, appearance, or multi-display placement. Live app inspection was blocked by computer-use timeouts and missing assistive access. Run the acceptance matrices below on an accessible macOS session before marking release verification complete.
 
 ## Purpose
 
@@ -32,9 +36,9 @@ This plan follows PRODUCT.md: the panel is transit, native behavior comes first,
 
 | Item | Inspiration | Problem solved | Status |
 |---|---|---|---|
-| 1. Short, reliable retrieval | Maccy | Extra navigation and unstable selection slow down routine retrieval | Initial scope |
-| 2. Explicit actions | Raycast | People cannot reliably predict whether activation copies or pastes; secondary commands are hidden | Initial scope |
-| 3. Inspect before using | Paste and PastePal | Truncated cards cannot reliably distinguish long or similar clips | Included, after items 1 and 2 |
+| 1. Short, reliable retrieval | Maccy | Extra navigation and unstable selection slow down routine retrieval | Implemented; live QA pending |
+| 2. Explicit actions | Raycast | People cannot reliably predict whether activation copies or pastes; secondary commands are hidden | Implemented; live QA pending |
+| 3. Inspect before using | Paste and PastePal | Truncated cards cannot reliably distinguish long or similar clips | Implemented; live QA pending |
 | 4. Separate library window | PastePal | Content management is buried in Settings | Later |
 | 5. Recent versus Saved | Paste pinboards | Pinned content competes with fresh copies; durability is implicit | Later |
 | 6. Adjustable density | Paste compact mode and Maccy's compact retrieval | One card size does not serve text and visual workflows equally well | Later |

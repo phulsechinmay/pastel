@@ -5,9 +5,10 @@ import OSLog
 
 /// Writes clipboard item content to NSPasteboard and optionally simulates Cmd+V via CGEvent.
 ///
-/// This is the core paste-back service. Behavior depends on the user's paste preference:
+/// This is the core paste-back service. Default activation respects the user's
+/// primary-action preference; explicitly named Copy and Paste commands do not.
 ///
-/// **Paste / Copy + Paste mode:**
+/// **Paste action:**
 /// 1. Check Accessibility permission (required for CGEvent)
 /// 2. Check secure input (fall back to copy-only if active)
 /// 3. Write item content to NSPasteboard.general via `writeSuppressed`
@@ -15,7 +16,7 @@ import OSLog
 /// 4. Hide the panel
 /// 5. After a delay, simulate Cmd+V via CGEvent
 ///
-/// **Copy mode:**
+/// **Copy action:**
 /// 1. Write item content to NSPasteboard.general via `writeSuppressed`
 /// 2. Hide the panel
 ///
@@ -54,20 +55,6 @@ final class PasteService {
         /// The Settings history browser. A normal activating window: while it is up,
         /// a posted ⌘V lands in Settings itself. It must be ordered out before posting.
         case settings
-    }
-
-    /// How `performPaste` treats the user's paste-behavior preference.
-    private enum PasteMode {
-        /// Honour `PasteBehavior`: post ⌘V unless the user chose copy-only.
-        case respectPreference
-        /// A control explicitly named Paste always attempts to paste.
-        case explicitPaste
-        /// Never post ⌘V, whatever the preference says — the explicit Copy actions.
-        ///
-        /// This is a parameter rather than a comment because the difference is one
-        /// early return in the middle of a shared sequence, and getting it wrong
-        /// makes the Copy button paste.
-        case copyOnly
     }
 
     /// What a paste attempt did. Returned so the branches are named rather than
@@ -137,12 +124,17 @@ final class PasteService {
     @discardableResult
     private func performPaste(
         source: String,
-        mode: PasteMode,
+        mode: ClipboardActionIntent,
         clipboardMonitor: ClipboardMonitor,
         origin: PasteOrigin,
         write: () -> Bool
     ) -> PasteOutcome {
         let dismissal = dismissal(for: origin)
+        let expectedTargetPID: pid_t?
+        switch origin {
+        case .panel(let panel): expectedTargetPID = panel.pasteTargetPID
+        case .settings: expectedTargetPID = nil
+        }
 
         guard writeSuppressed(clipboardMonitor, write) else {
             pasteLog("[PASTE] nothing to write (source=\(source)) — clipboard left as-is, not posting")
@@ -150,15 +142,16 @@ final class PasteService {
             return .nothingToWrite
         }
 
-        if mode == .copyOnly {
-            pasteLog("[PASTE] copy-only action (source=\(source)) — no CGEvent")
+        if !Self.pasteBehavior.postsPaste(for: mode) {
+            pasteLog("[PASTE] copy outcome (source=\(source)) — write-only, no CGEvent")
             dismissal.finishWithoutPosting()
             return .copiedOnly
         }
 
-        if mode == .respectPreference && Self.pasteBehavior == .copy {
-            pasteLog("[PASTE] behavior=copy (source=\(source)) — write-only, no CGEvent")
+        if case .panel = origin, expectedTargetPID == nil {
             dismissal.finishWithoutPosting()
+            Self.showFailureAlert(title: "Copied to Clipboard",
+                message: "No destination app was active when Pastel opened. Switch to the app you want and press ⌘V.")
             return .copiedOnly
         }
 
@@ -196,6 +189,12 @@ final class PasteService {
 
             let frontmost = NSWorkspace.shared.frontmostApplication
             pasteLog("[PASTE] posting now. frontmostApp=\(frontmost?.localizedName ?? "nil") bundle=\(frontmost?.bundleIdentifier ?? "nil") pid=\(frontmost?.processIdentifier ?? -1)")
+            if let expectedTargetPID,
+               frontmost?.processIdentifier != expectedTargetPID {
+                Self.showFailureAlert(title: "Copied to Clipboard",
+                    message: "The active app changed while Pastel was open. Switch to the destination you want and press ⌘V.")
+                return
+            }
             guard Self.simulatePaste() else {
                 pasteLog("[PASTE] CGEvent post FAILED (source=\(source)) — event source or events were nil")
                 Self.showFailureAlert(
@@ -228,7 +227,7 @@ final class PasteService {
         Self.logEntry(method: "paste", source: source, item: item)
         performPaste(
             source: source,
-            mode: respectsPreference ? .respectPreference : .explicitPaste,
+            mode: respectsPreference ? .activation : .explicitPaste,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeToPasteboard(item: item) }
@@ -248,7 +247,7 @@ final class PasteService {
         Self.logEntry(method: "pastePlainText", source: source, item: item)
         performPaste(
             source: source,
-            mode: respectsPreference ? .respectPreference : .explicitPaste,
+            mode: respectsPreference ? .activation : .explicitPaste,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeToPasteboardPlainText(item: item) }
@@ -274,7 +273,7 @@ final class PasteService {
         pasteLog("[PASTE] paste(items) ENTRY count=\(items.count) source=\(source)")
         performPaste(
             source: source,
-            mode: respectsPreference ? .respectPreference : .explicitPaste,
+            mode: respectsPreference ? .activation : .explicitPaste,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeConcatenatedText(items: items) }
@@ -292,10 +291,21 @@ final class PasteService {
         pasteLog("[PASTE] copyOnly() ENTRY itemType=\(item.type.rawValue)")
         performPaste(
             source: "copyOnly",
-            mode: .copyOnly,
+            mode: .explicitCopy,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeToPasteboard(item: item) }
+    }
+
+    func copyPlainText(
+        item: ClipboardItem,
+        clipboardMonitor: ClipboardMonitor,
+        from origin: PasteOrigin
+    ) {
+        performPaste(source: "copyPlainText", mode: .explicitCopy,
+                     clipboardMonitor: clipboardMonitor, origin: origin) {
+            writeToPasteboardPlainText(item: item)
+        }
     }
 
     /// Copy one or more selected items to the pasteboard without simulating ⌘V.
@@ -312,7 +322,7 @@ final class PasteService {
         pasteLog("[PASTE] copyOnly(items) ENTRY count=\(items.count)")
         performPaste(
             source: "copyOnly(items)",
-            mode: .copyOnly,
+            mode: .explicitCopy,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeConcatenatedText(items: items) }

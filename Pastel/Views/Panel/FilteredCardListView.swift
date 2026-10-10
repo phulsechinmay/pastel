@@ -27,9 +27,12 @@ struct FilteredCardListView: View {
     @State private var pageTask: Task<Void, Never>?
     @State private var queryGeneration = 0
     @State private var selectedItemID: PersistentIdentifier?
+    @State private var selectedIdentityIDs: Set<PersistentIdentifier> = []
+    @State private var selectionIDsBeforeReload: Set<PersistentIdentifier> = []
     @State private var selectionBeforeReload: PersistentIdentifier?
     @State private var indexBeforeReload: Int = 0
     @State private var resetSelectionOnLoad = false
+    @State private var restorePageSize = 12
     @State private var loadedQuery: String?
     @State private var pendingActivationQuery: String?
     @State private var windowStart = 0
@@ -51,6 +54,9 @@ struct FilteredCardListView: View {
     /// without view recreation (preserves scroll position across dismiss/reopen).
     var showCount: Int
     var activationRequestID: Int
+    var activationCancelID: Int
+    var navigationRequestID: Int
+    var navigationOffset: Int
     var onPaste: (ClipboardItem) -> Void
     var onPastePlainText: (ClipboardItem) -> Void
     /// Copy the current selection (one or many items). Single copies full fidelity;
@@ -59,7 +65,10 @@ struct FilteredCardListView: View {
     /// Paste the current multi-selection (concatenated text). Invoked by Enter when
     /// more than one item is selected.
     var onPasteItems: ([ClipboardItem]) -> Void
-    var onTypeToSearch: ((Character) -> Void)?
+    var onSelectionChanged: ([ClipboardItem]) -> Void
+    var onResultsResolved: (Bool, Bool) -> Void
+    var onShowActions: () -> Void
+    var onPreview: (ClipboardItem) -> Void
     var onDragStarted: (() -> Void)?
     /// Callback for Cmd+Left/Right label cycling. Direction: -1 = previous, +1 = next.
     var onCycleLabelFilter: ((Int) -> Void)?
@@ -82,6 +91,11 @@ struct FilteredCardListView: View {
     /// `selectionAnchor` is nil, otherwise the contiguous anchor…cursor range.
     private var selectedIndices: Set<Int> {
         guard let cursor = selectedIndex, cursor < visibleItems.count else { return [] }
+        if selectionAnchor == nil, selectedIdentityIDs.count > 1 {
+            return Set(visibleItems.indices.filter {
+                selectedIdentityIDs.contains(visibleItems[$0].persistentModelID)
+            })
+        }
         guard let anchor = selectionAnchor, anchor < visibleItems.count else { return [cursor] }
         return Set(min(anchor, cursor)...max(anchor, cursor))
     }
@@ -98,15 +112,23 @@ struct FilteredCardListView: View {
             .joined(separator: ",")
     }
 
-    private func reload(resetSelection: Bool = false) {
+    private func reload(resetSelection: Bool = false, scanAll: Bool = false) {
+        let lastSelectedIndex = isReplacingResults
+            ? max(0, restorePageSize - 2)
+            : (selectedIndices.max() ?? selectedIndex ?? 0)
         selectionBeforeReload = resetSelection ? nil : selectedItemID
+        selectionIDsBeforeReload = resetSelection ? [] : selectedIdentityIDs
         indexBeforeReload = resetSelection ? 0 : (selectedIndex ?? 0)
         resetSelectionOnLoad = resetSelection
+        restorePageSize = SelectionReconciliation.pageSize(
+            reset: resetSelection, scanAll: scanAll, lastSelectedIndex: lastSelectedIndex,
+            initial: firstPageSize, maximum: maxResidentItems)
         pageTask?.cancel()
         refreshIndicatorTask?.cancel()
         queryGeneration &+= 1
         isLoading = false
         isReplacingResults = !filteredItems.isEmpty
+        onSelectionChanged([])
         showRefreshIndicator = false
         windowStart = 0
         cursor = HistoryPageCursor()
@@ -136,7 +158,7 @@ struct FilteredCardListView: View {
                     selectedLabelIDs: selectedLabelIDs, allLabels: allLabels,
                     filters: searchFilters, softDeletedIDs: appState.deletionManager.softDeletedIDs,
                     searchIndex: appState.searchIndex, worker: appState.historyPageWorker,
-                    pageSize: firstPage ? firstPageSize : pageSize
+                    pageSize: firstPage ? restorePageSize : pageSize
                 )
                 guard !Task.isCancelled, generation == queryGeneration else { return }
                 cursor = nextCursor
@@ -147,14 +169,18 @@ struct FilteredCardListView: View {
                     filteredItems.append(contentsOf: page)
                 }
                 if firstPage {
-                    if let priorID = selectionBeforeReload, !resetSelectionOnLoad,
-                       let retained = filteredItems.firstIndex(where: { $0.persistentModelID == priorID }) {
-                        selectedIndex = retained
-                    } else {
-                        selectedIndex = filteredItems.isEmpty ? nil : min(indexBeforeReload, filteredItems.count - 1)
-                    }
+                    let displayedIDs = filteredItems.map(\.persistentModelID)
+                    selectedIndex = SelectionReconciliation.index(
+                        priorID: resetSelectionOnLoad ? nil : selectionBeforeReload,
+                        priorIndex: indexBeforeReload, displayedIDs: displayedIDs)
                     selectionAnchor = nil
                     selectedItemID = selectedIndex.map { filteredItems[$0].persistentModelID }
+                    selectedIdentityIDs = SelectionReconciliation.identities(
+                        previous: selectionIDsBeforeReload, selectedID: selectedItemID,
+                        displayedIDs: displayedIDs, reset: resetSelectionOnLoad)
+                    onResultsResolved(!filteredItems.isEmpty,
+                        resetSelectionOnLoad || selectionBeforeReload == selectedItemID)
+                    onSelectionChanged(selectedItems)
                     loadedQuery = searchText
                     if pendingActivationQuery == searchText, rawSearchText == searchText {
                         pendingActivationQuery = nil
@@ -176,6 +202,8 @@ struct FilteredCardListView: View {
                     }
                     selectedIndex = nil
                     selectedItemID = nil
+                    selectedIdentityIDs = []
+                    onSelectionChanged([])
                     pendingActivationQuery = nil
                     loadError = error.localizedDescription
                 }
@@ -193,9 +221,12 @@ struct FilteredCardListView: View {
         filteredItems.removeAll(keepingCapacity: false)
         selectedIndex = nil
         selectedItemID = nil
+        selectedIdentityIDs = []
+        onSelectionChanged([])
         selectionBeforeReload = nil
         indexBeforeReload = 0
         resetSelectionOnLoad = true
+        restorePageSize = firstPageSize
         selectionAnchor = nil
         loadMore()
     }
@@ -224,6 +255,9 @@ struct FilteredCardListView: View {
         searchText: String,
         rawSearchText: String? = nil,
         activationRequestID: Int = 0,
+        activationCancelID: Int = 0,
+        navigationRequestID: Int = 0,
+        navigationOffset: Int = 0,
         selectedLabelIDs: Set<PersistentIdentifier>,
         searchFilters: SearchFilters = SearchFilters(),
         allLabels: [Label] = [],
@@ -234,7 +268,10 @@ struct FilteredCardListView: View {
         onPastePlainText: @escaping (ClipboardItem) -> Void,
         onCopy: @escaping ([ClipboardItem]) -> Void = { _ in },
         onPasteItems: @escaping ([ClipboardItem]) -> Void = { _ in },
-        onTypeToSearch: ((Character) -> Void)? = nil,
+        onSelectionChanged: @escaping ([ClipboardItem]) -> Void = { _ in },
+        onResultsResolved: @escaping (Bool, Bool) -> Void = { _, _ in },
+        onShowActions: @escaping () -> Void = {},
+        onPreview: @escaping (ClipboardItem) -> Void = { _ in },
         onDragStarted: (() -> Void)? = nil,
         onCycleLabelFilter: ((Int) -> Void)? = nil,
         onFocusSearch: (() -> Void)? = nil
@@ -247,19 +284,26 @@ struct FilteredCardListView: View {
         self.searchText = searchText
         self.rawSearchText = rawSearchText ?? searchText
         self.activationRequestID = activationRequestID
+        self.activationCancelID = activationCancelID
+        self.navigationRequestID = navigationRequestID
+        self.navigationOffset = navigationOffset
         _selectedIndex = selectedIndex
         self.isShiftHeld = isShiftHeld
         self.onPaste = onPaste
         self.onPastePlainText = onPastePlainText
         self.onCopy = onCopy
         self.onPasteItems = onPasteItems
-        self.onTypeToSearch = onTypeToSearch
+        self.onSelectionChanged = onSelectionChanged
+        self.onResultsResolved = onResultsResolved
+        self.onShowActions = onShowActions
+        self.onPreview = onPreview
         self.onDragStarted = onDragStarted
         self.onCycleLabelFilter = onCycleLabelFilter
         self.onFocusSearch = onFocusSearch
     }
 
-    var body: some View {
+    @ViewBuilder
+    private var resultsContent: some View {
         Group {
             if filteredItems.isEmpty && isLoading {
                 Group {
@@ -341,7 +385,11 @@ struct FilteredCardListView: View {
                 }
             }
         }
-        .allowsHitTesting(!isReplacingResults)
+    }
+
+    var body: some View {
+        resultsContent
+        .allowsHitTesting(!isReplacingResults && rawSearchText == searchText)
         .overlay {
             if isReplacingResults && showRefreshIndicator {
                 ProgressView("Loading clips…")
@@ -353,21 +401,11 @@ struct FilteredCardListView: View {
         }
         .focusable()
         .focusEffectDisabled()
-        .onKeyPress(characters: .alphanumerics.union(.punctuationCharacters)) { keyPress in
-            // Don't intercept Cmd/Ctrl modified keys (those go to quick paste or system)
-            guard !keyPress.modifiers.contains(.command),
-                  !keyPress.modifiers.contains(.control) else { return .ignored }
-
-            // Forward unmodified character presses to search field
-            if let char = keyPress.characters.first, let onTypeToSearch {
-                onTypeToSearch(char)
-                return .handled
-            }
-            return .ignored
-        }
         .onAppear {
             selectedIndex = nil
+            onSelectionChanged([])
             selectedItemID = nil
+            selectedIdentityIDs = []
             selectionAnchor = nil
             reload(resetSelection: true)
             installKeyboardMonitor()
@@ -385,12 +423,14 @@ struct FilteredCardListView: View {
             reload(resetSelection: true)
             selectedIndex = nil
             selectedItemID = nil
+            selectedIdentityIDs = []
             selectionAnchor = nil
         }
         .onChange(of: searchText) { _, _ in
             reload(resetSelection: true)
             selectedIndex = nil
             selectedItemID = nil
+            selectedIdentityIDs = []
             selectionAnchor = nil
         }
         .onChange(of: rawSearchText) { _, newValue in
@@ -406,10 +446,18 @@ struct FilteredCardListView: View {
                 pendingActivationQuery = query
             }
         }
+        .onChange(of: activationCancelID) { _, _ in
+            pendingActivationQuery = nil
+        }
+        .onChange(of: navigationRequestID) { _, _ in
+            guard rawSearchText == searchText else { return }
+            moveSelection(by: navigationOffset)
+        }
         .onChange(of: selectedLabelIDs) { _, _ in
             reload(resetSelection: true)
             selectedIndex = nil
             selectedItemID = nil
+            selectedIdentityIDs = []
             selectionAnchor = nil
         }
         .onChange(of: labelFilterSignature) { _, _ in reload() }
@@ -417,13 +465,15 @@ struct FilteredCardListView: View {
             reload(resetSelection: true)
             selectedIndex = nil
             selectedItemID = nil
+            selectedIdentityIDs = []
             selectionAnchor = nil
         }
-        .onChange(of: appState.searchIndexRevision) { _, _ in reload() }
+        .onChange(of: appState.searchIndexRevision) { _, _ in reload(scanAll: true) }
         .onChange(of: appState.pinRevision) { _, _ in
-            reload()
+            reload(scanAll: true)
         }
         .onDisappear {
+            pendingActivationQuery = nil
             pageTask?.cancel()
             refreshIndicatorTask?.cancel()
             filteredItems.removeAll(keepingCapacity: false)
@@ -446,13 +496,23 @@ struct FilteredCardListView: View {
             isSelected: selectedIndices.contains(index),
             allLabels: allLabels,
             badgePosition: badge,
-            isShiftHeld: isShiftHeld
+            isShiftHeld: isShiftHeld,
+            onPaste: { onPaste(item) },
+            onPreview: {
+                selectionAnchor = nil
+                selectedIndex = index
+                selectedItemID = item.persistentModelID
+                selectedIdentityIDs = [item.persistentModelID]
+                onSelectionChanged([item])
+                onPreview(item)
+            }
         )
         .onDrag {
             onDragStarted?()
             return DragItemProviderService.createItemProvider(for: item)
         }
         .onTapGesture(count: 2) {
+            pendingActivationQuery = nil
             pasteLog("[PASTE] origin=double-click index=\(index) shift=\(NSEvent.modifierFlags.contains(.shift))")
             if NSEvent.modifierFlags.contains(.shift) {
                 onPastePlainText(item)
@@ -461,9 +521,12 @@ struct FilteredCardListView: View {
             }
         }
         .onTapGesture(count: 1) {
+            pendingActivationQuery = nil
             selectionAnchor = nil
             selectedIndex = index
             selectedItemID = item.persistentModelID
+            selectedIdentityIDs = [item.persistentModelID]
+            onSelectionChanged([item])
             // Option+click copies the clicked item (full fidelity) without pasting,
             // mirroring the Shift+double-click plain-text paste convention.
             if NSEvent.modifierFlags.contains(.option) {
@@ -513,6 +576,17 @@ struct FilteredCardListView: View {
             }
 
             switch event.keyCode {
+            case 0x30: // Tab returns to search; text-field Tab returns here.
+                onFocusSearch?()
+                return nil
+            case 0x31: // Space previews the focused clip.
+                if let index = selectedIndex, index < visibleItems.count,
+                   !event.modifierFlags.contains(.command),
+                   !event.modifierFlags.contains(.control) {
+                    onPreview(visibleItems[index])
+                    return nil
+                }
+                return event
             case 123: // Left arrow
                 if event.modifierFlags.contains(.command) {
                     onCycleLabelFilter?(-1)
@@ -600,7 +674,14 @@ struct FilteredCardListView: View {
                     }
                     return nil // consumed
                 }
-                return event // pass through all other keys
+                if !event.modifierFlags.contains(.command),
+                   !event.modifierFlags.contains(.control),
+                   !event.modifierFlags.contains(.option),
+                   let characters = event.characters, !characters.isEmpty,
+                   characters.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) {
+                    PanelSearchFieldFocus.focusForIncomingKey()
+                }
+                return event // AppKit delivers the complete event to the search editor
             }
         }
     }
@@ -632,17 +713,26 @@ struct FilteredCardListView: View {
 
         case "f": // Focus the search field
             guard !modifiers.contains(.shift), !modifiers.contains(.option) else { return false }
+            pendingActivationQuery = nil
             onFocusSearch?()
+            return true
+
+        case "k": // Actions for the selected clip
+            guard !modifiers.contains(.shift), !modifiers.contains(.option),
+                  !selectedItems.isEmpty else { return false }
+            onShowActions()
             return true
 
         case "n": // Author a new snippet (matches Paste)
             guard !modifiers.contains(.shift), !modifiers.contains(.option) else { return false }
+            pendingActivationQuery = nil
             EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
             return true
 
         case "e": // Edit the selected item (matches Paste)
             guard !modifiers.contains(.shift), !modifiers.contains(.option),
                   let index = selectedIndex, index < visibleItems.count else { return false }
+            pendingActivationQuery = nil
             EditItemWindow.show(
                 for: visibleItems[index],
                 modelContainer: modelContext.container
@@ -665,28 +755,36 @@ struct FilteredCardListView: View {
 
     /// Move the cursor by `offset`, collapsing any multi-selection to a single item.
     private func moveSelection(by offset: Int) {
+        pendingActivationQuery = nil
         guard !visibleItems.isEmpty else { return }
         selectionAnchor = nil
         if let current = selectedIndex {
             let newIndex = max(0, min(visibleItems.count - 1, current + offset))
             selectedIndex = newIndex
             selectedItemID = visibleItems[newIndex].persistentModelID
+            selectedIdentityIDs = [visibleItems[newIndex].persistentModelID]
+            onSelectionChanged(selectedItems)
             // Load more items if navigating near the end
             if newIndex >= filteredItems.count - 10 { loadMore() }
         } else {
             selectedIndex = 0
             selectedItemID = visibleItems[0].persistentModelID
+            selectedIdentityIDs = [visibleItems[0].persistentModelID]
+            onSelectionChanged(selectedItems)
         }
     }
 
     /// Extend the contiguous selection by moving the cursor while keeping the anchor.
     /// Establishes the anchor at the current cursor on the first Shift+arrow.
     private func extendSelection(by offset: Int) {
+        pendingActivationQuery = nil
         guard !visibleItems.isEmpty else { return }
         guard let current = selectedIndex else {
             // No cursor yet — start a selection at the first item.
             selectedIndex = 0
             selectedItemID = visibleItems[0].persistentModelID
+            selectedIdentityIDs = [visibleItems[0].persistentModelID]
+            onSelectionChanged(selectedItems)
             return
         }
         if selectionAnchor == nil {
@@ -695,6 +793,9 @@ struct FilteredCardListView: View {
         let newIndex = max(0, min(visibleItems.count - 1, current + offset))
         selectedIndex = newIndex
         selectedItemID = visibleItems[newIndex].persistentModelID
+        selectedIdentityIDs = Set((min(selectionAnchor ?? current, newIndex)...max(selectionAnchor ?? current, newIndex))
+            .map { visibleItems[$0].persistentModelID })
+        onSelectionChanged(selectedItems)
         if newIndex >= filteredItems.count - 10 { loadMore() }
     }
 }

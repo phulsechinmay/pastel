@@ -14,11 +14,13 @@ final class PanelActions {
     var pasteItem: ((ClipboardItem) -> Void)?
     var pastePlainTextItem: ((ClipboardItem) -> Void)?
     var copyOnlyItem: ((ClipboardItem) -> Void)?
+    var copyPlainTextItem: ((ClipboardItem) -> Void)?
     /// Copy one or more selected items (Cmd+C / Cmd+Ctrl+digit). Single item copies
     /// full fidelity; multiple concatenate as newline-joined text.
     var copyItems: (([ClipboardItem]) -> Void)?
     /// Paste one or more selected items (Enter on a multi-selection).
     var pasteItems: (([ClipboardItem]) -> Void)?
+    var explicitPasteItems: (([ClipboardItem]) -> Void)?
     var onDragStarted: (() -> Void)?
     /// Called by PanelContentView (horizontal mode) with the extra height needed for
     /// wrapped chip rows. Wired to PanelController.applyHorizontalExtra.
@@ -116,6 +118,7 @@ final class PanelController {
     /// Callback invoked when a SwiftUI view triggers an explicit copy-only action.
     /// Set by AppState during setupPanel() to wire into PasteService.copyOnly.
     var onCopyOnlyItem: ((ClipboardItem) -> Void)?
+    var onCopyPlainTextItem: ((ClipboardItem) -> Void)?
 
     /// Callback invoked to copy a selection of one or more items (Cmd+C / Cmd+Ctrl+digit).
     /// Set by AppState during setupPanel() to wire into PasteService.copyOnly(items:).
@@ -124,11 +127,15 @@ final class PanelController {
     /// Callback invoked to paste a selection of one or more items (Enter on multi-select).
     /// Set by AppState during setupPanel() to wire into PasteService.paste(items:).
     var onPasteItems: (([ClipboardItem]) -> Void)?
+    var onExplicitPasteItems: (([ClipboardItem]) -> Void)?
 
     /// Whether the panel is currently visible on screen.
     var isVisible: Bool {
         panel?.isVisible ?? false
     }
+    var panelForPreview: NSPanel? { panel }
+    private(set) var pasteTargetPID: pid_t?
+    private(set) var pasteTargetName: String?
 
     /// The CGWindowID of the panel, used for `screencapture -l` during visual verification.
     var panelWindowNumber: Int {
@@ -191,6 +198,14 @@ final class PanelController {
     /// Because the panel is non-activating, the previous app stays frontmost
     /// throughout — no app switch happens, and no `previousApp` tracking is needed.
     func show() {
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        if frontmost?.bundleIdentifier != Bundle.main.bundleIdentifier {
+            pasteTargetPID = frontmost?.processIdentifier
+            pasteTargetName = frontmost?.localizedName
+        } else {
+            pasteTargetPID = nil
+            pasteTargetName = nil
+        }
         let edge = currentEdge
         // Vertical panels are already full height; never carry a horizontal delta.
         if edge.isVertical { horizontalExtraHeight = 0 }
@@ -227,8 +242,10 @@ final class PanelController {
         panelActions.activatePlainTextItem = onActivatePlainTextItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
+        panelActions.copyPlainTextItem = onCopyPlainTextItem
         panelActions.copyItems = onCopyItems
         panelActions.pasteItems = onPasteItems
+        panelActions.explicitPasteItems = onExplicitPasteItems
         panelActions.onDragStarted = { [weak self] in
             self?.dragSessionStarted()
         }
@@ -267,6 +284,7 @@ final class PanelController {
     ///     Paste uses this: the animation is 100ms of latency in front of a keystroke.
     ///   - completion: Run once the panel is off-screen and its monitors are gone.
     func hide(animated: Bool = true, completion: (() -> Void)? = nil) {
+        ClipPreviewWindow.close(restoreFocus: false)
         guard let panel, panel.isVisible else {
             // Nothing to hide, but a caller may be waiting on this to post ⌘V —
             // Settings pastes arrive here with the panel already down. Deliberately
@@ -494,8 +512,15 @@ final class PanelController {
             matching: .keyDown
         ) { [weak self] event in
             if event.keyCode == 53 { // Escape
-                self?.hide()
-                return nil // consume the event
+                if ClipPreviewWindow.isVisible,
+                   (event.window is SlidingPanel || ClipPreviewWindow.owns(event.window)) {
+                    ClipPreviewWindow.close()
+                    return nil
+                }
+                if event.window is SlidingPanel {
+                    self?.hide()
+                    return nil
+                }
             }
             return event
         }
@@ -570,8 +595,10 @@ final class PanelController {
         panelActions.activatePlainTextItem = onActivatePlainTextItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
+        panelActions.copyPlainTextItem = onCopyPlainTextItem
         panelActions.copyItems = onCopyItems
         panelActions.pasteItems = onPasteItems
+        panelActions.explicitPasteItems = onExplicitPasteItems
         panelActions.onDragStarted = { [weak self] in
             self?.dragSessionStarted()
         }

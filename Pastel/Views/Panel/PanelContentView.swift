@@ -36,7 +36,13 @@ struct PanelContentView: View {
     @State private var chipExtraHeight: CGFloat = 0
     @State private var filterRowHeight: CGFloat = 0
     @State private var selectedIndex: Int? = nil
+    @State private var selectedItems: [ClipboardItem] = []
+    @State private var showActions = false
+    @State private var navigationRequestID = 0
+    @State private var navigationOffset = 0
+    @AppStorage("pasteBehavior") private var pasteBehaviorRaw: String = PasteBehavior.copy.rawValue
     @State private var activationRequestID = 0
+    @State private var activationCancelID = 0
     @State private var isShiftHeld = false
     @State private var flagsMonitor: Any?
 
@@ -74,10 +80,12 @@ struct PanelContentView: View {
                     SearchFieldView(
                         searchText: $searchText,
                         focusRequestID: searchFocusRequestID,
+                        isPanelSearch: true,
                         isFilterExpanded: showFilters,
                         isFilterActive: !searchFilters.isEmpty,
                         onToggleFilters: toggleFilters,
-                        onSubmit: submitSearch
+                        onSubmit: submitSearch,
+                        onTab: focusResults
                     )
                     .frame(maxWidth: 240)
 
@@ -135,10 +143,12 @@ struct PanelContentView: View {
                 SearchFieldView(
                     searchText: $searchText,
                     focusRequestID: searchFocusRequestID,
+                    isPanelSearch: true,
                     isFilterExpanded: showFilters,
                     isFilterActive: !searchFilters.isEmpty,
                     onToggleFilters: toggleFilters,
-                    onSubmit: submitSearch
+                    onSubmit: submitSearch,
+                    onTab: focusResults
                 )
                 .padding(.vertical, PanelLayout.sectionSpacing)
                 ChipBarView(
@@ -167,6 +177,9 @@ struct PanelContentView: View {
                 searchText: debouncedSearchText,
                 rawSearchText: searchText,
                 activationRequestID: activationRequestID,
+                activationCancelID: activationCancelID,
+                navigationRequestID: navigationRequestID,
+                navigationOffset: navigationOffset,
                 selectedLabelIDs: selectedLabelIDs,
                 searchFilters: searchFilters,
                 allLabels: labels,
@@ -176,12 +189,20 @@ struct PanelContentView: View {
                 onPaste: { item in pasteItem(item) },
                 onPastePlainText: { item in pastePlainTextItem(item) },
                 onCopy: { items in panelActions.copyItems?(items) },
-                onPasteItems: { items in panelActions.pasteItems?(items) },
-                onTypeToSearch: { char in
-                    searchText.append(char)
-                    panelFocus = nil
-                    searchFocusRequestID &+= 1
+                onPasteItems: { items in activateItems(items) },
+                onSelectionChanged: { items in
+                    selectedItems = items
+                    if let item = items.last, ClipPreviewWindow.isVisible {
+                        ClipPreviewWindow.update(for: item, actionTitle: primaryActionTitle,
+                                                 selectionNote: selectionNote(for: item),
+                                                 onActivate: { activateSelection() })
+                    }
                 },
+                onResultsResolved: { hasResults, retainedPreviewItem in
+                    if !hasResults || !retainedPreviewItem { ClipPreviewWindow.close() }
+                },
+                onShowActions: { showActions = true },
+                onPreview: { item in preview(item) },
                 onDragStarted: {
                     panelActions.onDragStarted?()
                 },
@@ -197,6 +218,8 @@ struct PanelContentView: View {
             .focused($panelFocus, equals: .cardList)
             // Keep the result view alive while typing. It resets its cursor when
             // the debounced query changes, without rebuilding its focus/scroll tree.
+
+            actionBar
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)
@@ -213,6 +236,8 @@ struct PanelContentView: View {
             }
         }
         .onDisappear {
+            showActions = false
+            ClipPreviewWindow.close()
             if let monitor = flagsMonitor {
                 NSEvent.removeMonitor(monitor)
                 flagsMonitor = nil
@@ -220,6 +245,9 @@ struct PanelContentView: View {
             isShiftHeld = false
         }
         .onChange(of: panelActions.showCount) { _, _ in
+            selectedItems = []
+            showActions = false
+            ClipPreviewWindow.close()
             // Reset to "All History" — clear label filter
             selectedLabelIDs.removeAll()
             // Clear search text so panel opens fresh
@@ -232,7 +260,15 @@ struct PanelContentView: View {
             // Focus card list, not search
             panelFocus = .cardList
         }
+        .onChange(of: isShiftHeld) { _, _ in
+            if let item = selectedItems.last, ClipPreviewWindow.isVisible {
+                ClipPreviewWindow.update(for: item, actionTitle: primaryActionTitle,
+                                         selectionNote: selectionNote(for: item),
+                                         onActivate: { activateSelection() })
+            }
+        }
         .onChange(of: selectedLabelIDs) { _, _ in
+            ClipPreviewWindow.close()
             panelFocus = .cardList
         }
         .onChange(of: showFilters) { _, isShown in
@@ -256,9 +292,192 @@ struct PanelContentView: View {
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
         }
+        .onChange(of: searchText) { _, _ in ClipPreviewWindow.close() }
+        .onChange(of: searchFilters) { _, _ in ClipPreviewWindow.close() }
     }
 
     // MARK: - Toolbar Buttons
+
+    private var actionReady: Bool {
+        !selectedItems.isEmpty && searchText == debouncedSearchText &&
+            (selectedItems.count == 1 || bulkTextCount > 0)
+    }
+
+    private var bulkTextCount: Int {
+        selectedItems.filter { item in
+            switch item.type {
+            case .text, .richText, .url, .code, .color:
+                return !(item.textContent ?? "").isEmpty
+            case .image, .file:
+                return false
+            }
+        }.count
+    }
+
+    private var primaryActionTitle: String {
+        let isCopy = PasteBehavior.resolved(pasteBehaviorRaw) == .copy
+        let hasDestination = appState.panelController.pasteTargetPID != nil
+        let count = selectedItems.count
+        let canUsePlainText = selectedItems.first.map {
+            $0.type != .image && $0.type != .file
+        } ?? false
+        if count > 1 {
+            let verb = isCopy || !hasDestination ? "Copy" : "Paste"
+            return bulkTextCount == count
+                ? "\(verb) \(count) clips as Text"
+                : "\(verb) \(bulkTextCount) of \(count) as Text"
+        }
+        if isCopy || !hasDestination {
+            return isShiftHeld && canUsePlainText ? "Copy as Plain Text" : "Copy to Clipboard"
+        }
+        let destination = appState.panelController.pasteTargetName
+        let verb = isShiftHeld && canUsePlainText ? "Paste Plain Text" : "Paste"
+        return destination.map { "\(verb) into \($0)" } ?? "Copy to Clipboard"
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: PanelLayout.sectionSpacing) {
+            Button {
+                activateSelection()
+            } label: {
+                HStack(spacing: PanelLayout.sectionSpacing) {
+                    Image(systemName: PasteBehavior.resolved(pasteBehaviorRaw) == .copy ||
+                          appState.panelController.pasteTargetPID == nil
+                          ? "doc.on.doc" : "arrow.uturn.forward")
+                    Text(primaryActionTitle)
+                        .lineLimit(1)
+                    Text("↵")
+                        .foregroundStyle(.secondary)
+                }
+                .font(PanelStyle.Text.control)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!actionReady)
+            .help(actionReady ? primaryActionTitle : "Select a matching clip to continue")
+
+            Button {
+                showActions = true
+            } label: {
+                HStack(spacing: PanelLayout.sectionSpacing) {
+                    Text("Actions")
+                    Text("⌘K").foregroundStyle(.secondary)
+                }
+                .font(PanelStyle.Text.control)
+            }
+            .buttonStyle(.plain)
+            .disabled(!actionReady)
+            .popover(isPresented: $showActions, arrowEdge: .top) { actionsPopover }
+        }
+        .padding(.horizontal, PanelLayout.sectionSpacing)
+        .padding(.top, PanelLayout.sectionSpacing)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    private var actionsPopover: some View {
+        VStack(alignment: .leading, spacing: PanelLayout.sectionSpacing) {
+            Button(primaryActionTitle) { activateSelection() }
+            Divider()
+            Button("Copy") { panelActions.copyItems?(selectedItems) }
+            if selectedItems.count == 1, let item = selectedItems.first, item.type == .richText {
+                Button("Copy as Plain Text") { panelActions.copyPlainTextItem?(item) }
+            }
+            Button("Paste") { explicitPasteSelection() }
+                .disabled(appState.panelController.pasteTargetPID == nil)
+            if selectedItems.count == 1, let item = selectedItems.first {
+                Button("Paste as Plain Text") { panelActions.pastePlainTextItem?(item) }
+                    .disabled(appState.panelController.pasteTargetPID == nil ||
+                              item.type == .image || item.type == .file)
+                Button("Preview") { preview(item) }
+                Divider()
+                Button(item.isPinned ? "Unpin" : "Pin to Top") {
+                    appState.togglePin(item, in: modelContext)
+                    showActions = false
+                }
+                Button("Edit…") {
+                    showActions = false
+                    EditItemWindow.show(for: item, modelContainer: modelContext.container)
+                }
+                if !labels.isEmpty {
+                    Menu("Labels") {
+                        ForEach(labels, id: \.persistentModelID) { label in
+                            Button {
+                                let id = label.persistentModelID
+                                if item.safeLabels.contains(where: { $0.persistentModelID == id }) {
+                                    item.safeLabels.removeAll { $0.persistentModelID == id }
+                                } else {
+                                    item.safeLabels.append(label)
+                                }
+                                item.refreshLabelKey()
+                                saveWithLogging(modelContext, operation: "panel action label toggle")
+                            } label: {
+                                if item.safeLabels.contains(where: { $0.persistentModelID == label.persistentModelID }) {
+                                    SwiftUI.Label(label.name, systemImage: "checkmark")
+                                } else {
+                                    Text(label.name)
+                                }
+                            }
+                        }
+                    }
+                }
+                Divider()
+                Button("Delete", role: .destructive) {
+                    appState.deletionManager.softDelete(item, in: modelContext)
+                    appState.itemCount -= 1
+                    showActions = false
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .font(PanelStyle.Text.control)
+        .padding(12)
+        .frame(minWidth: 220, alignment: .leading)
+        .onExitCommand { showActions = false }
+    }
+
+    private func activateSelection() {
+        guard actionReady else { return }
+        if appState.panelController.pasteTargetPID == nil {
+            if isShiftHeld, selectedItems.count == 1, let item = selectedItems.first {
+                panelActions.copyPlainTextItem?(item)
+            } else {
+                panelActions.copyItems?(selectedItems)
+            }
+            return
+        }
+        if selectedItems.count > 1 {
+            activateItems(selectedItems)
+        } else if let item = selectedItems.first {
+            if isShiftHeld { pastePlainTextItem(item) }
+            else { pasteItem(item) }
+        }
+    }
+
+    private func explicitPasteSelection() {
+        guard actionReady else { return }
+        if selectedItems.count > 1 { panelActions.explicitPasteItems?(selectedItems) }
+        else if let item = selectedItems.first { panelActions.pasteItem?(item) }
+    }
+
+    private func preview(_ item: ClipboardItem) {
+        showActions = false
+        ClipPreviewWindow.toggle(for: item, beside: appState.panelController,
+                                 actionTitle: primaryActionTitle,
+                                 selectionNote: selectionNote(for: item),
+                                 onActivate: { activateSelection() },
+                                 onNavigate: { offset in
+                                     navigationOffset = offset
+                                     navigationRequestID &+= 1
+                                 })
+    }
+
+    private func selectionNote(for item: ClipboardItem) -> String? {
+        guard selectedItems.count > 1,
+              let index = selectedItems.firstIndex(where: { $0.persistentModelID == item.persistentModelID })
+        else { return nil }
+        return "\(index + 1) of \(selectedItems.count) selected"
+    }
 
     /// Color picker, position switcher, and settings gear — shared between both layouts.
     ///
@@ -269,6 +488,7 @@ struct PanelContentView: View {
     private var toolbarButtons: some View {
         HStack(spacing: 2) {
             Button {
+                activationCancelID &+= 1
                 EditItemWindow.showNewSnippet(appState: appState, modelContext: modelContext)
             } label: {
                 Image(systemName: "plus")
@@ -314,6 +534,7 @@ struct PanelContentView: View {
             .help("Panel Position")
 
             Button {
+                activationCancelID &+= 1
                 if let container = appState.modelContainer {
                     SettingsWindowController.shared.showSettings(
                         modelContainer: container,
@@ -369,7 +590,11 @@ struct PanelContentView: View {
     }
 
     private func pasteItem(_ item: ClipboardItem) {
-        panelActions.activateItem?(item)
+        if appState.panelController.pasteTargetPID == nil {
+            panelActions.copyOnlyItem?(item)
+        } else {
+            panelActions.activateItem?(item)
+        }
     }
 
     private func submitSearch() {
@@ -379,8 +604,27 @@ struct PanelContentView: View {
         activationRequestID &+= 1
     }
 
+    private func focusResults() {
+        activationCancelID &+= 1
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        panelFocus = nil
+        DispatchQueue.main.async { panelFocus = .cardList }
+    }
+
     private func pastePlainTextItem(_ item: ClipboardItem) {
-        panelActions.activatePlainTextItem?(item)
+        if appState.panelController.pasteTargetPID == nil {
+            panelActions.copyPlainTextItem?(item)
+        } else {
+            panelActions.activatePlainTextItem?(item)
+        }
+    }
+
+    private func activateItems(_ items: [ClipboardItem]) {
+        if appState.panelController.pasteTargetPID == nil {
+            panelActions.copyItems?(items)
+        } else {
+            panelActions.pasteItems?(items)
+        }
     }
 
     /// Cycle through label filters by direction (-1 = previous, +1 = next).

@@ -239,6 +239,9 @@ final class AppState {
         panelController.onCopyOnlyItem = { [weak self] item in
             self?.copyOnly(item: item)
         }
+        panelController.onCopyPlainTextItem = { [weak self] item in
+            self?.copyPlainText(item: item)
+        }
 
         // Wire multi-item copy/paste callbacks (keyboard selection: Cmd+C, Enter, Cmd+Ctrl+digit)
         panelController.onCopyItems = { [weak self] items in
@@ -246,6 +249,9 @@ final class AppState {
         }
         panelController.onPasteItems = { [weak self] items in
             self?.activateItems(items)
+        }
+        panelController.onExplicitPasteItems = { [weak self] items in
+            self?.pasteItems(items)
         }
 
         // Wire drag-ended callback: SwiftUI -> PanelActions -> PanelController -> AppState -> ClipboardMonitor
@@ -436,6 +442,12 @@ final class AppState {
             clipboardMonitor: clipboardMonitor,
             from: origin ?? .panel(panelController)
         )
+    }
+
+    func copyPlainText(item: ClipboardItem, from origin: PasteService.PasteOrigin? = nil) {
+        guard let clipboardMonitor else { return }
+        pasteService.copyPlainText(item: item, clipboardMonitor: clipboardMonitor,
+                                   from: origin ?? .panel(panelController))
     }
 
     /// Copy a selection of one or more items to the pasteboard (no Cmd+V simulation).

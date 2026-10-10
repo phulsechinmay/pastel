@@ -1,6 +1,19 @@
 import SwiftUI
 import AppKit
 
+@MainActor
+enum PanelSearchFieldFocus {
+    static weak var field: NSTextField?
+
+    static func focusForIncomingKey() {
+        guard let field, let window = field.window else { return }
+        window.makeFirstResponder(field)
+        if let editor = field.currentEditor() {
+            editor.selectedRange = NSRange(location: editor.string.utf16.count, length: 0)
+        }
+    }
+}
+
 /// NSViewRepresentable wrapper around NSTextField for reliable programmatic focus.
 ///
 /// SwiftUI's `@FocusState` doesn't reliably call `makeFirstResponder()` on TextFields
@@ -21,9 +34,11 @@ struct FocusableTextField: NSViewRepresentable {
     /// which makes a second focus request invisible if focus was lost in the
     /// meantime (e.g. SwiftUI moved first responder elsewhere).
     var focusRequestID: Int = 0
+    var isPanelSearch = false
 
     /// Invoked when the user presses Return while the field is focused.
     var onSubmit: (() -> Void)?
+    var onTab: (() -> Void)?
     /// Invoked when the user presses Escape while the field is focused.
     var onCancel: (() -> Void)?
 
@@ -34,7 +49,7 @@ struct FocusableTextField: NSViewRepresentable {
         tf.isBordered = false
         tf.drawsBackground = false
         tf.focusRingType = .none
-        tf.textColor = .white
+        tf.textColor = .labelColor
         tf.placeholderAttributedString = NSAttributedString(
             string: placeholder,
             attributes: [
@@ -43,6 +58,7 @@ struct FocusableTextField: NSViewRepresentable {
             ]
         )
         tf.delegate = context.coordinator
+        if isPanelSearch { PanelSearchFieldFocus.field = tf }
         context.coordinator.lastPublishedText = text
         // Initialize so the first updateNSView (with focusRequestID == 0)
         // does not steal focus on appear.
@@ -51,6 +67,7 @@ struct FocusableTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ tf: NSTextField, context: Context) {
+        if isPanelSearch { PanelSearchFieldFocus.field = tf }
         // AppKit owns the live edit buffer. A parent SwiftUI refresh can arrive
         // while the field editor is still handling a keystroke or IME composition;
         // only push text back into it for an actual external change (e.g. Clear).
@@ -61,6 +78,7 @@ struct FocusableTextField: NSViewRepresentable {
 
         // Refresh callbacks each update so the coordinator invokes the latest closures.
         context.coordinator.onSubmit = onSubmit
+        context.coordinator.onTab = onTab
         context.coordinator.onCancel = onCancel
 
         if focusRequestID != context.coordinator.lastSeenFocusRequestID {
@@ -84,6 +102,7 @@ struct FocusableTextField: NSViewRepresentable {
         var lastPublishedText = ""
         var lastSeenFocusRequestID: Int = 0
         var onSubmit: (() -> Void)?
+        var onTab: (() -> Void)?
         var onCancel: (() -> Void)?
 
         init(text: Binding<String>) {
@@ -102,8 +121,14 @@ struct FocusableTextField: NSViewRepresentable {
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             switch commandSelector {
             case #selector(NSResponder.insertNewline(_:)):
+                if textView.hasMarkedText() { return false }
                 if let onSubmit {
                     onSubmit()
+                    return true
+                }
+            case #selector(NSResponder.insertTab(_:)), #selector(NSResponder.insertBacktab(_:)):
+                if let onTab {
+                    onTab()
                     return true
                 }
             case #selector(NSResponder.cancelOperation(_:)):

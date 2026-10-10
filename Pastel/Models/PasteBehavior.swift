@@ -26,4 +26,20 @@ enum PasteBehavior: String, CaseIterable {
         case .copyAndPaste: return "Paste into active app"
         }
     }
+
+    func postsPaste(for intent: ClipboardActionIntent) -> Bool {
+        switch intent {
+        case .activation: return self != .copy
+        case .explicitPaste: return true
+        case .explicitCopy: return false
+        }
+    }
+}
+
+/// Action intent is separate from the user's preferred primary action.
+/// An explicitly named Copy or Paste command never changes meaning with Settings.
+enum ClipboardActionIntent {
+    case activation
+    case explicitPaste
+    case explicitCopy
 }

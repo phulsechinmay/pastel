@@ -17,6 +17,7 @@ struct ClipboardCardView: View {
     let item: ClipboardItem
     var isSelected: Bool
     var onPaste: (() -> Void)?
+    var onPreview: (() -> Void)?
 
     let allLabels: [Label]
     @Environment(\.modelContext) private var modelContext
@@ -64,7 +65,7 @@ struct ClipboardCardView: View {
     /// go to organize in bulk, and doing it one card at a time there was busywork.
     var labelDropTargets: (() -> [ClipboardItem])?
 
-    init(item: ClipboardItem, isSelected: Bool = false, allLabels: [Label] = [], badgePosition: Int? = nil, isShiftHeld: Bool = false, hideContextMenu: Bool = false, labelDropTargets: (() -> [ClipboardItem])? = nil, onPaste: (() -> Void)? = nil) {
+    init(item: ClipboardItem, isSelected: Bool = false, allLabels: [Label] = [], badgePosition: Int? = nil, isShiftHeld: Bool = false, hideContextMenu: Bool = false, labelDropTargets: (() -> [ClipboardItem])? = nil, onPaste: (() -> Void)? = nil, onPreview: (() -> Void)? = nil) {
         self.item = item
         self.isSelected = isSelected
         self.allLabels = allLabels
@@ -73,6 +74,7 @@ struct ClipboardCardView: View {
         self.hideContextMenu = hideContextMenu
         self.labelDropTargets = labelDropTargets
         self.onPaste = onPaste
+        self.onPreview = onPreview
     }
 
     var body: some View {
@@ -218,7 +220,16 @@ struct ClipboardCardView: View {
         }
         .animation(.easeInOut(duration: 0.15), value: isHovered)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityActions {
+            if let onPaste { Button("Activate", action: onPaste) }
+            if let onPreview { Button("Preview", action: onPreview) }
+        }
         .contextMenu(hideContextMenu ? nil : ContextMenu {
+            if let onPreview {
+                Button("Preview") { onPreview() }
+            }
             if item.type == .image {
                 Button("View Image") {
                     ImageViewerWindow.show(for: item)
