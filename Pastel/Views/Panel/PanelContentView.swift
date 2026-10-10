@@ -96,12 +96,14 @@ struct PanelContentView: View {
                         isAllHistoryActive: selectedLabelIDs.isEmpty,
                         onSelectAllHistory: { selectedLabelIDs.removeAll() }
                     )
-                    .frame(maxWidth: 420, alignment: .leading)
+                    // Use the space between search and the actions before wrapping.
+                    // The flow layout still wraps on genuinely narrow panels.
+                    .layoutPriority(1)
                     // Grow the horizontal panel by a row when the chips wrap to two lines.
                     .onGeometryChange(for: CGFloat.self) { proxy in
                         proxy.size.height
                     } action: { chipBarHeight in
-                        chipExtraHeight = max(0, chipBarHeight - PanelLayout.chipHeight)
+                        chipExtraHeight = max(0, chipBarHeight - PanelLayout.chipSingleRowHeight)
                         reportHorizontalExtraHeight()
                     }
 
@@ -116,12 +118,12 @@ struct PanelContentView: View {
                     FilterBarView(filters: $searchFilters, availableApps: availableApps)
                         .padding(.bottom, PanelLayout.sectionSpacing)
                         .transition(.opacity.combined(with: .move(edge: .top)))
-                        // A horizontal panel is a fixed height, so the filter row has to
-                        // buy its own space or it eats into the single row of cards.
+                        // Buy the filter row's measured height instead of taking it
+                        // from the cards (the measurement includes bottom padding).
                         .onGeometryChange(for: CGFloat.self) { proxy in
                             proxy.size.height
                         } action: { height in
-                            filterRowHeight = height + PanelLayout.sectionSpacing
+                            filterRowHeight = height
                             reportHorizontalExtraHeight()
                         }
                 }

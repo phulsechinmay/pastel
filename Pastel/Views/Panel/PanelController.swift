@@ -411,8 +411,8 @@ final class PanelController {
     /// Grow/shrink a horizontal panel to fit wrapped chip rows (top/bottom edges only).
     ///
     /// Called from PanelContentView when the chip bar's measured height changes.
-    /// `extra` is the chip bar's height beyond a single row; it's clamped to one row
-    /// and, when the panel is visible, animated. The existing edge-anchored frame math
+    /// `extra` includes measured chip and filter rows and, when the panel is visible,
+    /// is animated. The existing edge-anchored frame math
     /// keeps the top edge pinned (grows down) / bottom edge pinned (grows up).
     func applyHorizontalExtra(_ extra: CGFloat) {
         let edge = currentEdge
@@ -421,9 +421,9 @@ final class PanelController {
             return
         }
 
-        // Cap at a single extra row so the panel never balloons for 3+ rows.
-        let maxExtra = PanelLayout.chipHeight + PanelLayout.chipRowSpacing
-        let clamped = max(0, min(extra, maxExtra))
+        // Do not let an extra chip or filter row consume card height. The chip bar
+        // normally caps itself at two rows; expanding it can add more rows.
+        let clamped = max(0, extra)
         guard abs(clamped - horizontalExtraHeight) > 0.5 else { return }
         horizontalExtraHeight = clamped
 
