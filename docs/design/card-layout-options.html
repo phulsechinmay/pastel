@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pastel card layout directions</title>
+<style>
+  :root { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ebe9e6; color: #171b23; }
+  .sheet { width: 1180px; height: 900px; margin: 0 auto; padding: 38px 42px 35px; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 26px; }
+  .eyebrow { font-size: 11px; letter-spacing: .16em; font-weight: 750; color: #636d7b; }
+  h1 { font-size: 31px; letter-spacing: -.04em; margin: 6px 0 6px; font-weight: 740; }
+  .subtitle { margin: 0; font-size: 14px; color: #58616e; max-width: 740px; line-height: 1.4; }
+  .badge-top { color: #485365; border: 1px solid #cad0d7; border-radius: 30px; padding: 8px 13px; font-size: 11px; font-weight: 650; }
+  .panel { width: 1096px; height: 314px; margin-bottom: 16px; background: #202329; border: 1px solid #414750; border-radius: 16px; box-shadow: 0 15px 34px #10192323; padding: 20px 25px; }
+  .panel-top { display: flex; align-items: center; gap: 11px; height: 33px; margin-bottom: 17px; }
+  .search { height: 32px; width: 212px; border-radius: 8px; background: #32363f; color: #b7bec8; padding: 8px 12px; font-size: 12px; }
+  .chip { border-radius: 20px; background: #343943; color: #c5cad3; padding: 7px 11px; font-size: 11px; line-height: 1; }
+  .toolbar-spacer { flex: 1; }
+  .toolbar-icon { font-size: 18px; color: #a6afbc; width: 25px; text-align: center; }
+  .grid { display: grid; grid-template-columns: repeat(3, 260px); gap: 31px; justify-content: center; }
+  .sample-name { color: #aeb6c2; font-size: 10px; letter-spacing: .12em; font-weight: 700; margin: 0 0 9px 2px; text-transform: uppercase; }
+  .card { width: 260px; height: 202px; border-radius: 11px; background: #30333b; color: #f3f5f8; padding: 10px 14px; position: relative; outline: 2px solid #7fa8fb; outline-offset: 3px; overflow: visible; }
+  .card.color { background: #eec274; color: #2c251b; }
+  .card-header { display: flex; align-items: center; gap: 5px; height: 28px; white-space: nowrap; }
+  .app { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex: none; }
+  .app.notes { background: #ffd35d; color: #5a3d00; }
+  .app.safari { background: #5d9def; color: #ffffff; }
+  .app.photos { background: #f0f3f6; color: #f27f58; }
+  .app.code { background: #4b7aab; color: #ffffff; }
+  .app.finder { background: #80c4e7; color: #174063; }
+  .app.figma { background: #272b30; color: #ef7b68; }
+  .time { color: #aeb8c6; font-size: 10px; margin-left: 3px; }
+  .card.color .time { color: #4b3f2e; }
+  .grow { flex: 1; }
+  .primary { height: 28px; display: flex; align-items: center; justify-content: center; padding: 0 7px; background: #475a82; color: #f7f9fc; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: -.025em; border: 1px solid #738ec6; }
+  .primary .return { opacity: .78; margin-left: 5px; font-weight: 600; }
+  .more { height: 28px; width: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: #434a56; color: #eef1f6; font-weight: 760; letter-spacing: 1px; font-size: 13px; flex: none; }
+  .card.color .primary { background: #292723; border-color: #524633; }
+  .card.color .more { background: #36312b; color: #fff6e8; }
+  .body { margin-top: 9px; }
+  .text-headline { font-size: 13px; font-weight: 720; margin-bottom: 5px; }
+  .text-body { color: #dce2e9; font-size: 12px; line-height: 1.38; letter-spacing: -.01em; }
+  .text-body .dim { color: #aeb7c2; }
+  .inline-meta { position: absolute; bottom: 12px; left: 14px; color: #acb6c3; font-size: 10px; }
+  .inline-meta b { color: #d7dce6; font-weight: 600; }
+  .quick { position: absolute; right: 13px; bottom: 10px; height: 19px; min-width: 29px; padding: 2px 5px; border-radius: 6px; background: #424955; color: #d7e0ed; font-size: 10px; text-align: center; }
+  .card.color .quick { background: #544735; color: #fff2d9; }
+  .link-art { height: 67px; width: 100%; border-radius: 5px; background: linear-gradient(125deg, #3c6276 0%, #426c71 42%, #d1a57a 100%); position: relative; overflow: hidden; }
+  .link-art::before { content: ""; position: absolute; bottom: -17px; left: -15px; width: 185px; height: 60px; border-radius: 50%; background: #263f4b; transform: rotate(-17deg); }
+  .link-art::after { content: ""; position: absolute; right: 18px; top: 16px; width: 57px; height: 57px; border-radius: 50%; background: #e8c49b; opacity: .9; }
+  .link-art-label { position: absolute; top: 12px; left: 13px; z-index: 1; font-size: 9px; font-weight: 700; letter-spacing: .15em; color: #fff4e9; }
+  .link-title { font-size: 12px; line-height: 1.18; font-weight: 690; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .link-url { font-size: 10px; color: #b3beca; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .photo-art { height: 139px; width: 100%; border-radius: 6px; overflow: hidden; background: linear-gradient(#8aafc2, #b9d7d4 53%, #425c66 54%, #1e3946); position: relative; }
+  .photo-art .sun { width: 36px; height: 36px; border-radius: 50%; background: #f6dab2; position: absolute; right: 31px; top: 21px; box-shadow: 0 0 24px #ffe6bd99; }
+  .photo-art .mountain1 { position: absolute; left: -30px; bottom: 29px; width: 205px; height: 91px; background: #557981; clip-path: polygon(0% 100%, 48% 4%, 100% 100%); }
+  .photo-art .mountain2 { position: absolute; right: -33px; bottom: 24px; width: 165px; height: 90px; background: #375760; clip-path: polygon(0% 100%, 46% 9%, 100% 100%); }
+  .photo-art .foreground { position: absolute; left: 0; bottom: 0; width: 100%; height: 37px; background: #213d48; clip-path: polygon(0 45%, 18% 28%, 31% 60%, 55% 16%, 74% 41%, 100% 9%, 100% 100%, 0 100%); }
+  .photo-meta { position: absolute; bottom: 6px; left: 8px; padding: 3px 5px; border-radius: 4px; color: #f7f9fa; background: #172e3eaf; font-size: 9px; font-weight: 650; }
+  .photo-quick { position: absolute; bottom: 6px; right: 8px; padding: 3px 5px; border-radius: 4px; color: #f7f9fa; background: #172e3eaf; font-size: 9px; }
+  pre { margin: 0; color: #cad5e0; font: 10.5px/1.38 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; }
+  .kw { color: #bd9eee; }.fn { color: #79c5ea; }.str { color: #d4bb8c; }.com { color: #8e9da8; }
+  .language { color: #b6c7de; font-size: 10px; margin-top: 6px; }
+  .file-body { height: 137px; display: flex; align-items: center; gap: 14px; }
+  .file-thumb { flex: none; width: 72px; height: 91px; border-radius: 5px; background: #e8ebf0; box-shadow: 0 4px 14px #15181c73; padding: 14px 8px; }
+  .file-thumb .rule { height: 4px; background: #9cb5c2; border-radius: 2px; margin: 8px 0; }
+  .file-thumb .rule.short { width: 63%; }
+  .file-title { font-size: 13px; font-weight: 680; line-height: 1.25; }
+  .file-location { margin-top: 6px; font-size: 10px; color: #b3bdc8; line-height: 1.35; }
+  .color-body { margin-top: 14px; }
+  .swatch-title { font-size: 26px; letter-spacing: -.045em; font-weight: 750; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .swatch-sub { font-size: 11px; margin-top: 7px; color: #51432e; }
+  .color .inline-meta { color: #4e412e; }
+  .label { display: inline-block; border-radius: 10px; padding: 3px 6px; background: #485268; color: #e2e7f1; font-size: 9px; }
+  .small-caption { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; color: #5d6774; font-size: 11px; }
+  .quiet .primary { display: none; }
+  .quiet .card-header .label { margin-left: 3px; }
+  .quiet .more { margin-left: auto; }
+  .quiet .card .inline-meta { bottom: 12px; }
+  .quiet .header-hint { margin-left: auto; color: #e5eaf1; font-size: 10px; font-weight: 650; background: #424a58; border-radius: 6px; height: 28px; padding: 8px 7px; }
+  .quiet .header-hint + .more { margin-left: 2px; }
+  .quiet .card.color .header-hint { color: #fff6e8; background: #36312b; }
+</style>
+</head>
+<body>
+<div class="sheet" id="sheet">
+  <div class="top">
+    <div>
+      <div class="eyebrow">PASTEL · HORIZONTAL PANEL STUDY</div>
+      <h1 id="title"></h1>
+      <p class="subtitle" id="subtitle"></p>
+    </div>
+    <div class="badge-top">Concept mockup · six selected-state examples</div>
+  </div>
+  <div class="panel">
+    <div class="panel-top">
+      <div class="search">⌕ &nbsp; Search clips</div>
+      <div class="chip">All History</div><div class="chip">Work</div><div class="chip">Design</div>
+      <div class="toolbar-spacer"></div><div class="toolbar-icon">☷</div><div class="toolbar-icon">⚙</div>
+    </div>
+    <div class="grid" id="grid-first"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-top">
+      <div class="search">⌕ &nbsp; Search clips</div>
+      <div class="chip">All History</div><div class="chip">Work</div><div class="chip">Design</div>
+      <div class="toolbar-spacer"></div><div class="toolbar-icon">☷</div><div class="toolbar-icon">⚙</div>
+    </div>
+    <div class="grid" id="grid-second"></div>
+  </div>
+  <div class="small-caption"><span>Two separate panel examples show six clip types. Each real horizontal panel has one scrolling row.</span><span>260 × 202 pt card specimens</span></div>
+</div>
+<script>
+ const variant = new URLSearchParams(location.search).get('variant') === 'b' ? 'b' : 'a';
+ document.body.classList.toggle('quiet', variant === 'b');
+ document.getElementById('title').textContent = variant === 'a' ? 'Option A · Action in the selected header' : 'Option B · Quiet selected header';
+ document.getElementById('subtitle').textContent = variant === 'a'
+   ? 'A named Paste action and More replace low-priority header metadata on the focused clip. The content area stays intact.'
+   : 'Keep source, label, and recency in the header. A compact More control reveals explicit actions; Return still performs the primary action.';
+ const app = (cls, text) => `<div class="app ${cls}">${text}</div>`;
+ const header = (cls, icon, time, label = '') => variant === 'a'
+   ? `<div class="card-header">${app(cls, icon)}<span class="time">${time}</span><span class="grow"></span><span class="primary">Paste → Notes<span class="return">↵</span></span><span class="more">···</span></div>`
+   : `<div class="card-header">${app(cls, icon)}${label ? `<span class="label">${label}</span>` : ''}<span class="time">${time}</span><span class="header-hint">Paste ↵</span><span class="more">···</span></div>`;
+ const cards = [
+   ['Text', 'notes', 'N', '2m', 'Work', `<div class="body"><div class="text-headline">Project handoff</div><div class="text-body">Send the final review by Friday.<br>Include the screenshots and the<br>open questions from design.<br><span class="dim">The first build is ready for…</span></div></div><div class="inline-meta">Text · <b>142 characters</b></div><div class="quick">⌘1</div>`],
+   ['Link', 'safari', '✦', '8m', 'Design', `<div class="body"><div class="link-art"><span class="link-art-label">FIELDNOTES</span></div><div class="link-title">Design systems for smaller teams</div><div class="link-url">fieldnotes.design/notes/system-42</div></div><div class="quick">⌘2</div>`],
+   ['Image', 'photos', '✿', '14m', '', `<div class="body"><div class="photo-art"><div class="sun"></div><div class="mountain1"></div><div class="mountain2"></div><div class="foreground"></div><span class="photo-meta">2560 × 1440</span><span class="photo-quick">⌘3</span></div></div>`],
+   ['Code', 'code', '⌘', '22m', 'Dev', `<div class="body"><pre><span class="kw">func</span> <span class="fn">makePreview</span>(for clip: Clip) {
+    <span class="kw">guard let</span> item = clip.item <span class="kw">else</span> {
+        <span class="kw">return nil</span>
+    }
+    <span class="kw">return</span> Preview(item: item)
+}</pre><div class="language">Swift · 6 lines shown</div></div><div class="quick">⌘4</div>`],
+   ['File', 'finder', '◧', '1h', '', `<div class="file-body"><div class="file-thumb"><div class="rule"></div><div class="rule short"></div><div class="rule"></div><div class="rule short"></div></div><div><div class="file-title">Quarterly<br>review.pdf</div><div class="file-location">Documents / Planning<br>PDF · 2.4 MB</div></div></div><div class="quick">⌘5</div>`],
+   ['Color', 'figma', '◉', '3h', 'Palette', `<div class="color-body"><div class="swatch-title">#EEC274</div><div class="swatch-sub">rgb(238, 194, 116)</div></div><div class="inline-meta">Original value retained</div><div class="quick">⌘6</div>`]
+ ];
+ function render(items) { return items.map(([type, cls, icon, time, label, content]) =>
+  `<div class="sample"><div class="sample-name">${type} clip</div><div class="card ${type === 'Color' ? 'color' : ''}">${header(cls,icon,time,label)}${content}</div></div>`).join(''); }
+ document.getElementById('grid-first').innerHTML = render(cards.slice(0, 3));
+ document.getElementById('grid-second').innerHTML = render(cards.slice(3));
+</script>
+</body>
+</html>
