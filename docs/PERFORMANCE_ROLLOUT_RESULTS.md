@@ -1,0 +1,16 @@
+# Performance rollout measurements
+
+The release-mode component benchmark in `Tests/PerformanceRolloutBenchmark.swift` creates a disk-backed SwiftData library, builds the disposable search index, then times 20 first-page requests per case. Each fixture includes ordinary text, sparse labels, pins, and 64 KiB, 1 MiB, and 10 MiB clips. Inserts use fresh contexts per batch so fixture creation does not retain every model. The machine was a 16 GB Mac16,12 running macOS 26.3. Values below are p95 milliseconds after indexing; each sample is a first page of 12 results.
+
+| Ordinary clips | First page | Sparse label | Deep search | 2-character search | 1-character search | No-result search | Index build | Index file | Page-sweep RSS (before / after 1 / after 2) | Process peak RSS |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 5.6 ms | 3.5 ms | 1.2 ms | 19.8 ms | 21.4 ms | 0.2 ms | 0.63 s | 34.9 MB | 89 / 89 / 89 MB | 119 MB |
+| 10,000 | 3.6 ms | 11.5 ms | 2.3 ms | 45.9 ms | 21.3 ms | 0.2 ms | 3.81 s | 53.1 MB | 108 / 112 / 17 MB | 147 MB |
+| 50,000 | 7.2 ms | 41.6 ms | 1.1 ms | 138.5 ms | 20.0 ms | 0.3 ms | 36.53 s | 134.63 MB | 298 / 298 / 298 MB | 346 MB |
+| 100,000 | 13.0 ms | 52.0 ms | 1.3 ms | 457.2 ms | 5.1 ms | 0.2 ms | 138.11 s | 237.76 MB | 79 / 76 / 76 MB | 588 MB |
+
+The 100,000-item two-character median was 68.6 ms; its p95 shows cold-cache variance and remains a long-tail latency concern. In an earlier run, 100,000-item indexing was still incomplete after 249 seconds, so the 138-second completed build is a useful improvement. The 588 MB process peak is still substantial and occurs during fixture creation/index construction, not repeated page sweeps. At 50,000 items, a prior run peaked lower, so these measurements do **not** establish a reduction in peak RSS. RSS can also fall when the OS reclaims pages, as in the 10,000-item run.
+
+The disk-backed correctness fixture in `Tests/PerformanceUpgradeSmoke.swift` passed at 10,000 items, including externally stored large-text matches, Unicode and short queries, sparse-label paging, and cancellation of stale searches. The `Pastel AppStore` Release-AppStore build passed. SQL tracing of a 400-item fixture showed that SwiftData full-model SELECTs include the `ClipboardItem` text and rich-content columns. Indexed paging resolves only a bounded number of IDs, but the temporary SwiftData fallback during initial backfill still fetches full models in 100-item batches. A separate metadata representation or a verified projection would further reduce fallback work. Exporting the entire library and some requested bulk actions can likewise materialize many items.
+
+These are synthetic component timings, not panel frame times, typing latency, or live CloudKit measurements. The existing running app was not replaced with this branch for profiling, so release-device Time Profiler/Hangs/SwiftUI/Allocations runs, live filter-switch and scroll checks, and real-account CloudKit import measurements remain rollout work. In particular, the temporary indexing peak and two-character p95 at 100,000 items merit measurement in the actual app before claiming the performance target is met end to end.
