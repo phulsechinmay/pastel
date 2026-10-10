@@ -16,6 +16,7 @@ struct SearchFieldView: View {
     var isFilterActive: Bool = false
     /// Toggles the filter row. When nil, the filter button is not shown at all.
     var onToggleFilters: (() -> Void)?
+    var onSubmit: (() -> Void)?
 
     /// Lit whenever filters are doing something or the row is open, so the control
     /// never looks inert while it is affecting what the user sees.
@@ -32,7 +33,8 @@ struct SearchFieldView: View {
             FocusableTextField(
                 text: $searchText,
                 placeholder: "Search...",
-                focusRequestID: focusRequestID
+                focusRequestID: focusRequestID,
+                onSubmit: onSubmit
             )
 
             if !searchText.isEmpty {

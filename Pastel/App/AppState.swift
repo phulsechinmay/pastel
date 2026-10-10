@@ -223,10 +223,16 @@ final class AppState {
         panelController.onPasteItem = { [weak self] item in
             self?.paste(item: item)
         }
+        panelController.onActivateItem = { [weak self] item in
+            self?.activate(item: item)
+        }
 
         // Wire plain text paste callback: SwiftUI -> PanelActions -> onPastePlainTextItem -> AppState.pastePlainText -> PasteService
         panelController.onPastePlainTextItem = { [weak self] item in
             self?.pastePlainText(item: item)
+        }
+        panelController.onActivatePlainTextItem = { [weak self] item in
+            self?.activatePlainText(item: item)
         }
 
         // Wire copy-only callback: SwiftUI -> PanelActions -> onCopyOnlyItem -> AppState.copyOnly -> PasteService
@@ -239,7 +245,7 @@ final class AppState {
             self?.copyItems(items)
         }
         panelController.onPasteItems = { [weak self] items in
-            self?.pasteItems(items)
+            self?.activateItems(items)
         }
 
         // Wire drag-ended callback: SwiftUI -> PanelActions -> PanelController -> AppState -> ClipboardMonitor
@@ -379,6 +385,29 @@ final class AppState {
             from: origin ?? .panel(panelController),
             source: "AppState.paste"
         )
+    }
+
+    /// Primary keyboard/double-click action; unlike an explicit Paste menu item,
+    /// this honors the user's Copy or Paste preference.
+    func activate(item: ClipboardItem) {
+        guard let clipboardMonitor else { return }
+        pasteService.paste(item: item, clipboardMonitor: clipboardMonitor,
+                           from: .panel(panelController), source: "AppState.activate",
+                           respectsPreference: true)
+    }
+
+    func activatePlainText(item: ClipboardItem) {
+        guard let clipboardMonitor else { return }
+        pasteService.pastePlainText(item: item, clipboardMonitor: clipboardMonitor,
+                                    from: .panel(panelController), source: "AppState.activatePlainText",
+                                    respectsPreference: true)
+    }
+
+    func activateItems(_ items: [ClipboardItem]) {
+        guard let clipboardMonitor else { return }
+        pasteService.paste(items: items, clipboardMonitor: clipboardMonitor,
+                           from: .panel(panelController), source: "AppState.activateItems",
+                           respectsPreference: true)
     }
 
     /// Paste a clipboard item as plain text (RTF stripped) into the frontmost app.

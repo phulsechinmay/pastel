@@ -120,7 +120,7 @@ struct OnboardingView: View {
                             .font(.body)
                     }
 
-                    Picker("When activating an item:", selection: $pasteBehaviorRaw) {
+                    Picker("Primary action:", selection: $pasteBehaviorRaw) {
                         ForEach(PasteBehavior.allCases, id: \.rawValue) { behavior in
                             Text(behavior.displayName).tag(behavior.rawValue)
                         }
@@ -188,6 +188,11 @@ struct OnboardingView: View {
             .padding(32)
         }
         .fontDesign(.rounded)
+        .onAppear {
+            if pasteBehaviorRaw == PasteBehavior.copyAndPaste.rawValue {
+                pasteBehaviorRaw = PasteBehavior.paste.rawValue
+            }
+        }
         .onReceive(pollTimer) { _ in
             let granted = AccessibilityService.isGranted
             // Auto-switch to paste when permission is first granted during onboarding

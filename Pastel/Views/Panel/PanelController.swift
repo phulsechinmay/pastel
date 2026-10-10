@@ -9,6 +9,8 @@ import OSLog
 /// without coupling to AppKit or PanelController directly.
 @MainActor @Observable
 final class PanelActions {
+    var activateItem: ((ClipboardItem) -> Void)?
+    var activatePlainTextItem: ((ClipboardItem) -> Void)?
     var pasteItem: ((ClipboardItem) -> Void)?
     var pastePlainTextItem: ((ClipboardItem) -> Void)?
     var copyOnlyItem: ((ClipboardItem) -> Void)?
@@ -104,6 +106,8 @@ final class PanelController {
     /// Callback invoked when a SwiftUI view triggers a paste action.
     /// Set by AppState during setupPanel() to wire into PasteService.
     var onPasteItem: ((ClipboardItem) -> Void)?
+    var onActivateItem: ((ClipboardItem) -> Void)?
+    var onActivatePlainTextItem: ((ClipboardItem) -> Void)?
 
     /// Callback invoked when a SwiftUI view triggers a plain text paste action.
     /// Set by AppState during setupPanel() to wire into PasteService.pastePlainText.
@@ -219,6 +223,8 @@ final class PanelController {
 
         // Sync paste callbacks to panelActions (in case they were set after panel creation)
         panelActions.pasteItem = onPasteItem
+        panelActions.activateItem = onActivateItem
+        panelActions.activatePlainTextItem = onActivatePlainTextItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
         panelActions.copyItems = onCopyItems
@@ -560,6 +566,8 @@ final class PanelController {
 
         // Sync paste callbacks into panelActions before creating SwiftUI view
         panelActions.pasteItem = onPasteItem
+        panelActions.activateItem = onActivateItem
+        panelActions.activatePlainTextItem = onActivatePlainTextItem
         panelActions.pastePlainTextItem = onPastePlainTextItem
         panelActions.copyOnlyItem = onCopyOnlyItem
         panelActions.copyItems = onCopyItems

@@ -36,6 +36,7 @@ struct PanelContentView: View {
     @State private var chipExtraHeight: CGFloat = 0
     @State private var filterRowHeight: CGFloat = 0
     @State private var selectedIndex: Int? = nil
+    @State private var activationRequestID = 0
     @State private var isShiftHeld = false
     @State private var flagsMonitor: Any?
 
@@ -75,7 +76,8 @@ struct PanelContentView: View {
                         focusRequestID: searchFocusRequestID,
                         isFilterExpanded: showFilters,
                         isFilterActive: !searchFilters.isEmpty,
-                        onToggleFilters: toggleFilters
+                        onToggleFilters: toggleFilters,
+                        onSubmit: submitSearch
                     )
                     .frame(maxWidth: 240)
 
@@ -135,7 +137,8 @@ struct PanelContentView: View {
                     focusRequestID: searchFocusRequestID,
                     isFilterExpanded: showFilters,
                     isFilterActive: !searchFilters.isEmpty,
-                    onToggleFilters: toggleFilters
+                    onToggleFilters: toggleFilters,
+                    onSubmit: submitSearch
                 )
                 .padding(.vertical, PanelLayout.sectionSpacing)
                 ChipBarView(
@@ -162,6 +165,8 @@ struct PanelContentView: View {
             // Filtered content area with keyboard navigation
             FilteredCardListView(
                 searchText: debouncedSearchText,
+                rawSearchText: searchText,
+                activationRequestID: activationRequestID,
                 selectedLabelIDs: selectedLabelIDs,
                 searchFilters: searchFilters,
                 allLabels: labels,
@@ -364,11 +369,18 @@ struct PanelContentView: View {
     }
 
     private func pasteItem(_ item: ClipboardItem) {
-        panelActions.pasteItem?(item)
+        panelActions.activateItem?(item)
+    }
+
+    private func submitSearch() {
+        // Flush the debounce. The list accepts this request only after the page
+        // for this exact query has arrived, so Return cannot use old results.
+        debouncedSearchText = searchText
+        activationRequestID &+= 1
     }
 
     private func pastePlainTextItem(_ item: ClipboardItem) {
-        panelActions.pastePlainTextItem?(item)
+        panelActions.activatePlainTextItem?(item)
     }
 
     /// Cycle through label filters by direction (-1 = previous, +1 = next).

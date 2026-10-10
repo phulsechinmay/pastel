@@ -2,6 +2,15 @@
 ///
 /// Persisted via `@AppStorage("pasteBehavior")`.
 enum PasteBehavior: String, CaseIterable {
+    static var allCases: [PasteBehavior] { [.paste, .copy] }
+
+    static func resolved(_ raw: String?) -> PasteBehavior {
+        switch raw {
+        case PasteBehavior.copy.rawValue: return .copy
+        case PasteBehavior.paste.rawValue, PasteBehavior.copyAndPaste.rawValue: return .paste
+        default: return .copy // matches the fresh-install UI default
+        }
+    }
     /// Write to pasteboard and simulate Cmd+V to paste into frontmost app.
     case paste = "paste"
     /// Write to pasteboard only. User must manually Cmd+V.
@@ -12,9 +21,9 @@ enum PasteBehavior: String, CaseIterable {
     /// Human-readable label for display in settings UI.
     var displayName: String {
         switch self {
-        case .paste: return "Paste"
+        case .paste: return "Paste into active app"
         case .copy: return "Copy to Clipboard"
-        case .copyAndPaste: return "Copy + Paste"
+        case .copyAndPaste: return "Paste into active app"
         }
     }
 }

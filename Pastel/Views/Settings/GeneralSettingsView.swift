@@ -39,6 +39,11 @@ struct GeneralSettingsView: View {
             contentAndDataSection
         }
         .formStyle(.grouped)
+        .onAppear {
+            if pasteBehaviorRaw == PasteBehavior.copyAndPaste.rawValue {
+                pasteBehaviorRaw = PasteBehavior.paste.rawValue
+            }
+        }
         .onReceive(accessibilityPollTimer) { _ in
             accessibilityGranted = AccessibilityService.isGranted
         }
@@ -129,7 +134,7 @@ struct GeneralSettingsView: View {
         } header: {
             Text("Panel")
         } footer: {
-            Text("Use \u{2318}N to paste the Nth item, \u{2318}\u{21E7}N to paste as plain text.")
+            Text("Use \u{2318}1 through \u{2318}9 to activate the corresponding item; add Shift for plain text.")
         }
     }
 
@@ -137,7 +142,7 @@ struct GeneralSettingsView: View {
 
     private var pastingSection: some View {
         Section {
-            Picker("When activating an item", selection: $pasteBehaviorRaw) {
+            Picker("Primary action", selection: $pasteBehaviorRaw) {
                 ForEach(PasteBehavior.allCases, id: \.rawValue) { behavior in
                     Text(behavior.displayName).tag(behavior.rawValue)
                 }
@@ -151,7 +156,7 @@ struct GeneralSettingsView: View {
         } header: {
             Text("Pasting")
         } footer: {
-            Text("\u{201C}Paste\u{201D} writes to the clipboard and pastes into the active app. \u{201C}Copy to Clipboard\u{201D} only writes to the clipboard.")
+            Text("Controls Return, double-click, and numbered shortcuts. Explicit Copy and Paste commands always do what they say.")
         }
     }
 

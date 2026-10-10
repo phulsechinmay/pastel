@@ -60,6 +60,8 @@ final class PasteService {
     private enum PasteMode {
         /// Honour `PasteBehavior`: post ⌘V unless the user chose copy-only.
         case respectPreference
+        /// A control explicitly named Paste always attempts to paste.
+        case explicitPaste
         /// Never post ⌘V, whatever the preference says — the explicit Copy actions.
         ///
         /// This is a parameter rather than a comment because the difference is one
@@ -154,7 +156,7 @@ final class PasteService {
             return .copiedOnly
         }
 
-        if Self.pasteBehavior == .copy {
+        if mode == .respectPreference && Self.pasteBehavior == .copy {
             pasteLog("[PASTE] behavior=copy (source=\(source)) — write-only, no CGEvent")
             dismissal.finishWithoutPosting()
             return .copiedOnly
@@ -220,12 +222,13 @@ final class PasteService {
         item: ClipboardItem,
         clipboardMonitor: ClipboardMonitor,
         from origin: PasteOrigin,
-        source: String = "unknown"
+        source: String = "unknown",
+        respectsPreference: Bool = false
     ) {
         Self.logEntry(method: "paste", source: source, item: item)
         performPaste(
             source: source,
-            mode: .respectPreference,
+            mode: respectsPreference ? .respectPreference : .explicitPaste,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeToPasteboard(item: item) }
@@ -239,12 +242,13 @@ final class PasteService {
         item: ClipboardItem,
         clipboardMonitor: ClipboardMonitor,
         from origin: PasteOrigin,
-        source: String = "unknown"
+        source: String = "unknown",
+        respectsPreference: Bool = false
     ) {
         Self.logEntry(method: "pastePlainText", source: source, item: item)
         performPaste(
             source: source,
-            mode: .respectPreference,
+            mode: respectsPreference ? .respectPreference : .explicitPaste,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeToPasteboardPlainText(item: item) }
@@ -258,17 +262,19 @@ final class PasteService {
         items: [ClipboardItem],
         clipboardMonitor: ClipboardMonitor,
         from origin: PasteOrigin,
-        source: String = "unknown"
+        source: String = "unknown",
+        respectsPreference: Bool = false
     ) {
         guard !items.isEmpty else { return }
         if items.count == 1 {
-            paste(item: items[0], clipboardMonitor: clipboardMonitor, from: origin, source: source)
+            paste(item: items[0], clipboardMonitor: clipboardMonitor, from: origin,
+                  source: source, respectsPreference: respectsPreference)
             return
         }
         pasteLog("[PASTE] paste(items) ENTRY count=\(items.count) source=\(source)")
         performPaste(
             source: source,
-            mode: .respectPreference,
+            mode: respectsPreference ? .respectPreference : .explicitPaste,
             clipboardMonitor: clipboardMonitor,
             origin: origin
         ) { writeConcatenatedText(items: items) }
@@ -314,8 +320,7 @@ final class PasteService {
 
     /// The user's configured paste behavior, read fresh on every paste.
     private static var pasteBehavior: PasteBehavior {
-        let raw = UserDefaults.standard.string(forKey: "pasteBehavior") ?? PasteBehavior.paste.rawValue
-        return PasteBehavior(rawValue: raw) ?? .paste
+        PasteBehavior.resolved(UserDefaults.standard.string(forKey: "pasteBehavior"))
     }
 
     // MARK: - Pasteboard Writing
