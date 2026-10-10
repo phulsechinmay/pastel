@@ -49,6 +49,12 @@
   .inline-meta b { color: #d7dce6; font-weight: 600; }
   .quick { position: absolute; right: 13px; bottom: 10px; height: 19px; min-width: 29px; padding: 2px 5px; border-radius: 6px; background: #424955; color: #d7e0ed; font-size: 10px; text-align: center; }
   .card.color .quick { background: #544735; color: #fff2d9; }
+  .card-footer { display: none; position: absolute; bottom: 10px; left: 14px; right: 14px; align-items: center; gap: 8px; height: 20px; }
+  .card-footer .footer-meta { min-width: 0; flex: 1; color: #b7c1ce; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-footer .quick { position: static; flex: none; display: flex; align-items: center; justify-content: center; height: 19px; }
+  .card.color .card-footer .footer-meta { color: #433827; }
+  .card.image .card-footer .footer-meta, .card.image .card-footer .quick { color: #f7f9fa; background: #172e3ed9; padding: 3px 5px; border-radius: 4px; flex: none; }
+  .card.image .card-footer .footer-meta { margin-right: auto; }
   .link-art { height: 67px; width: 100%; border-radius: 5px; background: linear-gradient(125deg, #3c6276 0%, #426c71 42%, #d1a57a 100%); position: relative; overflow: hidden; }
   .link-art::before { content: ""; position: absolute; bottom: -17px; left: -15px; width: 185px; height: 60px; border-radius: 50%; background: #263f4b; transform: rotate(-17deg); }
   .link-art::after { content: ""; position: absolute; right: 18px; top: 16px; width: 57px; height: 57px; border-radius: 50%; background: #e8c49b; opacity: .9; }
@@ -85,12 +91,15 @@
   .quiet .header-hint + .more { margin-left: 2px; }
   .quiet .card.color .header-hint { color: #fff6e8; background: #36312b; }
   .minimal .mode-status { display: block; }
-  .minimal .card .quick, .minimal .card .photo-quick, .minimal .card .inline-meta { display: none; }
+  .minimal .card > .quick, .minimal .card .photo-quick, .minimal .card .inline-meta { display: none; }
+  .minimal .card-footer, .clean .card-footer { display: flex; }
+  .minimal .language, .clean .language, .minimal .link-url, .clean .link-url, .minimal .file-kind, .clean .file-kind, .minimal .swatch-sub, .clean .swatch-sub, .minimal .photo-meta, .clean .photo-meta { display: none; }
+  .minimal .photo-art, .clean .photo-art { height: 145px; }
   .minimal .card-header .label { margin-left: 3px; }
   .minimal .card-header .more { margin-left: auto; }
   .panel-more { display: none; height: 28px; width: 28px; align-items: center; justify-content: center; border-radius: 6px; background: #434a56; color: #eef1f6; font-size: 14px; font-weight: 750; letter-spacing: 1px; }
   .clean .mode-status, .clean .panel-more { display: flex; }
-  .clean .card .quick, .clean .card .photo-quick, .clean .card .inline-meta, .clean .card .more { display: none; }
+  .clean .card > .quick, .clean .card .photo-quick, .clean .card .inline-meta, .clean .card .more { display: none; }
   .clean .card-header .label { margin-left: 3px; }
   .clean .card-header .time { margin-left: auto; }
 </style>
@@ -135,8 +144,8 @@
    : variant === 'b' ? 'Keep source, label, and recency in the header. A compact More control reveals explicit actions; Return still performs the primary action.'
    : variant === 'c' ? 'The card carries its content and one contextual More control. A quiet panel-level cue says what Return does; the full destination lives in the menu and preview.'
    : 'Cards show content, source, and recency. A single panel-level More control follows selection, with Return shown nearby.';
- if (variant === 'c') document.getElementById('caption').textContent = 'More appears on selected or hovered cards; the numbered shortcuts appear while Command is held. Each real panel has one scrolling row.';
- if (variant === 'd') document.getElementById('caption').textContent = 'One panel-level More menu follows the current selection; right-click and Command-K reach the same actions. Each real panel has one scrolling row.';
+ if (variant === 'c') document.getElementById('caption').textContent = 'Selected or hovered cards show More. Subtext and the Command-number chip share a bottom row. Each real panel has one scrolling row.';
+ if (variant === 'd') document.getElementById('caption').textContent = 'One panel-level More menu follows selection. Subtext and the Command-number chip share a bottom row. Each real panel has one scrolling row.';
  const app = (cls, text) => `<div class="app ${cls}">${text}</div>`;
  const header = (cls, icon, time, label = '') => variant === 'a'
    ? `<div class="card-header">${app(cls, icon)}<span class="time">${time}</span><span class="grow"></span><span class="primary">Paste → Notes<span class="return">↵</span></span><span class="more">···</span></div>`
@@ -152,13 +161,21 @@
     }
     <span class="kw">return</span> Preview(item: item)
 }</pre><div class="language">Swift · 6 lines shown</div></div><div class="quick">⌘4</div>`],
-   ['File', 'finder', '◧', '1h', '', `<div class="file-body"><div class="file-thumb"><div class="rule"></div><div class="rule short"></div><div class="rule"></div><div class="rule short"></div></div><div><div class="file-title">Quarterly<br>review.pdf</div><div class="file-location">Documents / Planning<br>PDF · 2.4 MB</div></div></div><div class="quick">⌘5</div>`],
+   ['File', 'finder', '◧', '1h', '', `<div class="file-body"><div class="file-thumb"><div class="rule"></div><div class="rule short"></div><div class="rule"></div><div class="rule short"></div></div><div><div class="file-title">Quarterly<br>review.pdf</div><div class="file-location">Documents / Planning<br><span class="file-kind">PDF · 2.4 MB</span></div></div></div><div class="quick">⌘5</div>`],
    ['Color', 'figma', '◉', '3h', 'Palette', `<div class="color-body"><div class="swatch-title">#EEC274</div><div class="swatch-sub">rgb(238, 194, 116)</div></div><div class="inline-meta">Original value retained</div><div class="quick">⌘6</div>`]
  ];
- function render(items) { return items.map(([type, cls, icon, time, label, content]) =>
-  `<div class="sample"><div class="sample-name">${type} clip</div><div class="card ${type === 'Color' ? 'color' : ''}">${header(cls,icon,time,label)}${content}</div></div>`).join(''); }
- document.getElementById('grid-first').innerHTML = render(cards.slice(0, 3));
- document.getElementById('grid-second').innerHTML = render(cards.slice(3));
+ const footerMeta = {
+   Text: 'Text · 142 characters', Link: 'fieldnotes.design/notes/system-42',
+   Image: '2560 × 1440', Code: 'Swift · 6 lines shown',
+   File: 'PDF · 2.4 MB', Color: 'rgb(238, 194, 116)'
+ };
+ function render(items, startIndex) { return items.map(([type, cls, icon, time, label, content], index) => {
+   const footer = variant === 'c' || variant === 'd'
+     ? `<div class="card-footer"><span class="footer-meta">${footerMeta[type]}</span><span class="quick">⌘${startIndex + index + 1}</span></div>` : '';
+   return `<div class="sample"><div class="sample-name">${type} clip</div><div class="card ${type.toLowerCase()}">${header(cls,icon,time,label)}${content}${footer}</div></div>`;
+ }).join(''); }
+ document.getElementById('grid-first').innerHTML = render(cards.slice(0, 3), 0);
+ document.getElementById('grid-second').innerHTML = render(cards.slice(3), 3);
 </script>
 </body>
 </html>
