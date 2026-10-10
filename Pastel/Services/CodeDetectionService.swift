@@ -19,7 +19,8 @@ struct CodeDetectionService {
     /// - Parameter text: The clipboard text to analyze.
     /// - Returns: `true` if the text likely contains code (score >= 3 across 5 signals).
     static func looksLikeCode(_ text: String) -> Bool {
-        let lines = text.components(separatedBy: .newlines)
+        let sample = TextWorkBudget.codeSample(text)
+        let lines = sample.components(separatedBy: .newlines)
         // Single-line text is almost never meaningful code
         guard lines.count >= 2 else { return false }
 
@@ -32,8 +33,8 @@ struct CodeDetectionService {
         // Signal 1 (+1): Punctuation density > 0.03
         // Count code-specific punctuation characters relative to total length
         let codePunctuation = CharacterSet(charactersIn: "{}()[];=<>")
-        let punctuationCount = text.unicodeScalars.filter { codePunctuation.contains($0) }.count
-        let punctuationDensity = Double(punctuationCount) / Double(max(text.count, 1))
+        let punctuationCount = sample.unicodeScalars.filter { codePunctuation.contains($0) }.count
+        let punctuationDensity = Double(punctuationCount) / Double(max(sample.count, 1))
         if punctuationDensity > 0.03 { score += 1 }
 
         // Signal 2 (+2): Contains programming keywords
@@ -43,7 +44,7 @@ struct CodeDetectionService {
             "let ", "var ", "const ", "public ", "private ", "static ", "void ",
             "#include", "#import", "function ", "async ", "await "
         ]
-        if keywords.contains(where: { text.contains($0) }) { score += 2 }
+        if keywords.contains(where: { sample.contains($0) }) { score += 2 }
 
         // Signal 3 (+1): >30% of non-empty lines have consistent indentation
         // (start with 2+ spaces or a tab)
@@ -58,8 +59,8 @@ struct CodeDetectionService {
         if Double(codeLineEndings.count) / Double(nonEmptyLines.count) > 0.2 { score += 1 }
 
         // Signal 5 (+1): Contains CamelCase or snake_case identifiers
-        let hasCamelCase = text.range(of: "[a-z][a-zA-Z]*[A-Z][a-zA-Z]*", options: .regularExpression) != nil
-        let hasSnakeCase = text.range(of: "[a-z]+_[a-z]+", options: .regularExpression) != nil
+        let hasCamelCase = sample.range(of: "[a-z][a-zA-Z]*[A-Z][a-zA-Z]*", options: .regularExpression) != nil
+        let hasSnakeCase = sample.range(of: "[a-z]+_[a-z]+", options: .regularExpression) != nil
         if hasCamelCase || hasSnakeCase { score += 1 }
 
         return score >= 3
@@ -77,12 +78,13 @@ struct CodeDetectionService {
     /// - Parameter text: The code text to analyze.
     /// - Returns: A tuple of (language identifier, relevance score), or nil if not detected.
     static func detectLanguage(_ text: String) async -> (language: String, relevance: Int)? {
+        let sample = TextWorkBudget.codeSample(text)
         // Check keyword hints first for strong language signals
-        let hintedLanguage = languageHint(for: text)
+        let hintedLanguage = languageHint(for: sample)
 
         do {
             let highlight = Highlight()
-            let result = try await highlight.request(text)
+            let result = try await highlight.request(sample)
 
             // If we have a keyword hint and highlight.js returned something different,
             // prefer the keyword hint (highlight.js often misdetects Swift as SCSS, etc.)
@@ -140,14 +142,17 @@ struct CodeDetectionService {
 
 /// Actor-based cache for syntax-highlighted `AttributedString` values, keyed by content hash.
 ///
-/// Prevents re-highlighting when scrolling through code cards. Limited to 200 entries
-/// with simple oldest-first eviction.
+/// Prevents re-highlighting when scrolling through code cards. Entries have both
+/// a count and an estimated byte budget, and card input itself is size-capped.
 actor HighlightCache {
     static let shared = HighlightCache()
 
     private var cache: [String: AttributedString] = [:]
+    private var costs: [String: Int] = [:]
     private var insertionOrder: [String] = []
-    private let maxEntries = 200
+    private var totalCost = 0
+    private let maxEntries = 100
+    private let maxEstimatedBytes = 16 * 1024 * 1024
 
     /// Retrieve a cached highlighted AttributedString by content hash.
     func get(_ hash: String) -> AttributedString? {
@@ -165,21 +170,31 @@ actor HighlightCache {
         let doomed = cache.keys.filter { $0 == hash || $0.hasPrefix(prefix) }
         for key in doomed {
             cache.removeValue(forKey: key)
+            totalCost -= costs.removeValue(forKey: key) ?? 0
         }
         insertionOrder.removeAll { doomed.contains($0) }
     }
 
     /// Store a highlighted AttributedString keyed by content hash.
     func set(_ hash: String, value: AttributedString) {
+        // Attributed runs cost more than UTF-8 text. The multiplier is conservative
+        // bookkeeping, not an exact allocator measurement.
+        let estimatedCost = String(value.characters).utf8.count * 8
+        if let oldCost = costs[hash] {
+            totalCost -= oldCost
+        }
         if cache[hash] == nil {
             insertionOrder.append(hash)
         }
         cache[hash] = value
+        costs[hash] = estimatedCost
+        totalCost += estimatedCost
 
-        // Evict oldest entries when cache exceeds limit
-        while cache.count > maxEntries, let oldest = insertionOrder.first {
+        while (cache.count > maxEntries || totalCost > maxEstimatedBytes),
+              let oldest = insertionOrder.first {
             insertionOrder.removeFirst()
             cache.removeValue(forKey: oldest)
+            totalCost -= costs.removeValue(forKey: oldest) ?? 0
         }
     }
 }

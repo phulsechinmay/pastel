@@ -248,6 +248,7 @@ final class ClipboardMonitor {
 
     /// Process the current pasteboard content: classify, deduplicate, and persist.
     private func processPasteboardContent() {
+        let captureStarted = ContinuousClock.now
         // Classify content type
         guard let (contentType, isConcealed) = pasteboard.classifyContent() else {
             return // Empty, transient, or auto-generated -- skip
@@ -306,12 +307,13 @@ final class ClipboardMonitor {
         // --- Content detection: color first, then code ---
         var detectedContentType = contentType
         var detectedColorHex: String? = nil
-        var detectedLanguage: String? = nil
+        let detectedLanguage: String? = nil
 
         // Skip detection for concealed items (password managers)
         if !isConcealed {
             // Color detection first (prevents rgb() from matching as code)
-            if let colorHex = ColorDetectionService.detectColor(primaryContent) {
+            if primaryContent.utf8.count <= 128,
+               let colorHex = ColorDetectionService.detectColor(primaryContent) {
                 detectedContentType = .color
                 detectedColorHex = colorHex
             }
@@ -364,12 +366,15 @@ final class ClipboardMonitor {
         do {
             try modelContext.save()
             itemCount += 1
-            Self.logger.info("Captured \(detectedContentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes)")
+            let elapsed = captureStarted.duration(to: .now)
+            Self.logger.info("Captured \(detectedContentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes, \(String(describing: elapsed)))")
 
             // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
             if let bundleID = sourceAppBundleID {
                 _ = AppIconCache.shared.icon(forBundleID: bundleID)
-                _ = AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                Task(priority: .utility) {
+                    _ = await AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                }
             }
 
             // Schedule expiration for concealed items (password managers)
@@ -380,7 +385,7 @@ final class ClipboardMonitor {
             // Fire-and-forget async language detection for code items
             if detectedContentType == .code {
                 let itemID = item.persistentModelID
-                let textForDetection = primaryContent
+                let textForDetection = TextWorkBudget.codeSample(primaryContent)
                 Task {
                     guard let result = await CodeDetectionService.detectLanguage(textForDetection) else { return }
                     guard let savedItem = self.modelContext.model(for: itemID) as? ClipboardItem else { return }
@@ -492,7 +497,9 @@ final class ClipboardMonitor {
                 // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
                 if let bundleID = sourceAppBundleID {
                     _ = AppIconCache.shared.icon(forBundleID: bundleID)
-                    _ = AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                    Task(priority: .utility) {
+                        _ = await AppIconColorService.shared.dominantColor(forBundleID: bundleID)
+                    }
                 }
 
                 // Schedule expiration for concealed items

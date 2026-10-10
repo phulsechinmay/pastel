@@ -4,7 +4,7 @@ import SwiftData
 /// Root SwiftUI view hosted inside the sliding panel.
 ///
 /// Delegates item display, filtering, and keyboard navigation to
-/// `FilteredCardListView` which uses an init-based `@Query` predicate
+/// `FilteredCardListView` which pages visible items through the history loader
 /// for dynamic search and label filtering.
 ///
 /// Layout: Header -> Divider -> SearchField -> ChipBar -> FilteredCardList
@@ -29,6 +29,7 @@ struct PanelContentView: View {
     /// Source apps offered by the app filter, refreshed when the row is revealed
     /// rather than held in a standing @Query that would duplicate the card list's fetch.
     @State private var availableApps: [SourceAppOption] = []
+    @State private var appListTask: Task<Void, Never>?
 
     /// Horizontal-mode height contributions, tracked separately because the panel takes
     /// a single combined figure and either source can change independently.
@@ -152,6 +153,12 @@ struct PanelContentView: View {
                 }
             }
 
+            if appState.searchIndexBuilding && !debouncedSearchText.isEmpty {
+                Text("Indexing older clips; more matches may appear")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
             // Filtered content area with keyboard navigation
             FilteredCardListView(
                 searchText: debouncedSearchText,
@@ -181,14 +188,10 @@ struct PanelContentView: View {
                     searchFocusRequestID &+= 1
                 }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .focused($panelFocus, equals: .cardList)
-            // .id() triggers full view recreation only when the @Query predicate changes
-            // (search text). Label filtering is in-memory, so changing labels does not
-            // require a new @Query and is handled via onChange(of: selectedLabelIDs)
-            // inside FilteredCardListView — preserving scroll position, dominant-color
-            // caches, and the keyboard NSEvent monitor across chip taps.
-            // showCount is intentionally EXCLUDED so scroll position survives panel dismiss/reopen.
-            .id(debouncedSearchText)
+            // Keep the result view alive while typing. It resets its cursor when
+            // the debounced query changes, without rebuilding its focus/scroll tree.
         }
         .fontDesign(.rounded)
         .padding(PanelLayout.panelOuterPadding)
@@ -240,7 +243,11 @@ struct PanelContentView: View {
             appState.panelController.handleEdgeChange(reopen: true)
         }
         .task(id: searchText) {
-            try? await Task.sleep(for: .milliseconds(200))
+            // A one- or two-character query scans the normalized SQLite text.
+            // Give a continuing keystroke a little more time before doing that work.
+            let delay = searchText.unicodeScalars.count > 0 && searchText.unicodeScalars.count < 3
+                ? 350 : 200
+            try? await Task.sleep(for: .milliseconds(delay))
             guard !Task.isCancelled else { return }
             debouncedSearchText = searchText
         }
@@ -334,6 +341,7 @@ struct PanelContentView: View {
         if showFilters {
             refreshAvailableApps()
         } else {
+            appListTask?.cancel()
             // Collapsing must clear, or a filter the user can no longer see keeps
             // narrowing results and reads as missing history.
             searchFilters.removeAll()
@@ -346,12 +354,13 @@ struct PanelContentView: View {
     }
 
     private func refreshAvailableApps() {
-        var descriptor = FetchDescriptor<ClipboardItem>(
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
-        )
-        descriptor.fetchLimit = 2000
-        let recent = (try? modelContext.fetch(descriptor)) ?? []
-        availableApps = SourceAppOption.derive(from: recent)
+        appListTask?.cancel()
+        guard let worker = appState.historyPageWorker else { return }
+        appListTask = Task {
+            guard let apps = try? await worker.recentSourceApps(),
+                  !Task.isCancelled, showFilters else { return }
+            availableApps = apps
+        }
     }
 
     private func pasteItem(_ item: ClipboardItem) {

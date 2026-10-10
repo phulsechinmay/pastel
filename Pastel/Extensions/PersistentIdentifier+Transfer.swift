@@ -4,7 +4,9 @@ import Foundation
 extension PersistentIdentifier {
     /// Encode this identifier as a JSON string for drag-and-drop transfer.
     var asTransferString: String? {
-        guard let data = try? JSONEncoder().encode(self),
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let data = try? encoder.encode(self),
               let string = String(data: data, encoding: .utf8) else {
             return nil
         }

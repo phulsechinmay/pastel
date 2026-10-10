@@ -1,35 +1,44 @@
 import SwiftUI
 import SwiftData
+import OSLog
 
 /// Responsive card grid for the History tab in Settings.
 ///
-/// Follows the same init-based @Query pattern as FilteredCardListView but uses
-/// LazyVGrid instead of LazyVStack, and adds multi-selection via Cmd-click toggle,
-/// Shift-click range, Cmd+A select all, and Escape deselect.
-///
-/// Label filtering is done in-memory (OR logic) because SwiftData #Predicate
-/// cannot use .contains() on to-many relationships.
+/// Uses the shared bounded page loader and adds multi-selection for the loaded
+/// window via Cmd-click, Shift-click, Cmd+A, and Escape.
 ///
 /// Context menus are selection-aware: right-clicking a selected item shows bulk
 /// actions for all selected items; right-clicking an unselected item selects it
 /// and shows single-item actions.
 struct HistoryGridView: View {
 
-    @Query private var items: [ClipboardItem]
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
 
     // Multi-selection state (owned by parent HistoryBrowserView)
     @Binding var selectedIDs: Set<PersistentIdentifier>
-    // Resolved items exposed to parent for bulk operations
+    // Resolved items in the loaded window, exposed to parent for bulk operations
     @Binding var resolvedItems: [ClipboardItem]
     @State private var lastClickedID: PersistentIdentifier? = nil
     @State private var memoizedFilteredItems: [ClipboardItem] = []
-    @State private var displayLimit: Int = 100
-    private let pageSize: Int = 100
+    @State private var cursor = HistoryPageCursor(pinnedExhausted: true)
+    @State private var isLoading = false
+    @State private var isReplacingResults = false
+    @State private var showRefreshIndicator = false
+    @State private var refreshIndicatorTask: Task<Void, Never>?
+    @State private var pageTask: Task<Void, Never>?
+    @State private var queryGeneration = 0
+    @State private var windowStart = 0
+    @State private var loadError: String?
+    private let pageSize = 100
+    private let firstPageSize = 12
+    private let maxResidentItems = 300
+    private let logger = Logger(subsystem: "app.pastel.Pastel", category: "HistoryResults")
+    private let searchText: String
 
     // Labels passed from parent for ClipboardCardView context menus
     let allLabels: [Label]
-    // Label filtering (in-memory, same reason as FilteredCardListView)
+    // Indexed label filtering
     private let selectedLabelIDs: Set<PersistentIdentifier>
 
     // Bulk action closures (provided by parent HistoryBrowserView)
@@ -49,6 +58,7 @@ struct HistoryGridView: View {
     ]
 
     init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, allLabels: [Label] = [], selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}, onPastePlainText: @escaping (ClipboardItem) -> Void = { _ in }) {
+        self.searchText = searchText
         self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
         _selectedIDs = selectedIDs
@@ -57,33 +67,9 @@ struct HistoryGridView: View {
         self.onBulkPaste = onBulkPaste
         self.onRequestBulkDelete = onRequestBulkDelete
         self.onPastePlainText = onPastePlainText
-
-        // Text-only predicate. Label filtering AND sync filtering are done in-memory
-        // via filteredItems because:
-        // 1. #Predicate cannot use .contains() on to-many relationships (labels)
-        // 2. Combining search + sync conditions in a single #Predicate causes
-        //    Swift type-checker timeout ("unable to type-check this expression")
-        let predicate: Predicate<ClipboardItem>
-        if !searchText.isEmpty {
-            let search = searchText
-            predicate = #Predicate<ClipboardItem> { item in
-                item.textContent?.localizedStandardContains(search) == true ||
-                item.sourceAppName?.localizedStandardContains(search) == true ||
-                item.title?.localizedStandardContains(search) == true
-            }
-        } else {
-            // Fetch all items (no fetchLimit): required for in-memory label post-filtering.
-            // SwiftData #Predicate cannot use .contains() on to-many relationships.
-            predicate = #Predicate<ClipboardItem> { _ in true }
-        }
-
-        _items = Query(filter: predicate, sort: \ClipboardItem.timestamp, order: .reverse)
     }
 
-    /// Items visible after pagination (first `displayLimit` of memoizedFilteredItems).
-    private var visibleItems: [ClipboardItem] {
-        Array(memoizedFilteredItems.prefix(displayLimit))
-    }
+    private var visibleItems: [ClipboardItem] { isReplacingResults ? [] : memoizedFilteredItems }
 
     /// Compact signature for label metadata that affects labelKey filtering.
     private var labelFilterSignature: String {
@@ -92,44 +78,103 @@ struct HistoryGridView: View {
             .joined(separator: ",")
     }
 
-    /// Compute items filtered by sync rules and selected labels (in-memory).
-    ///
-    /// Sync filtering (applied first):
-    /// - Concealed items excluded (passwords never appear in browseable history)
-    /// - Remote image/file items excluded (no displayable content on receiving device)
-    /// - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
-    ///
-    /// Label filtering (applied second, OR logic):
-    /// If no labels selected, returns all sync-filtered items. Otherwise checks
-    /// each item's denormalized `labelKey` string — a fast column read that does
-    /// NOT fault the labels relationship.
-    private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
-        let localDeviceID = DeviceIdentifier.current
-        let syncFiltered = items.filter { item in
-            // Exclude concealed items (passwords should never appear in browseable history)
-            guard !item.isConcealed else { return false }
-            // Allow local items and pre-v1.5 legacy items (empty originDeviceID)
-            let isLocal = item.originDeviceID == localDeviceID || item.originDeviceID.isEmpty
-            if isLocal { return true }
-            // Remote items: allow only if NOT image/file (those have no displayable content)
-            return item.type != .image && item.type != .file
-        }
-        guard !selectedLabelIDs.isEmpty else { return syncFiltered }
+    private func reload() {
+        pageTask?.cancel()
+        refreshIndicatorTask?.cancel()
+        queryGeneration &+= 1
+        isLoading = false
+        isReplacingResults = !memoizedFilteredItems.isEmpty
+        showRefreshIndicator = false
+        windowStart = 0
+        resolvedItems.removeAll(keepingCapacity: false)
+        cursor = HistoryPageCursor(pinnedExhausted: true)
+        loadMore()
+    }
 
-        let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
-        return syncFiltered.filter { item in
-            itemMatchesSelectedLabels(
-                item,
-                selectedLabelIDs: selectedLabelIDs,
-                allLabels: allLabels,
-                knownStableIDs: knownStableIDs
-            )
+    private func loadMore() {
+        guard !isLoading, !cursor.isExhausted,
+              isReplacingResults || memoizedFilteredItems.count < maxResidentItems else { return }
+        isLoading = true
+        let generation = queryGeneration
+        let replacing = isReplacingResults
+        let firstPage = replacing || memoizedFilteredItems.isEmpty
+        let started = ContinuousClock.now
+        if firstPage {
+            refreshIndicatorTask = Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled, generation == queryGeneration, isLoading else { return }
+                showRefreshIndicator = true
+            }
         }
+        var nextCursor = cursor
+        pageTask = Task {
+            do {
+                let page = try await HistoryPageLoader.nextPage(
+                    in: modelContext, cursor: &nextCursor, searchText: searchText,
+                    selectedLabelIDs: selectedLabelIDs, allLabels: allLabels,
+                    softDeletedIDs: appState.deletionManager.softDeletedIDs,
+                    searchIndex: appState.searchIndex, worker: appState.historyPageWorker,
+                    pinsFirst: false, pageSize: firstPage ? firstPageSize : pageSize
+                )
+                guard !Task.isCancelled, generation == queryGeneration else { return }
+                cursor = nextCursor
+                if replacing {
+                    memoizedFilteredItems = page
+                    isReplacingResults = false
+                } else {
+                    memoizedFilteredItems.append(contentsOf: page)
+                }
+                resolvedItems = memoizedFilteredItems
+                loadError = nil
+                if firstPage {
+                    let elapsed = started.duration(to: .now)
+                    let milliseconds = elapsed.components.seconds * 1000 +
+                        elapsed.components.attoseconds / 1_000_000_000_000_000
+                    logger.info("History first page ready in \(milliseconds, privacy: .public) ms; \(page.count, privacy: .public) clips")
+                }
+            } catch {
+                if generation == queryGeneration && !Task.isCancelled {
+                    if replacing {
+                        memoizedFilteredItems.removeAll(keepingCapacity: false)
+                        isReplacingResults = false
+                    }
+                    loadError = error.localizedDescription
+                }
+            }
+            if generation == queryGeneration {
+                refreshIndicatorTask?.cancel()
+                showRefreshIndicator = false
+                isLoading = false
+            }
+        }
+    }
+
+    private func advanceToOlderResults() {
+        windowStart += memoizedFilteredItems.count
+        selectedIDs.removeAll()
+        lastClickedID = nil
+        memoizedFilteredItems.removeAll(keepingCapacity: false)
+        resolvedItems.removeAll(keepingCapacity: false)
+        loadMore()
     }
 
     var body: some View {
         Group {
-            if memoizedFilteredItems.isEmpty {
+            if memoizedFilteredItems.isEmpty && isLoading {
+                Group {
+                    if showRefreshIndicator {
+                        ProgressView("Loading history…")
+                            .controlSize(.small)
+                            .font(.caption)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let loadError, memoizedFilteredItems.isEmpty {
+                Text("Could not load history: \(loadError)")
+                    .foregroundStyle(.secondary)
+            } else if memoizedFilteredItems.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(PanelStyle.Icon.empty)
@@ -142,7 +187,10 @@ struct HistoryGridView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                        if windowStart > 0 {
+                            Button("Newest results") { reload() }
+                        }
+                        ForEach(Array(memoizedFilteredItems.enumerated()), id: \.element.id) { index, item in
                             let isInSelection = selectedIDs.contains(item.persistentModelID)
                             ClipboardCardView(
                                 item: item,
@@ -162,9 +210,7 @@ struct HistoryGridView: View {
                                 handleTap(item: item, index: index)
                             }
                             .onAppear {
-                                if index >= displayLimit - 10 && displayLimit < memoizedFilteredItems.count {
-                                    displayLimit += pageSize
-                                }
+                                if index >= memoizedFilteredItems.count - 6 { loadMore() }
                             }
                             .contextMenu {
                                 if isInSelection && selectedIDs.count > 1 {
@@ -204,17 +250,30 @@ struct HistoryGridView: View {
                                 }
                             }
                         }
+                        if memoizedFilteredItems.count >= maxResidentItems && !cursor.isExhausted {
+                            Button("Older results") { advanceToOlderResults() }
+                        }
                     }
                     .padding(12)
                 }
             }
         }
+        .allowsHitTesting(!isReplacingResults)
+        .overlay {
+            if isReplacingResults && showRefreshIndicator {
+                ProgressView("Loading history…")
+                    .controlSize(.small)
+                    .font(.caption)
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
         .focusable()
         .focusEffectDisabled()
         .onKeyPress(characters: .init(charactersIn: "aA")) { keyPress in
-            // Cmd+A: select all filtered items (not just visible, for bulk operations)
+            // Cmd+A selects the loaded window; distant pages are not kept in memory.
             guard keyPress.modifiers.contains(.command) else { return .ignored }
-            selectedIDs = Set(memoizedFilteredItems.map(\.persistentModelID))
+            selectedIDs = Set(visibleItems.map(\.persistentModelID))
             return .handled
         }
         .onKeyPress(.escape) {
@@ -223,26 +282,19 @@ struct HistoryGridView: View {
             lastClickedID = nil
             return .handled
         }
-        .onAppear {
-            displayLimit = pageSize
-            memoizedFilteredItems = computeFilteredItems(from: items)
-            resolvedItems = memoizedFilteredItems
-        }
-        .onChange(of: items) { _, newItems in
-            memoizedFilteredItems = computeFilteredItems(from: newItems)
-            resolvedItems = memoizedFilteredItems
-        }
-        .onChange(of: selectedLabelIDs) { _, _ in
-            // Re-run the in-memory label post-filter without rebuilding @Query or recreating
-            // the view. Label filtering is not part of the predicate (see init), so the
-            // existing `items` array is still correct — only the filter output changes.
-            displayLimit = pageSize
-            memoizedFilteredItems = computeFilteredItems(from: items)
-            resolvedItems = memoizedFilteredItems
-        }
-        .onChange(of: labelFilterSignature) { _, _ in
-            memoizedFilteredItems = computeFilteredItems(from: items)
-            resolvedItems = memoizedFilteredItems
+        .onAppear { reload() }
+        .onChange(of: appState.itemCount) { _, _ in reload() }
+        .onChange(of: appState.pinRevision) { _, _ in reload() }
+        .onChange(of: appState.searchIndexRevision) { _, _ in reload() }
+        .onChange(of: searchText) { _, _ in reload() }
+        .onChange(of: appState.deletionManager.softDeletedIDs) { _, _ in reload() }
+        .onChange(of: selectedLabelIDs) { _, _ in reload() }
+        .onChange(of: labelFilterSignature) { _, _ in reload() }
+        .onDisappear {
+            pageTask?.cancel()
+            refreshIndicatorTask?.cancel()
+            memoizedFilteredItems.removeAll(keepingCapacity: false)
+            resolvedItems.removeAll(keepingCapacity: false)
         }
     }
 

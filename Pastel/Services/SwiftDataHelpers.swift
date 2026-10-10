@@ -169,20 +169,20 @@ extension ClipboardItem {
     ///   it, or `nil` when the text was unchanged and nothing was written.
     @discardableResult
     func applyEditedText(_ newText: String) -> String? {
-        let original = textContent ?? ""
+        let original = fullTextContent ?? ""
         guard newText != original else { return nil }
         let supersededHash = contentHash
 
-        textContent = newText
+        setStoredText(newText)
         characterCount = newText.count
         byteCount = Data(newText.utf8).count
         contentHash = ContentHash.hash(text: newText)
         modifiedAt = .now
 
         // Rich representations describe the text as it was captured, not as it is now.
-        if htmlContent != nil || rtfData != nil {
-            htmlContent = nil
-            rtfData = nil
+        if htmlContent != nil || largeHTMLData != nil || rtfData != nil || largeRTFData != nil {
+            setStoredHTML(nil)
+            setStoredRTF(nil)
             if type == .richText { type = .text }
         }
 
@@ -213,64 +213,6 @@ extension ClipboardItem {
 /// empty leading/trailing segments). `"|a|b|"` -> `["a", "b"]`, `"|"` -> `[]`.
 func labelKeyTokens(_ key: String) -> [Substring] {
     key.split(separator: "|")
-}
-
-/// Fast label membership check backed by `ClipboardItem.labelKey`.
-///
-/// Correctness-first: the denormalized `labelKey` is treated as a positive cache,
-/// never as an authoritative negative unless it is provably fresh. Concretely:
-///
-/// 1. Positive fast path — `labelKey` directly contains a selected label's stable
-///    ID: match, no relationship fault.
-/// 2. Trustworthy negative — no match AND `labelKey` is non-empty AND every token
-///    it carries maps to a currently-known stable ID AND every selected label is
-///    itself indexed: the item genuinely lacks the label, return false with NO
-///    relationship fault. This is the common case, so the optimization holds.
-/// 3. Otherwise — `labelKey` is empty (not indexed), carries an unknown/stale token
-///    (e.g. cross-device `stableID` divergence), or a selected label has no stable
-///    ID yet: fall back to the authoritative relationship scan. Only these few
-///    items pay the fault, and `backfillLabelIndex` heals their stored key later.
-///
-/// `knownStableIDs` is the set of all current `Label.stableID` values, computed once
-/// per filter pass by the caller (not per item). If selected label IDs cannot be
-/// resolved through `allLabels`, this fails closed by returning `false`.
-func itemMatchesSelectedLabels(
-    _ item: ClipboardItem,
-    selectedLabelIDs: Set<PersistentIdentifier>,
-    allLabels: [Label],
-    knownStableIDs: Set<String>
-) -> Bool {
-    guard !selectedLabelIDs.isEmpty else { return true }
-
-    let selectedLabels = allLabels.filter {
-        selectedLabelIDs.contains($0.persistentModelID)
-    }
-    guard !selectedLabels.isEmpty else { return false }
-
-    let key = item.labelKey
-
-    // 1. Positive fast path.
-    let stableNeedles = selectedLabels
-        .map(\.stableID)
-        .filter { !$0.isEmpty }
-        .map { "|\($0)|" }
-    if !key.isEmpty,
-       stableNeedles.contains(where: { key.contains($0) }) {
-        return true
-    }
-
-    // 2. Trustworthy negative — no relationship fault.
-    let selectedLabelsAllIndexed = !selectedLabels.contains { $0.stableID.isEmpty }
-    let keyTokensAllKnown = !key.isEmpty
-        && labelKeyTokens(key).allSatisfy { knownStableIDs.contains(String($0)) }
-    if selectedLabelsAllIndexed && keyTokensAllKnown {
-        return false
-    }
-
-    // 3. Authoritative fallback for empty/stale keys.
-    return item.safeLabels.contains { label in
-        selectedLabelIDs.contains(label.persistentModelID)
-    }
 }
 
 /// Delete a label and rewrite `labelKey` on every clipboard item that referenced

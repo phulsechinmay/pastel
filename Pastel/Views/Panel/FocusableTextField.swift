@@ -43,6 +43,7 @@ struct FocusableTextField: NSViewRepresentable {
             ]
         )
         tf.delegate = context.coordinator
+        context.coordinator.lastPublishedText = text
         // Initialize so the first updateNSView (with focusRequestID == 0)
         // does not steal focus on appear.
         context.coordinator.lastSeenFocusRequestID = focusRequestID
@@ -50,9 +51,13 @@ struct FocusableTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ tf: NSTextField, context: Context) {
-        if tf.stringValue != text {
+        // AppKit owns the live edit buffer. A parent SwiftUI refresh can arrive
+        // while the field editor is still handling a keystroke or IME composition;
+        // only push text back into it for an actual external change (e.g. Clear).
+        if text != context.coordinator.lastPublishedText, tf.stringValue != text {
             tf.stringValue = text
         }
+        context.coordinator.lastPublishedText = text
 
         // Refresh callbacks each update so the coordinator invokes the latest closures.
         context.coordinator.onSubmit = onSubmit
@@ -76,6 +81,7 @@ struct FocusableTextField: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         @Binding var text: String
+        var lastPublishedText = ""
         var lastSeenFocusRequestID: Int = 0
         var onSubmit: (() -> Void)?
         var onCancel: (() -> Void)?
@@ -86,7 +92,9 @@ struct FocusableTextField: NSViewRepresentable {
 
         func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTextField else { return }
-            text = tf.stringValue
+            let newText = tf.stringValue
+            lastPublishedText = newText
+            text = newText
         }
 
         /// Intercept Return / Escape from the field editor so callers can commit or

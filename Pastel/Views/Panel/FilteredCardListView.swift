@@ -1,26 +1,17 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import OSLog
 
-/// Dynamic query child view that constructs its @Query predicate at init time.
-///
-/// This pattern is required because SwiftData's @Query cannot be changed dynamically
-/// after view creation. When the parent passes new searchText or selectedLabelIDs values,
-/// SwiftUI recreates this view with a fresh @Query containing the updated predicate.
-///
-/// Filtering strategy: text search via @Query predicate, label filtering in-memory.
-/// #Predicate cannot use .contains() on to-many relationships, so label filtering
-/// is done as a post-filter on the query results (OR logic: items with ANY selected label).
-///
-/// Handles keyboard navigation and mouse interaction (single-click to select,
-/// double-click to paste) since it has direct access to the queried items array.
+/// Paged card list. The search/label service scans off the UI thread and returns
+/// only IDs for the current page; at most three pages of card models stay resident.
+/// Handles keyboard navigation and mouse interaction for the loaded page.
 ///
 /// Adapts layout based on panel edge: vertical edges (left/right) use LazyVStack
 /// with up/down arrow navigation; horizontal edges (top/bottom) use LazyHStack
 /// with left/right arrow navigation.
 struct FilteredCardListView: View {
 
-    @Query private var items: [ClipboardItem]
     @AppStorage("panelEdge") private var panelEdgeRaw: String = PanelEdge.right.rawValue
     @AppStorage("quickPasteEnabled") private var quickPasteEnabled: Bool = true
 
@@ -28,8 +19,19 @@ struct FilteredCardListView: View {
     @Environment(AppState.self) private var appState
     @State private var keyMonitor: Any? = nil
     @State private var filteredItems: [ClipboardItem] = []
-    @State private var displayLimit: Int = 50
-    private let pageSize: Int = 50
+    @State private var cursor = HistoryPageCursor()
+    @State private var isLoading = false
+    @State private var isReplacingResults = false
+    @State private var showRefreshIndicator = false
+    @State private var refreshIndicatorTask: Task<Void, Never>?
+    @State private var pageTask: Task<Void, Never>?
+    @State private var queryGeneration = 0
+    @State private var windowStart = 0
+    @State private var loadError: String?
+    private let pageSize = HistoryPageLoader.pageSize
+    private let firstPageSize = 12
+    private let maxResidentItems = 150
+    private let logger = Logger(subsystem: "app.pastel.Pastel", category: "PanelResults")
 
     /// Anchor index for Shift+arrow range selection. `nil` means single selection
     /// (only `selectedIndex`). When set, the selection is the contiguous range
@@ -39,7 +41,7 @@ struct FilteredCardListView: View {
     let allLabels: [Label]
     @Binding var selectedIndex: Int?
     var isShiftHeld: Bool
-    /// Incremented each time the panel is shown; triggers filteredItems recomputation
+    /// Incremented each time the panel is shown; triggers a page refresh
     /// without view recreation (preserves scroll position across dismiss/reopen).
     var showCount: Int
     var onPaste: (ClipboardItem) -> Void
@@ -57,16 +59,16 @@ struct FilteredCardListView: View {
     /// Callback for Cmd+F to focus the panel's search field.
     var onFocusSearch: (() -> Void)?
 
-    /// Selected label IDs for in-memory post-filtering (OR logic).
+    /// Selected label IDs for indexed membership filtering (OR logic).
     private let selectedLabelIDs: Set<PersistentIdentifier>
 
-    /// Type/app/date filters, applied in memory alongside the label filter.
+    /// Type/app/date filters applied by the result service.
     private let searchFilters: SearchFilters
+    private let searchText: String
 
-    /// Items visible after pagination (first `displayLimit` of filteredItems).
-    private var visibleItems: [ClipboardItem] {
-        Array(filteredItems.prefix(displayLimit))
-    }
+    // Old cards can remain on screen during a filter transition, but must not
+    // remain keyboard targets for a paste from the newly selected filter.
+    private var visibleItems: [ClipboardItem] { isReplacingResults ? [] : filteredItems }
 
     /// Indices (into `visibleItems`) currently selected. A single cursor when
     /// `selectionAnchor` is nil, otherwise the contiguous anchor…cursor range.
@@ -88,82 +90,81 @@ struct FilteredCardListView: View {
             .joined(separator: ",")
     }
 
-    /// Compute items filtered by soft-delete exclusion, sync rules, and selected labels (in-memory).
-    ///
-    /// Soft-delete exclusion (applied first):
-    /// - Items in DeletionManager's softDeletedIDs are hidden (pending undo or permanent deletion)
-    ///
-    /// Sync filtering (applied second):
-    /// - Concealed items excluded (passwords never appear in browseable panel)
-    /// - Remote image/file items excluded (no displayable content on receiving device)
-    /// - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
-    ///
-    /// Type/app/date filtering (applied third):
-    /// `SearchFilters` matches OR within a group and AND across groups. Skipped
-    /// entirely when no filter is active, so the common case costs one Bool check.
-    ///
-    /// Label filtering (applied fourth, OR logic):
-    /// If no labels selected, returns all sync-filtered items. Otherwise checks
-    /// each item's denormalized `labelKey` string for the selected labels' stable
-    /// IDs — a fast column read that does NOT fault the labels relationship.
-    ///
-    /// Pinned ordering (applied last):
-    /// Pinned items are hoisted to the front. Deliberately after label filtering,
-    /// so a filtered view never shows a pinned item that doesn't match the filter.
-    private func computeFilteredItems(from items: [ClipboardItem]) -> [ClipboardItem] {
-        // Exclude soft-deleted items (hidden but not yet permanently deleted, undoable via Cmd+Z)
-        let softDeleted = appState.deletionManager.softDeletedIDs
-        let nonDeleted = items.filter { !softDeleted.contains($0.persistentModelID) }
-
-        let localDeviceID = DeviceIdentifier.current
-        let syncFiltered = nonDeleted.filter { item in
-            // Exclude concealed items (passwords should never appear in browseable history)
-            guard !item.isConcealed else { return false }
-            // Allow local items and pre-v1.5 legacy items (empty originDeviceID)
-            let isLocal = item.originDeviceID == localDeviceID || item.originDeviceID.isEmpty
-            if isLocal { return true }
-            // Remote items: allow only if NOT image/file (those have no displayable content)
-            return item.type != .image && item.type != .file
-        }
-        // Cutoff computed once for the whole pass rather than per item.
-        let attributeFiltered: [ClipboardItem]
-        if searchFilters.isEmpty {
-            attributeFiltered = syncFiltered
-        } else {
-            let cutoff = searchFilters.dateRange?.cutoff()
-            attributeFiltered = syncFiltered.filter { searchFilters.matches($0, cutoff: cutoff) }
-        }
-
-        guard !selectedLabelIDs.isEmpty else { return pinnedFirst(attributeFiltered) }
-
-        let knownStableIDs = Set(allLabels.map(\.stableID).filter { !$0.isEmpty })
-        let labelFiltered = attributeFiltered.filter { item in
-            itemMatchesSelectedLabels(
-                item,
-                selectedLabelIDs: selectedLabelIDs,
-                allLabels: allLabels,
-                knownStableIDs: knownStableIDs
-            )
-        }
-        return pinnedFirst(labelFiltered)
+    private func reload() {
+        pageTask?.cancel()
+        refreshIndicatorTask?.cancel()
+        queryGeneration &+= 1
+        isLoading = false
+        isReplacingResults = !filteredItems.isEmpty
+        showRefreshIndicator = false
+        windowStart = 0
+        cursor = HistoryPageCursor()
+        loadMore()
     }
 
-    /// Hoist pinned items to the front, most-recently-pinned first, preserving the
-    /// query's timestamp order for everything else.
-    ///
-    /// Partitioning here rather than adding a `SortDescriptor` to `@Query` keeps
-    /// pinning off the predicate path, so toggling a pin never re-runs the fetch or
-    /// recreates the view. It also guarantees pins survive pagination: they sit at
-    /// the head of `filteredItems`, which `visibleItems` takes its prefix from.
-    private func pinnedFirst(_ items: [ClipboardItem]) -> [ClipboardItem] {
-        var pinned: [ClipboardItem] = []
-        var unpinned: [ClipboardItem] = []
-        for item in items {
-            if item.isPinned { pinned.append(item) } else { unpinned.append(item) }
+    private func loadMore() {
+        guard !isLoading, !cursor.isExhausted,
+              isReplacingResults || filteredItems.count < maxResidentItems else { return }
+        isLoading = true
+        let generation = queryGeneration
+        let replacing = isReplacingResults
+        let firstPage = replacing || filteredItems.isEmpty
+        let started = ContinuousClock.now
+        if firstPage {
+            refreshIndicatorTask = Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled, generation == queryGeneration, isLoading else { return }
+                showRefreshIndicator = true
+            }
         }
-        guard !pinned.isEmpty else { return unpinned }
-        pinned.sort { ($0.pinnedAt ?? .distantPast) > ($1.pinnedAt ?? .distantPast) }
-        return pinned + unpinned
+        var nextCursor = cursor
+        pageTask = Task {
+            do {
+                let page = try await HistoryPageLoader.nextPage(
+                    in: modelContext, cursor: &nextCursor, searchText: searchText,
+                    selectedLabelIDs: selectedLabelIDs, allLabels: allLabels,
+                    filters: searchFilters, softDeletedIDs: appState.deletionManager.softDeletedIDs,
+                    searchIndex: appState.searchIndex, worker: appState.historyPageWorker,
+                    pageSize: firstPage ? firstPageSize : pageSize
+                )
+                guard !Task.isCancelled, generation == queryGeneration else { return }
+                cursor = nextCursor
+                if replacing {
+                    filteredItems = page
+                    isReplacingResults = false
+                } else {
+                    filteredItems.append(contentsOf: page)
+                }
+                loadError = nil
+                if firstPage {
+                    let elapsed = started.duration(to: .now)
+                    let milliseconds = elapsed.components.seconds * 1000 +
+                        elapsed.components.attoseconds / 1_000_000_000_000_000
+                    logger.info("Panel first page ready in \(milliseconds, privacy: .public) ms; \(page.count, privacy: .public) clips; labels selected: \(!selectedLabelIDs.isEmpty, privacy: .public)")
+                }
+            } catch {
+                if generation == queryGeneration && !Task.isCancelled {
+                    if replacing {
+                        filteredItems.removeAll(keepingCapacity: false)
+                        isReplacingResults = false
+                    }
+                    loadError = error.localizedDescription
+                }
+            }
+            if generation == queryGeneration {
+                refreshIndicatorTask?.cancel()
+                showRefreshIndicator = false
+                isLoading = false
+            }
+        }
+    }
+
+    private func advanceToOlderResults() {
+        windowStart += filteredItems.count
+        filteredItems.removeAll(keepingCapacity: false)
+        selectedIndex = nil
+        selectionAnchor = nil
+        loadMore()
     }
 
     /// Static dictionary mapping NSEvent.keyCode to digit value (1-9).
@@ -208,35 +209,7 @@ struct FilteredCardListView: View {
         self.searchFilters = searchFilters
         self.showCount = showCount
 
-        // Text-only predicate. Label filtering AND sync filtering are done in-memory
-        // via filteredItems because:
-        // 1. #Predicate cannot use .contains() on to-many relationships (labels)
-        // 2. Combining search + sync conditions in a single #Predicate causes
-        //    Swift type-checker timeout ("unable to type-check this expression")
-        //
-        // Sync filtering (applied in filteredItems):
-        // - Concealed items excluded (passwords should never appear in browseable history)
-        // - Remote image/file items excluded (no displayable content on receiving device)
-        // - Items with empty originDeviceID (pre-v1.5 legacy) treated as local
-        let predicate: Predicate<ClipboardItem>
-        if !searchText.isEmpty {
-            let search = searchText
-            predicate = #Predicate<ClipboardItem> { item in
-                item.textContent?.localizedStandardContains(search) == true ||
-                item.sourceAppName?.localizedStandardContains(search) == true ||
-                item.title?.localizedStandardContains(search) == true
-            }
-        } else {
-            // Fetch all items (no fetchLimit): required for in-memory label post-filtering.
-            // SwiftData #Predicate cannot use .contains() on to-many relationships.
-            predicate = #Predicate<ClipboardItem> { _ in true }
-        }
-
-        _items = Query(
-            filter: predicate,
-            sort: \ClipboardItem.timestamp,
-            order: .reverse
-        )
+        self.searchText = searchText
         _selectedIndex = selectedIndex
         self.isShiftHeld = isShiftHeld
         self.onPaste = onPaste
@@ -251,7 +224,22 @@ struct FilteredCardListView: View {
 
     var body: some View {
         Group {
-            if visibleItems.isEmpty {
+            if filteredItems.isEmpty && isLoading {
+                Group {
+                    if showRefreshIndicator {
+                        ProgressView("Loading clips…")
+                            .controlSize(.small)
+                            .font(.caption)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else if let loadError, filteredItems.isEmpty {
+                Text("Could not load clips: \(loadError)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if filteredItems.isEmpty {
                     SwiftUI.Label("No matching items", systemImage: "magnifyingglass")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -262,7 +250,10 @@ struct FilteredCardListView: View {
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: PanelLayout.cardSpacing) {
-                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                            if windowStart > 0 {
+                                Button("Newest results") { reload() }
+                            }
+                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
                                     // Height is whatever is left under the header row, not a
                                     // hardcoded 200. The panel is a fixed height, so a fixed
@@ -270,6 +261,9 @@ struct FilteredCardListView: View {
                                     // depended on how tall the search field happened to render.
                                     .frame(width: PanelLayout.horizontalCardWidth)
                                     .frame(maxHeight: .infinity)
+                            }
+                            if filteredItems.count >= maxResidentItems && !cursor.isExhausted {
+                                Button("Older results") { advanceToOlderResults() }
                             }
                         }
                         .padding(PanelLayout.selectionRingGutter)
@@ -288,8 +282,14 @@ struct FilteredCardListView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: PanelLayout.cardSpacing) {
-                            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+                            if windowStart > 0 {
+                                Button("Newest results") { reload() }
+                            }
+                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
+                            }
+                            if filteredItems.count >= maxResidentItems && !cursor.isExhausted {
+                                Button("Older results") { advanceToOlderResults() }
                             }
                         }
                         .padding(PanelLayout.selectionRingGutter)
@@ -302,6 +302,16 @@ struct FilteredCardListView: View {
                         }
                     }
                 }
+            }
+        }
+        .allowsHitTesting(!isReplacingResults)
+        .overlay {
+            if isReplacingResults && showRefreshIndicator {
+                ProgressView("Loading clips…")
+                    .controlSize(.small)
+                    .font(.caption)
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             }
         }
         .focusable()
@@ -321,68 +331,48 @@ struct FilteredCardListView: View {
         .onAppear {
             selectedIndex = nil
             selectionAnchor = nil
-            displayLimit = pageSize
-            filteredItems = computeFilteredItems(from: items)
+            reload()
             installKeyboardMonitor()
         }
-        .onChange(of: items) { _, newItems in
-            filteredItems = computeFilteredItems(from: newItems)
-        }
+        .onChange(of: appState.itemCount) { _, _ in reload() }
         .onChange(of: appState.deletionManager.softDeletedIDs) { _, _ in
-            // Recompute after soft-delete or undo without view recreation (preserves scroll position).
-            // Wrap in withAnimation to ensure the slide-left removal transition plays correctly,
-            // since the animation context from the original withAnimation in deleteItem() may not
-            // propagate through the onChange handler.
-            withAnimation(.easeOut(duration: 0.2)) {
-                filteredItems = computeFilteredItems(from: items)
-            }
-            // A multi-selection range can't survive index shifts from deletion; collapse it.
+            reload()
             selectionAnchor = nil
-            // Advance selection after deletion: if deleted item was last, select new last;
-            // if in middle, same index now points to next item (shifted up).
             if let idx = selectedIndex, idx >= visibleItems.count {
                 selectedIndex = visibleItems.isEmpty ? nil : visibleItems.count - 1
             }
         }
         .onChange(of: showCount) { _, _ in
-            // Refresh data on panel reopen without view recreation (preserves scroll position).
-            displayLimit = pageSize
-            filteredItems = computeFilteredItems(from: items)
+            reload()
+            selectedIndex = nil
+            selectionAnchor = nil
+        }
+        .onChange(of: searchText) { _, _ in
+            reload()
             selectedIndex = nil
             selectionAnchor = nil
         }
         .onChange(of: selectedLabelIDs) { _, _ in
-            // Re-run the in-memory label post-filter without rebuilding @Query or recreating
-            // the view. Label filtering is not part of the predicate (see init), so the
-            // existing `items` array is still correct — only the filter output changes.
-            displayLimit = pageSize
-            filteredItems = computeFilteredItems(from: items)
+            reload()
             selectedIndex = nil
             selectionAnchor = nil
         }
-        .onChange(of: labelFilterSignature) { _, _ in
-            filteredItems = computeFilteredItems(from: items)
-        }
+        .onChange(of: labelFilterSignature) { _, _ in reload() }
         .onChange(of: searchFilters) { _, _ in
-            // Same in-memory path as label chips: the @Query predicate is untouched,
-            // so no refetch and no view recreation — scroll position and caches survive.
-            displayLimit = pageSize
-            filteredItems = computeFilteredItems(from: items)
+            reload()
             selectedIndex = nil
             selectionAnchor = nil
         }
+        .onChange(of: appState.searchIndexRevision) { _, _ in reload() }
         .onChange(of: appState.pinRevision) { _, _ in
-            // Re-partition after a pin toggle. `items` is unchanged (the mutation was
-            // to a property of an existing model object), so only the ordering moves.
-            withAnimation(.easeInOut(duration: 0.2)) {
-                filteredItems = computeFilteredItems(from: items)
-            }
-            // The item the user pinned just jumped position; a range selection
-            // anchored to old indices no longer describes anything meaningful.
+            reload()
             selectionAnchor = nil
             selectedIndex = nil
         }
         .onDisappear {
+            pageTask?.cancel()
+            refreshIndicatorTask?.cancel()
+            filteredItems.removeAll(keepingCapacity: false)
             if let monitor = keyMonitor {
                 NSEvent.removeMonitor(monitor)
                 keyMonitor = nil
@@ -431,9 +421,7 @@ struct FilteredCardListView: View {
             removal: .move(edge: .leading).combined(with: .opacity)
         ))
         .onAppear {
-            if index >= displayLimit - 10 && displayLimit < filteredItems.count {
-                displayLimit += pageSize
-            }
+            if index >= filteredItems.count - 3 { loadMore() }
         }
         .id(item.persistentModelID)
     }
@@ -624,9 +612,7 @@ struct FilteredCardListView: View {
             let newIndex = max(0, min(visibleItems.count - 1, current + offset))
             selectedIndex = newIndex
             // Load more items if navigating near the end
-            if newIndex >= displayLimit - 10 && displayLimit < filteredItems.count {
-                displayLimit += pageSize
-            }
+            if newIndex >= filteredItems.count - 10 { loadMore() }
         } else {
             selectedIndex = 0
         }
@@ -646,8 +632,6 @@ struct FilteredCardListView: View {
         }
         let newIndex = max(0, min(visibleItems.count - 1, current + offset))
         selectedIndex = newIndex
-        if newIndex >= displayLimit - 10 && displayLimit < filteredItems.count {
-            displayLimit += pageSize
-        }
+        if newIndex >= filteredItems.count - 10 { loadMore() }
     }
 }

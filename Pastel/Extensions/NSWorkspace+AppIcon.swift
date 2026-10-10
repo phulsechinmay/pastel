@@ -12,6 +12,7 @@ final class AppIconCache {
 
     private var cache: [String: NSImage] = [:]
     private var menuCache: [String: NSImage] = [:]
+    private var missingBundleIDs: Set<String> = []
 
     private init() {}
 
@@ -21,8 +22,10 @@ final class AppIconCache {
         if let cached = cache[bundleID] {
             return cached
         }
+        if missingBundleIDs.contains(bundleID) { return nil }
 
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            missingBundleIDs.insert(bundleID)
             return nil
         }
 

@@ -375,18 +375,18 @@ final class PasteService {
 
         switch item.type {
         case .text:
-            addString(item.textContent, .string)
-            addData(item.rtfData, .rtf)
-            addString(item.htmlContent, .html)
+            addString(item.fullTextContent, .string)
+            addData(item.fullRTFData, .rtf)
+            addString(item.fullHTMLContent, .html)
 
         case .richText:
             // Write richest format first for maximum fidelity
-            addData(item.rtfData, .rtf)
-            addString(item.htmlContent, .html)
-            addString(item.textContent, .string)
+            addData(item.fullRTFData, .rtf)
+            addString(item.fullHTMLContent, .html)
+            addString(item.fullTextContent, .string)
 
         case .url:
-            if let urlString = item.textContent, !urlString.isEmpty {
+            if let urlString = item.fullTextContent, !urlString.isEmpty {
                 writes.append(.string(urlString, .string))
                 // Also set as proper URL type for apps that support it
                 if let url = URL(string: urlString) {
@@ -408,13 +408,13 @@ final class PasteService {
             }
 
         case .file:
-            if let filePath = item.textContent, !filePath.isEmpty {
+            if let filePath = item.fullTextContent, !filePath.isEmpty {
                 writes.append(.objects([URL(fileURLWithPath: filePath) as NSURL]))
             }
 
         case .code, .color:
             // Code snippets and color values are stored as text
-            addString(item.textContent, .string)
+            addString(item.fullTextContent, .string)
         }
 
         return writes
@@ -489,7 +489,7 @@ final class PasteService {
             switch item.type {
             case .text, .richText, .url, .code, .color:
                 // Empty is nothing to write, same as a non-text type — see `commit`.
-                guard let text = item.textContent, !text.isEmpty else { return nil }
+                guard let text = item.fullTextContent, !text.isEmpty else { return nil }
                 return text
             case .image, .file:
                 return nil
@@ -584,8 +584,7 @@ final class PasteService {
     // MARK: - Logging & Alert helpers
 
     private static func logEntry(method: String, source: String, item: ClipboardItem) {
-        let preview = (item.textContent ?? "").prefix(40).replacingOccurrences(of: "\n", with: "⏎")
-        pasteLog("[PASTE] \(method)() ENTRY source=\(source) type=\(item.type.rawValue) behavior=\(pasteBehavior.rawValue) preview=\"\(preview)\"")
+        pasteLog("[PASTE] \(method)() ENTRY source=\(source) type=\(item.type.rawValue) behavior=\(pasteBehavior.rawValue) bytes=\(item.byteCount)")
     }
 
     /// Display an NSAlert so paste failures are user-visible.

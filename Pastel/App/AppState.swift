@@ -31,15 +31,25 @@ final class AppState {
     /// The model container, stored so settings views can access SwiftData
     var modelContainer: ModelContainer?
 
+    /// Local, disposable search accelerator. The SwiftData store is authoritative.
+    var searchIndex: ClipboardSearchIndex?
+    var historyPageWorker: HistoryPageWorker?
+    var searchIndexBuilding = false
+    var searchIndexRevision = 0
+    @ObservationIgnored private var pendingSyncIndexRefresh = false
+    @ObservationIgnored private var pendingIndexSaves = 0
+    @ObservationIgnored private var historyRefreshTask: Task<Void, Never>?
+    @ObservationIgnored private var indexWillSaveObserver: NSObjectProtocol?
+    @ObservationIgnored private var indexSaveObserver: NSObjectProtocol?
+    private static let indexDirtyKey = "pastelSearchIndexDirty"
+
     /// Total number of captured clipboard items (stored for @Observable reactivity).
     /// ClipboardMonitor is not @Observable, so a computed property delegating to it
     /// would not trigger SwiftUI updates. This stored property is synced via callback.
     var itemCount: Int = 0
 
-    /// Bumped whenever an item's pin state changes, so the panel can re-partition
-    /// its in-memory list. Mutating `isPinned` on a model object does not change the
-    /// identity of the `@Query` array, so `onChange(of: items)` would never fire —
-    /// this is the same reason `DeletionManager.softDeletedIDs` is observed separately.
+    /// Bumped whenever an item's pin state changes so page cursors reload in
+    /// the correct order. Model property mutation alone does not reset a cursor.
     private(set) var pinRevision: Int = 0
 
     /// Whether clipboard monitoring is active (delegates to monitor)
@@ -81,12 +91,8 @@ final class AppState {
 
     /// Remove a snippet draft the user closed without typing anything.
     ///
-    /// Deliberately does NOT bump `pinRevision`. Deleting the row already changes the
-    /// panel's `@Query` array, so `onChange(of: items)` re-partitions on its own. Bumping
-    /// here would additionally run `computeFilteredItems` over the *pre-refresh* array,
-    /// which still contains the row just deleted — and reading `isPinned` off an
-    /// invalidated model traps. Callers must ensure nothing is still bound to `item`
-    /// before calling this; see `EditItemWindow`'s close handler.
+    /// The item-count change reloads page cursors after deletion. Callers must
+    /// ensure nothing is still bound to `item` before calling this.
     @MainActor
     func discardSnippet(_ item: ClipboardItem, in modelContext: ModelContext) {
         deleteClipboardItemWithCleanup(item, from: modelContext)
@@ -102,6 +108,60 @@ final class AppState {
         // for rows created before those fields existed or synced later.
         backfillLabelIndex(in: modelContext)
 
+        let index = ClipboardSearchIndex(modelContainer: modelContext.container)
+        searchIndex = index
+        historyPageWorker = HistoryPageWorker(modelContainer: modelContext.container)
+        searchIndexBuilding = true
+        let wasDirty = UserDefaults.standard.bool(forKey: Self.indexDirtyKey)
+        Task(priority: .utility) { [weak self] in
+            do {
+                if wasDirty { try await index.resetAndRebuild() }
+                else { try await index.rebuild() }
+                if self?.pendingSyncIndexRefresh == true {
+                    self?.pendingSyncIndexRefresh = false
+                    try await index.resetAndRebuild()
+                }
+                self?.searchIndexBuilding = false
+                self?.searchIndexRevision &+= 1
+                if self?.pendingIndexSaves == 0 {
+                    UserDefaults.standard.set(false, forKey: Self.indexDirtyKey)
+                }
+                try await index.externalizeLegacyLargeClips()
+            } catch {
+                self?.searchIndexBuilding = false
+                NSLog("Search index rebuild failed: %@", String(describing: error))
+            }
+        }
+        indexWillSaveObserver = NotificationCenter.default.addObserver(
+            forName: ModelContext.willSave, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.pendingIndexSaves += 1
+                UserDefaults.standard.set(true, forKey: Self.indexDirtyKey)
+            }
+        }
+        indexSaveObserver = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave, object: nil, queue: .main
+        ) { [weak self] notification in
+            let upserted = Self.savedIdentifiers(notification, keys: [.insertedIdentifiers, .updatedIdentifiers])
+            let deleted = Self.savedIdentifiers(notification, keys: [.deletedIdentifiers])
+            Task { @MainActor [weak self] in
+                guard let self, let index = self.searchIndex else { return }
+                do {
+                    if !upserted.isEmpty || !deleted.isEmpty {
+                        try await index.applyChanges(upserted: upserted, deleted: deleted)
+                        self.scheduleHistoryRefresh()
+                    }
+                    self.pendingIndexSaves = max(0, self.pendingIndexSaves - 1)
+                    if self.pendingIndexSaves == 0 && !self.searchIndexBuilding {
+                        UserDefaults.standard.set(false, forKey: Self.indexDirtyKey)
+                    }
+                } catch {
+                    NSLog("Search index update failed: %@", String(describing: error))
+                }
+            }
+        }
+
         let monitor = ClipboardMonitor(modelContext: modelContext)
         monitor.onItemCountChanged = { [weak self] count in
             self?.itemCount = count
@@ -113,6 +173,45 @@ final class AppState {
         let retention = RetentionService(modelContext: modelContext)
         retention.startPeriodicPurge()
         self.retentionService = retention
+    }
+
+    private func scheduleHistoryRefresh() {
+        historyRefreshTask?.cancel()
+        historyRefreshTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            self?.searchIndexRevision &+= 1
+        }
+    }
+
+    func refreshSearchIndexAfterSync() {
+        guard let index = searchIndex else { return }
+        if searchIndexBuilding {
+            pendingSyncIndexRefresh = true
+            return
+        }
+        searchIndexBuilding = true
+        Task(priority: .utility) { [weak self] in
+            do {
+                try await index.resetAndRebuild()
+                self?.searchIndexRevision &+= 1
+            } catch {
+                NSLog("Search index sync refresh failed: %@", String(describing: error))
+            }
+            self?.searchIndexBuilding = false
+        }
+    }
+
+    nonisolated private static func savedIdentifiers(
+        _ notification: Notification,
+        keys: [ModelContext.NotificationKey]
+    ) -> [PersistentIdentifier] {
+        keys.flatMap { key in
+            let value = notification.userInfo?[key] ?? notification.userInfo?[key.rawValue]
+            if let identifiers = value as? Set<PersistentIdentifier> { return Array(identifiers) }
+            if let identifiers = value as? [PersistentIdentifier] { return identifiers }
+            return []
+        }
     }
 
     /// Pass the model container to the panel controller so @Query works inside the panel.

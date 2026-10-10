@@ -1,5 +1,31 @@
 import Foundation
 
+/// A source app present in clipboard history, for the app filter menu.
+struct SourceAppOption: Identifiable, Equatable, Sendable {
+    let bundleID: String
+    let name: String
+
+    var id: String { bundleID }
+
+    /// Distinct source apps in a recent, bounded history sample.
+    static func derive(from items: [ClipboardItem], limit: Int = 12) -> [SourceAppOption] {
+        var counts: [String: Int] = [:]
+        var names: [String: String] = [:]
+        for item in items {
+            guard let bundleID = item.sourceAppBundleID, !bundleID.isEmpty else { continue }
+            counts[bundleID, default: 0] += 1
+            if names[bundleID] == nil { names[bundleID] = item.sourceAppName ?? bundleID }
+        }
+        return counts.sorted { lhs, rhs in
+            lhs.value == rhs.value
+                ? (names[lhs.key] ?? lhs.key) < (names[rhs.key] ?? rhs.key)
+                : lhs.value > rhs.value
+        }
+        .prefix(limit)
+        .map { SourceAppOption(bundleID: $0.key, name: names[$0.key] ?? $0.key) }
+    }
+}
+
 /// Preset time windows for the date filter.
 ///
 /// Presets only, deliberately — a full date picker costs more panel space than the
@@ -31,12 +57,8 @@ enum DateRangeFilter: String, CaseIterable, Identifiable, Sendable {
 /// Picking Text + Image widens; adding Today narrows. This matches how the label
 /// chips already behave, so the two selections read consistently.
 ///
-/// Applied in memory rather than in `#Predicate`, even though `contentType`,
-/// `sourceAppBundleID`, and `timestamp` are all predicate-safe scalars. Changing the
-/// `@Query` predicate re-runs the fetch and recreates the view through `.id()`, which
-/// is exactly the cost the Phase 26 perf work removed — and filters change on every
-/// click. The fetch already returns the full set for label post-filtering, so
-/// filtering here adds a pass over an array that was being walked anyway.
+/// Applied in the SQLite metadata query once the local index is ready. During
+/// backfill, the background page worker applies the same rules to bounded batches.
 struct SearchFilters: Equatable, Sendable {
 
     /// Empty means "any type".
