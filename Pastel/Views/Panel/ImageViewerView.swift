@@ -354,8 +354,11 @@ private struct ClipPreviewView: View {
 
     private var title: String {
         if let title = item.title, !title.isEmpty { return title }
-        if item.type == .file { return URL(fileURLWithPath: item.textContent ?? "").lastPathComponent }
-        return item.type.rawValue.capitalized
+        if item.type == .file, let path = item.textContent, !path.isEmpty {
+            return URL(fileURLWithPath: path).lastPathComponent
+        }
+        // The filter calls URLs "Link"; the preview names their content type.
+        return item.type == .url ? "URL" : item.type.displayName
     }
 
     var body: some View {
