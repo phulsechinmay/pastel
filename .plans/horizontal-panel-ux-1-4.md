@@ -31,6 +31,7 @@ Make the top/bottom quick panel easier to scan without losing explicit actions o
 - Search has a 190 pt minimum; label chips use the remaining space up to the actions instead of an artificial 420 pt cap. The panel adds the measured height of extra chip and filter rows rather than reducing card height. Infrequent colour picker and panel-position utilities share a Tools menu; New Snippet and Settings remain direct.
 - Strip-specific card presentation is explicit. Titles sit with content; one label plus count fits the header; the existing Command-number chip remains at bottom right with type-specific detail opposite it. URL banners are shorter, favicon-only links omit the large well, images fit remaining height, files use system icons and parent folders, and color foreground selection uses linearized luminance. History geometry stays separate.
 - Multi-selection top-row copy/paste cues and full popover commands show eligible text count; all-image/file ranges cannot claim to copy or paste text. Unknown app name now says “active app” rather than incorrectly promising Copy.
+- Image cards now reserve the same bottom metadata/shortcut row as other clips. The image fits and centers in the space above it; no dark footer overlay can cover tall or wide images.
 - App Store and Sparkle Debug builds pass with code signing off. Existing UX action-policy and selection-reconciliation smoke checks pass. A UI inspection attempt timed out, so actual rendered spacing, interaction timing, VoiceOver order, and narrow-display behavior remain pending.
 
 ## Non-goals

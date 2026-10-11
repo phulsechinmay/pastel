@@ -126,16 +126,18 @@ struct ClipboardCardView: View {
 
             if isHorizontal && item.type == .image {
                 contentPreview
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .overlay(alignment: .bottom) { cardFooter }
+                    // Center the whole image in the space above the footer. Keeping
+                    // the footer in the stack reserves its height for wide and tall
+                    // images alike, so it cannot cover the copied content.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
                 contentPreview
                 if isHorizontal { Spacer(minLength: 0) }
-                if isHorizontal {
-                    cardFooter
-                } else if (item.title != nil && !(item.title?.isEmpty ?? true)) || badgePosition != nil {
-                    legacyFooter
-                }
+            }
+            if isHorizontal {
+                cardFooter
+            } else if (item.title != nil && !(item.title?.isEmpty ?? true)) || badgePosition != nil {
+                legacyFooter
             }
         }
         .padding(.horizontal, PanelLayout.cardHorizontalPadding)
@@ -388,20 +390,13 @@ struct ClipboardCardView: View {
                     .font(PanelStyle.Text.meta)
                     .lineLimit(1)
                     .truncationMode(item.type == .url ? .middle : .tail)
-                    .foregroundStyle(item.type == .image ? Color.white :
-                                     (isColorCard ? colorCardTextColor : Color.secondary))
+                    .foregroundStyle(isColorCard ? colorCardTextColor : Color.secondary)
                     .help(detail)
             }
             Spacer(minLength: 0)
             if let badgePosition {
                 KeycapBadge(number: badgePosition, isShiftHeld: isShiftHeld,
-                            tint: item.type == .image ? .white : (isColorCard ? colorCardTextColor : nil))
-            }
-        }
-        .padding(item.type == .image ? 4 : 0)
-        .background {
-            if item.type == .image {
-                RoundedRectangle(cornerRadius: 5).fill(Color.black.opacity(0.78))
+                            tint: isColorCard ? colorCardTextColor : nil)
             }
         }
     }
