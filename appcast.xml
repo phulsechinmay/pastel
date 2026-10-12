@@ -3,12 +3,12 @@
     <channel>
         <title>Pastel</title>
         <item>
-            <title>1.0.18</title>
-            <pubDate>Thu, 01 Oct 2026 22:45:46 -0400</pubDate>
-            <sparkle:version>8</sparkle:version>
-            <sparkle:shortVersionString>1.0.18</sparkle:shortVersionString>
+            <title>1.0.19</title>
+            <pubDate>Mon, 12 Oct 2026 14:05:59 -0400</pubDate>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>1.0.19</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/phulsechinmay/pastel/releases/download/v1.0.18/Pastel.dmg" length="7378542" type="application/octet-stream" sparkle:edSignature="euWil6V6QbuFGC4PaYDopnEDPll/PSTaYuOjNi1Yx2OCzRhFL6/Bd0J1p45RNl9vCrOWJHIZCtzkx+jVBnASAw=="/>
+            <enclosure url="https://github.com/phulsechinmay/pastel/releases/download/v1.0.19/Pastel.dmg" length="7849093" type="application/octet-stream" sparkle:edSignature="0xRC/POhWe+eEAAiNt2YzMuBNFyGKWXWe9VUxzKkjOLMKnuq7qDO0NLMdPJo4Mfso0mUme9R9lKrDzY1VQ+KDw=="/>
         </item>
     </channel>
 </rss>
