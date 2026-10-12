@@ -259,14 +259,20 @@ final class PanelController {
         let onScreen = edge.onScreenFrame(screenFrame: screenFrame, extraHeight: horizontalExtraHeight)
         let offScreen = edge.offScreenFrame(screenFrame: screenFrame, extraHeight: horizontalExtraHeight)
 
-        panel.setFrame(offScreen, display: false)
-        panel.orderFrontRegardless()
-        panel.makeKey()
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            panel.setFrame(onScreen, display: false)
+            panel.orderFrontRegardless()
+            panel.makeKey()
+        } else {
+            panel.setFrame(offScreen, display: false)
+            panel.orderFrontRegardless()
+            panel.makeKey()
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = animationDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(onScreen, display: true)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = animationDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(onScreen, display: true)
+            }
         }
 
         installEventMonitors()
@@ -306,7 +312,7 @@ final class PanelController {
             appState?.deletionManager.commitPendingDeletion(in: modelContext)
         }
 
-        guard animated else {
+        guard animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             panel.orderOut(nil)
             finishHide()
             logger.info("Panel hidden (immediate)")

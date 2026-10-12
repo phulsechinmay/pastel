@@ -71,6 +71,12 @@ struct SettingsView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .fontDesign(.rounded)
+        .onAppear {
+            SettingsWindowController.shared.recordSelectedTab(selectedTab)
+        }
+        .onChange(of: selectedTab) { _, tab in
+            SettingsWindowController.shared.recordSelectedTab(tab)
+        }
         .onReceive(NotificationCenter.default.publisher(for: SettingsWindowController.switchTab)) { notification in
             if let rawValue = notification.userInfo?["tab"] as? String,
                let tab = SettingsTab(rawValue: rawValue) {

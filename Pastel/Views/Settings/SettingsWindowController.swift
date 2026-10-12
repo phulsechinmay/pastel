@@ -13,6 +13,7 @@ final class SettingsWindowController {
     static let shared = SettingsWindowController()
 
     private var window: NSWindow?
+    private let lastTabKey = "lastSettingsTab"
 
     /// In-flight activation hand-off (see `hideYieldingActivation`). Held on the
     /// instance rather than captured, so the observer block carries nothing across
@@ -40,8 +41,8 @@ final class SettingsWindowController {
     ///   - modelContainer: The SwiftData model container so settings views
     ///     can access the database (e.g., for label management in Plan 02).
     ///   - appState: The app state so settings can trigger panel edge changes.
-    ///   - initialTab: The tab to display when opening (default: .general).
-    func showSettings(modelContainer: ModelContainer, appState: AppState, initialTab: SettingsTab = .general) {
+    ///   - initialTab: An explicit destination. Without one, restore the last pane.
+    func showSettings(modelContainer: ModelContainer, appState: AppState, initialTab: SettingsTab? = nil) {
         // A paste from Settings leaves the app hidden (see `hideYieldingActivation`),
         // and `makeKeyAndOrderFront` on a hidden app does not reliably show anything.
         NSApp.unhide(nil)
@@ -50,15 +51,20 @@ final class SettingsWindowController {
         if let window, window.isVisible {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
-            NotificationCenter.default.post(
-                name: Self.switchTab,
-                object: nil,
-                userInfo: ["tab": initialTab.rawValue]
-            )
+            if let initialTab {
+                NotificationCenter.default.post(
+                    name: Self.switchTab,
+                    object: nil,
+                    userInfo: ["tab": initialTab.rawValue]
+                )
+            }
             return
         }
 
-        let baseView = SettingsView(initialTab: initialTab)
+        let selectedTab = initialTab
+            ?? SettingsTab(rawValue: UserDefaults.standard.string(forKey: lastTabKey) ?? "")
+            ?? .general
+        let baseView = SettingsView(initialTab: selectedTab)
             .modelContainer(modelContainer)
             .environment(appState)
             .environment(syncMonitor)
@@ -98,6 +104,11 @@ final class SettingsWindowController {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.window = window
+    }
+
+    /// Remember the pane to display when Settings is reopened without a destination.
+    func recordSelectedTab(_ tab: SettingsTab) {
+        UserDefaults.standard.set(tab.rawValue, forKey: lastTabKey)
     }
 
     /// Order the Settings window out, if it is up.
