@@ -1,4 +1,10 @@
 import SwiftUI
+import SwiftData
+
+struct HistoryLabelRequest: Identifiable {
+    let id = UUID()
+    let labelID: PersistentIdentifier
+}
 
 /// Tab identifiers for the settings window.
 enum SettingsTab: String, CaseIterable, Identifiable {
@@ -52,6 +58,7 @@ struct SettingsView: View {
 
     @State private var selectedTab: SettingsTab
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var historyLabelRequest: HistoryLabelRequest?
 
     init(initialTab: SettingsTab = .general) {
         _selectedTab = State(initialValue: initialTab)
@@ -91,11 +98,17 @@ struct SettingsView: View {
         case .general:
             GeneralSettingsView()
         case .labels:
-            LabelSettingsView()
+            LabelSettingsView { labelID in
+                historyLabelRequest = HistoryLabelRequest(labelID: labelID)
+                selectedTab = .history
+            }
         case .privacy:
             PrivacySettingsView()
         case .history:
-            HistoryBrowserView()
+            HistoryBrowserView(
+                labelRequest: historyLabelRequest,
+                onConsumeLabelRequest: { historyLabelRequest = nil }
+            )
         case .iCloudSync:
             SyncSettingsView()
         }
