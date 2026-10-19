@@ -310,7 +310,7 @@ private struct LabelRow: View {
                         if !isEditingName && nameError == nil { draftName = value }
                     }
 
-                Button(usageCount == 1 ? "1 clip" : "\(usageCount) clips", action: onShowClips)
+                Button(usageCount == 1 ? "1 clip" : "\(usageCount) clips", action: showClips)
                     .buttonStyle(.plain)
                     .font(PanelStyle.Text.meta)
                     .monospacedDigit()
@@ -356,7 +356,7 @@ private struct LabelRow: View {
 
     @ViewBuilder
     private var rowActions: some View {
-        Button(usageCount == 1 ? "Show 1 Clip" : "Show \(usageCount) Clips", action: onShowClips)
+        Button(usageCount == 1 ? "Show 1 Clip" : "Show \(usageCount) Clips", action: showClips)
         Button("Edit Appearance") { showingPalette = true }
         Divider()
         Button("Move Up", action: onMoveUp).disabled(!canMoveUp)
@@ -370,6 +370,15 @@ private struct LabelRow: View {
         nameError = nil
         draftName = label.name
         isNameFocused = false
+    }
+
+    private func showClips() {
+        if isEditingName { commitName() }
+        guard nameError == nil else {
+            isNameFocused = true
+            return
+        }
+        onShowClips()
     }
 
     private func commitName() {
