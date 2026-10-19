@@ -18,6 +18,9 @@ import SwiftData
 /// Paste copies then simulates Cmd+V. Delete shows a confirmation dialog.
 struct HistoryBrowserView: View {
 
+    var labelRequest: HistoryLabelRequest?
+    var onConsumeLabelRequest: () -> Void = {}
+
     @Query(sort: \Label.sortOrder) private var labels: [Label]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
@@ -39,7 +42,12 @@ struct HistoryBrowserView: View {
             VStack(alignment: .leading, spacing: 8) {
                 SearchFieldView(searchText: $searchText)
                     .frame(maxWidth: 350, alignment: .leading)
-                ChipBarView(labels: labels, selectedLabelIDs: $selectedLabelIDs)
+                ChipBarView(
+                    labels: labels,
+                    selectedLabelIDs: $selectedLabelIDs,
+                    isAllHistoryActive: selectedLabelIDs.isEmpty,
+                    onSelectAllHistory: { selectedLabelIDs.removeAll() }
+                )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
@@ -94,6 +102,17 @@ struct HistoryBrowserView: View {
         .fontDesign(.rounded)
         .onChange(of: debouncedSearchText) { _, _ in selectedIDs.removeAll() }
         .onChange(of: selectedLabelIDs) { _, _ in selectedIDs.removeAll() }
+        .task(id: labelRequest?.id) {
+            guard let labelRequest else { return }
+            searchText = ""
+            debouncedSearchText = ""
+            selectedIDs.removeAll()
+            resolvedItems.removeAll()
+            selectedLabelIDs = labels.contains(where: {
+                $0.persistentModelID == labelRequest.labelID
+            }) ? [labelRequest.labelID] : []
+            onConsumeLabelRequest()
+        }
         .alert("Delete \(selectedIDs.count) Items", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 bulkDelete()

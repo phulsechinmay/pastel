@@ -310,6 +310,12 @@ struct PanelContentView: View {
             (selectedItems.count == 1 || bulkTextCount > 0)
     }
 
+    /// The menu acts on the cards currently visible in the panel. Keep it available
+    /// while a newly typed search is debouncing so a click is never silently lost.
+    private var menuActionReady: Bool {
+        !selectedItems.isEmpty && (selectedItems.count == 1 || bulkTextCount > 0)
+    }
+
     private var bulkTextCount: Int {
         selectedItems.filter { item in
             switch item.type {
@@ -389,13 +395,17 @@ struct PanelContentView: View {
             .accessibilityLabel(primaryActionTitle)
             .help(actionReady ? primaryActionTitle : "Select a matching clip to continue")
 
-            Button { showActions = true } label: {
+            Menu {
+                actionsMenuItems
+            } label: {
                 Image(systemName: "ellipsis")
                     .font(PanelStyle.Icon.action)
                     .frame(width: PanelLayout.toolbarButtonSize, height: PanelLayout.toolbarButtonSize)
             }
             .modifier(AdaptiveGlassButtonStyle())
-            .disabled(selectedItems.isEmpty || searchText != debouncedSearchText)
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .disabled(selectedItems.isEmpty)
             .accessibilityLabel(selectedItems.count > 1
                 ? "More actions for \(selectedItems.count) selected clips"
                 : "More actions for selected clip")
@@ -448,59 +458,7 @@ struct PanelContentView: View {
 
     private var actionsPopover: some View {
         VStack(alignment: .leading, spacing: PanelLayout.sectionSpacing) {
-            Button(primaryActionTitle) { activateSelection() }
-                .disabled(!actionReady)
-            Divider()
-            Button(explicitCopyTitle) { panelActions.copyItems?(selectedItems) }
-                .disabled(!actionReady)
-            if selectedItems.count == 1, let item = selectedItems.first, item.type == .richText {
-                Button("Copy as Plain Text") { panelActions.copyPlainTextItem?(item) }
-            }
-            Button(explicitPasteTitle) { explicitPasteSelection() }
-                .disabled(!actionReady || appState.panelController.pasteTargetPID == nil)
-            if selectedItems.count == 1, let item = selectedItems.first {
-                Button("Paste as Plain Text") { panelActions.pastePlainTextItem?(item) }
-                    .disabled(appState.panelController.pasteTargetPID == nil ||
-                              item.type == .image || item.type == .file)
-                Button("Preview") { preview(item) }
-                Divider()
-                Button(item.isPinned ? "Unpin" : "Pin to Top") {
-                    appState.togglePin(item, in: modelContext)
-                    showActions = false
-                }
-                Button("Edit…") {
-                    showActions = false
-                    EditItemWindow.show(for: item, modelContainer: modelContext.container)
-                }
-                if !labels.isEmpty {
-                    Menu("Labels") {
-                        ForEach(labels, id: \.persistentModelID) { label in
-                            Button {
-                                let id = label.persistentModelID
-                                if item.safeLabels.contains(where: { $0.persistentModelID == id }) {
-                                    item.safeLabels.removeAll { $0.persistentModelID == id }
-                                } else {
-                                    item.safeLabels.append(label)
-                                }
-                                item.refreshLabelKey()
-                                saveWithLogging(modelContext, operation: "panel action label toggle")
-                            } label: {
-                                if item.safeLabels.contains(where: { $0.persistentModelID == label.persistentModelID }) {
-                                    SwiftUI.Label(label.name, systemImage: "checkmark")
-                                } else {
-                                    Text(label.name)
-                                }
-                            }
-                        }
-                    }
-                }
-                Divider()
-                Button("Delete", role: .destructive) {
-                    appState.deletionManager.softDelete(item, in: modelContext)
-                    appState.itemCount -= 1
-                    showActions = false
-                }
-            }
+            actionsMenuItems
         }
         .buttonStyle(.plain)
         .font(PanelStyle.Text.control)
@@ -509,8 +467,74 @@ struct PanelContentView: View {
         .onExitCommand { showActions = false }
     }
 
+    @ViewBuilder
+    private var actionsMenuItems: some View {
+        Button(primaryActionTitle) { activateVisibleSelection() }
+            .disabled(!menuActionReady)
+        Divider()
+        Button(explicitCopyTitle) { panelActions.copyItems?(selectedItems) }
+            .disabled(!menuActionReady)
+        if selectedItems.count == 1, let item = selectedItems.first, item.type == .richText {
+            Button("Copy as Plain Text") { panelActions.copyPlainTextItem?(item) }
+        }
+        Button(explicitPasteTitle) { explicitPasteSelection() }
+            .disabled(!menuActionReady || appState.panelController.pasteTargetPID == nil)
+        if selectedItems.count == 1, let item = selectedItems.first {
+            Button("Paste as Plain Text") { panelActions.pastePlainTextItem?(item) }
+                .disabled(appState.panelController.pasteTargetPID == nil ||
+                          item.type == .image || item.type == .file)
+            Button("Preview") { preview(item) }
+            Divider()
+            Button(item.isPinned ? "Unpin" : "Pin to Top") {
+                appState.togglePin(item, in: modelContext)
+                showActions = false
+            }
+            Button("Edit…") {
+                showActions = false
+                EditItemWindow.show(for: item, modelContainer: modelContext.container)
+            }
+            if !labels.isEmpty {
+                Menu("Labels") {
+                    ForEach(labels, id: \.persistentModelID) { label in
+                        Button {
+                            let id = label.persistentModelID
+                            if item.safeLabels.contains(where: { $0.persistentModelID == id }) {
+                                item.safeLabels.removeAll { $0.persistentModelID == id }
+                            } else {
+                                item.safeLabels.append(label)
+                            }
+                            item.refreshLabelKey()
+                            saveWithLogging(modelContext, operation: "panel action label toggle")
+                        } label: {
+                            if item.safeLabels.contains(where: { $0.persistentModelID == label.persistentModelID }) {
+                                SwiftUI.Label(label.name, systemImage: "checkmark")
+                            } else {
+                                Text(label.name)
+                            }
+                        }
+                    }
+                }
+            }
+            Divider()
+            Button("Delete", role: .destructive) {
+                appState.deletionManager.softDelete(item, in: modelContext)
+                appState.itemCount -= 1
+                showActions = false
+            }
+        }
+    }
+
     private func activateSelection() {
         guard actionReady else { return }
+        performActivation()
+    }
+
+    private func activateVisibleSelection() {
+        guard menuActionReady else { return }
+        performActivation()
+    }
+
+    private func performActivation() {
         if appState.panelController.pasteTargetPID == nil {
             if isShiftHeld, selectedItems.count == 1, let item = selectedItems.first {
                 panelActions.copyPlainTextItem?(item)
@@ -528,7 +552,7 @@ struct PanelContentView: View {
     }
 
     private func explicitPasteSelection() {
-        guard actionReady else { return }
+        guard menuActionReady else { return }
         if selectedItems.count > 1 { panelActions.explicitPasteItems?(selectedItems) }
         else if let item = selectedItems.first { panelActions.pasteItem?(item) }
     }
@@ -571,7 +595,7 @@ struct PanelContentView: View {
             .help("New Snippet (⌘N)")
 
             Menu {
-                Button("Pick a Colour from Screen", systemImage: "eyedropper") {
+                Button("Colorpicker", systemImage: "eyedropper") {
                     ColorToolController.shared.showColorPicker()
                 }
                 Menu("Panel Position") {
@@ -634,7 +658,7 @@ struct PanelContentView: View {
                     .foregroundStyle(.primary)
             }
             .modifier(AdaptiveGlassButtonStyle())
-            .help("Pick a Colour from Screen")
+            .help("Colorpicker")
 
             Menu {
                 ForEach(Array(PanelEdge.allCases), id: \.self) { (edge: PanelEdge) in
