@@ -1,0 +1,3 @@
+# Project instructions
+
+After completing a feature or user-facing behavior change, build Pastel and launch the newly built app so the user can test it. Use the `Pastel Sparkle` scheme with the `Debug-Sparkle` configuration for local testing unless the change specifically targets the App Store build. If Pastel is already running, quit that instance before launching the new build so the user does not test stale code or run two clipboard monitors. Confirm that the new app process is running, and tell the user which build is open. If building or launching fails, report the failure instead of saying the change is ready to test.
