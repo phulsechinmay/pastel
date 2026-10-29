@@ -196,6 +196,55 @@ to discuss before any of it is implemented. Nothing here is merged.
   A workaround for one laptop, not a fix for a shipped regression
   at the exact scale the performance upgrade was meant to serve.
 
+## Update 2026-10-28 — beachball confirmed on the laptop
+
+The user reports a genuine spinning beachball after the first two
+clicks, not just unresponsive clicks. That narrows the field: the
+main thread is not returning to the runloop, not merely starved by
+background work. The reload storm alone (empty `visibleItems` +
+hit-testing off) explains unresponsive clicks, but not a beachball.
+
+Main-thread suspects, in order, pending a spindump to confirm which
+one is actually on the stack:
+
+1. **Paste of an image card** (`PasteService`, `@MainActor`):
+   `representations()` does `Data(contentsOf:)` +
+   `NSImage(data:)` + `tiffRepresentation` synchronously on the main
+   actor. For a large screenshot this is a full decode plus an
+   uncompressed TIFF expansion on the UI thread — a direct
+   click → beachball path, and it fits "after a click or two" if
+   the clicks are card activations.
+2. **Main-context store waits during page resolution**
+   (`HistoryPageLoader.nextPage`, `@MainActor`): after the worker
+   returns IDs, each model is resolved on the main context, yielding
+   only every 8 items. If the rebuild / retention purge /
+   externalise save is holding the SwiftData store, those
+   resolutions can block the main thread.
+3. **Retention purge on the main actor** (`RetentionService`,
+   `@MainActor`): runs immediately at startup, fetching and saving
+   on the main context in 25-item batches. With store contention
+   from the rebuild, a purge batch can stall the main thread while
+   the user is clicking.
+4. **Per-card app-icon work on the main actor**
+   (`ClipboardCardView.task` → `AppIconCache.icon` +
+   `AppIconColorService.dominantColor` TIFF conversion, before the
+   detached colour extraction): first appearance of many distinct
+   app icons does Launch Services lookups and TIFF conversion on
+   the main thread, multiplied across a 150-item reload.
+
+What is *not* a beachball suspect on its own: `ThumbnailLoader`
+decodes on a background queue with `ShouldCacheImmediately`, and
+the index rebuild itself runs as a `.utility` task off the main
+actor. If the spindump shows the main thread in neither (1)–(4),
+the next suspect is a main-thread wait on a SwiftData store lock
+held by a background context — which the sample's lock/wait frames
+would show.
+
+Diagnostic that settles it: a process sample / spindump captured
+while the beachball is showing (Activity Monitor → Pastel →
+Sample Process, or `sample Pastel 5` from Terminal), plus what the
+two clicks were (card paste? filter/label chip? search? scroll?).
+
 ## Open questions for discussion
 
 1. Keyset cursor: timestamp + overlap window (minimal, no model
