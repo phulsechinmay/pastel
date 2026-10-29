@@ -91,14 +91,14 @@ struct URLMetadataService {
             else {
                 item.urlMetadataFetched = false
                 saveWithLogging(modelContext, operation: "URL metadata fetch")
-                logger.warning("URL metadata fetch got non-success status for \(urlString)")
+                logger.warning("URL metadata fetch got non-success status")
                 return
             }
 
             guard let html = String(data: data, encoding: .utf8) else {
                 item.urlMetadataFetched = false
                 saveWithLogging(modelContext, operation: "URL metadata failure")
-                logger.warning("URL metadata fetch could not decode HTML as UTF-8 for \(urlString)")
+                logger.warning("URL metadata fetch could not decode HTML as UTF-8")
                 return
             }
 
@@ -113,7 +113,7 @@ struct URLMetadataService {
                     let (faviconData, _) = try await session.data(from: faviconURL)
                     item.urlFaviconPath = await ImageStorageService.shared.saveFavicon(data: faviconData)
                 } catch {
-                    logger.warning("Favicon download failed for \(urlString): \(error.localizedDescription)")
+                    logger.warning("Favicon download failed")
                 }
             }
 
@@ -123,19 +123,19 @@ struct URLMetadataService {
                     let (imageData, _) = try await session.data(from: ogImageURL)
                     item.urlPreviewImagePath = await ImageStorageService.shared.savePreviewImage(data: imageData)
                 } catch {
-                    logger.warning("og:image download failed for \(urlString): \(error.localizedDescription)")
+                    logger.warning("og:image download failed")
                 }
             }
 
             item.urlMetadataFetched = true
             try modelContext.save()
-            logger.info("Fetched URL metadata for \(urlString): title=\(parsed.title ?? "nil")")
+            logger.info("Fetched URL metadata")
 
         } catch {
             // Mark as failed so we don't retry endlessly
             item.urlMetadataFetched = false
             saveWithLogging(modelContext, operation: "URL metadata failure")
-            logger.warning("URL metadata fetch failed for \(urlString): \(error.localizedDescription)")
+            logger.warning("URL metadata fetch failed")
         }
     }
 
@@ -201,7 +201,7 @@ struct URLMetadataService {
         currentItem.urlMetadataFetched = true
         saveWithLogging(modelContext, operation: "URL favicon save")
 
-        logger.info("Reused cached URL metadata for \(urlString)")
+        logger.info("Reused cached URL metadata")
         return true
     }
 

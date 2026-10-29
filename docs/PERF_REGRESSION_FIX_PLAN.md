@@ -1,5 +1,271 @@
 # perf-regression-fix — discussion plan (draft, no code changes yet)
 
+## Implementation v3.1 — what actually landed in this branch (2026-10-28)
+
+This section is the honest scope record for reviewers. It supersedes
+any earlier "will implement" wording where it differs.
+
+**Landed:**
+
+- Keyset rebuild: three passes (small 128, large-text 16,
+  large-metadata 128) with `(cursorTimestamp, tieOffset)` cursors
+  persisted in a new additive `rebuild_state` table per batch, in
+  the same SQLite transaction as the upserts. Legacy complete
+  indexes are seeded as complete (no rebuild on first fix launch);
+  legacy mid-rebuild indexes pay one fast rebuild.
+- Delta reconciliation replacing the count gate, with per-ID
+  error isolation in `applyChanges`, a mismatch counter in
+  UserDefaults (not the dirty flag), and escalation to one fast
+  full rebuild only on a second consecutive large (>1,000) mismatch.
+- Checkpointed, completion-flagged externalise: 32-item keyset
+  batches, payload-defined candidates, persisted cursor in
+  `externalize_state`, skipped entirely once complete.
+- Partial-index browsing (`browsingIDs` now serves while
+  rebuilding), incomplete marker for empty search in both panel
+  and History browser, reload gating while building (ready
+  transition still reloads), and never-empty visible lists with
+  hit-testing kept on in both `FilteredCardListView` and
+  `HistoryGridView`.
+- Retention purge deferred until building stops or 60 s, on the
+  main context (safe interim per C3); expiration batched to
+  100/batch; `scheduleHistoryRefresh` gated while building;
+  main-context page resolution time-budgeted (yield every 8 and
+  after >20 ms per turn).
+- Paste: TIFF expansion skipped for images >2 MB on the main
+  actor (PNG remains). A full async paste-decode refactor was
+  NOT done in this slice — it would ripple through the
+  `@MainActor` paste chain and cannot be verified without a
+  macOS compiler on this VM, so it is a named follow-up, not a
+  silent omission.
+- Thumbnail: cancelled tasks no longer apply stale decodes.
+- Settings breadcrumbs (tab enum name only, before/after window
+  creation), `recentSourceApps` elapsed/count log, dedup start
+  log, and the full existing-leak cleanup in C10 (monitor, URL
+  metadata, image storage, sync message, accessibility path,
+  `NSLog` kinds, paste frontmost/bytes).
+- `Tests/LoggingPrivacyCheck.sh`: grep heuristic over all log
+  entry points, with an explicit note that it is NOT a proof —
+  the canary test on macOS is still required before leaving draft.
+
+**Explicitly NOT landed in this slice (follow-ups, still in plan):**
+
+- Background-context purge/backfill and full off-main dedup
+  (C3/C4 designs required).
+- Monotonic sequence column, SwiftData index annotation,
+  `DuplicateScanWorker` pagination rewrite, bounding
+  `recentSourceApps` below 2,000, async paste decode, and the
+  100k-item macOS UI reproduction + Instruments measurement.
+- No macOS build was run on this VM (no Swift toolchain here);
+  the branch must be built and the UI reproduction run on macOS
+  before it leaves draft. Bracket/paren balance and the privacy
+  grep check passed here; that is not a compile check.
+
+## Revised plan v3 — redteam corrections, applied before code (2026-10-28)
+
+Redteam review (critical issues C1–C14) is accepted in full for the
+items below. The v2 order and several v2 claims are corrected here;
+v2 text below is superseded where it conflicts with v3.
+
+### Corrections applied
+
+- **C1 — Settings tab is a required reproduction variable.**
+  `SettingsView` builds only the selected tab; General has no store
+  fetch, History does. A General-tab freeze proves a pre-existing
+  global main block, not a grid bug. Implementation now logs the
+  tab at `showSettings` (enum name only) and adds a breadcrumb
+  before `NSHostingView` creation and after first frame, and the
+  reproduction script must cover General *and* History tabs.
+  Also corrected: `clearAllHistory` (called from the menu-bar
+  popover) *does* fetch all items on the main context — the
+  "menu-bar is light" argument applies to opening the dropdown,
+  not to that destructive button.
+- **C2 — Recurring main-actor loop, not just retention.**
+  Monitor polling (0.5 s, main runloop, save on main context),
+  `ExpirationService.expireOverdueItems` (all concealed items, no
+  fetch limit, `@MainActor`), dedup resolution/saves per group
+  (`@MainActor`), and `SyncMonitor` main-context `fetchCount`
+  all feed the `didSave` → `applyChanges` → `scheduleHistoryRefresh`
+  → `reload(scanAll: true)` loop. Scope is widened: batch/limit
+  expiration, breadcrumb-log monitor/expiration/dedup/sync, and
+  gate `scheduleHistoryRefresh` while building (ready transition
+  excepted). Full off-main dedup is a follow-up, not this slice.
+- **C3/C4 — No background-context purge or backfill in this slice.**
+  Background deletes do not auto-merge into faulted main-context
+  objects (stale panel items, stale `itemCount`, possible
+  resurrection on main save), and a background purge can delete
+  an item whose label edit is in flight on main. Background
+  `stableID` generation is worse: main-context `Label`s keep the
+  empty value until refresh, and a later main save can overwrite
+  it back to empty. Interim safe slice: keep purge and backfill
+  on the main context, defer them until first paint with a 60 s
+  backstop, keep batches small, and yield between batches.
+- **C5 — Partial browsing must not strand the user.**
+  `browsingIDs` pages by `OFFSET` into `clip_keys`; the worker
+  permanently sets `browseMode = false` on a `nil` first call and
+  `browseExhausted = true` on a short batch. Rebuild inserts
+  newest-first, so a partial list is not a stable prefix, and
+  gating reloads while building would strand a permanently
+  exhausted incomplete page. Fix: version cursors by index
+  generation — on the ready transition (and only there) invalidate
+  cursors, reset `browseExhausted`, fetch one fresh page while
+  keeping the stale page on screen, and dedupe IDs across the
+  transition. Also fix the UI gap: the "indexing…" note is only
+  shown for non-empty search in both panel and History browser;
+  empty-search partial browsing must show it too.
+- **C6 — Keyset cursor, specified exactly.**
+  Sort is `timestamp DESC` only, with no tie-breaker, and ties are
+  real (imports, same-millisecond captures). Implemented cursor:
+  `(cursorTimestamp, tieOffset)` per pass. Predicate is
+  `timestamp <= cursorTimestamp` (or unbounded for the first
+  batch), sorted `timestamp DESC`, with `fetchOffset = tieOffset`
+  — offset is now bounded by the size of one equal-timestamp
+  group, never by history size. After a batch: if the batch's
+  minimum timestamp is below the old cursor (or there was no
+  cursor), new cursor = that minimum and `tieOffset` = count of
+  items in the batch at that minimum; if the minimum equals the
+  old cursor, `tieOffset += batch.count` (cursor does not move,
+  so an all-tie batch still advances). A batch that is empty
+  completes the pass. Items inserted with a newer timestamp
+  during a pass, and items whose `byteCount` crosses passes on
+  edit, are covered by the final ID reconciliation (C8), not by
+  the cursor. No sequence column in this slice; no SwiftData
+  `@Attribute(.indexed)` annotation is assumed to be free — the
+  index change, if added, is a schema change requiring a
+  lightweight-migration + CloudKit test, and is *not* in this
+  slice.
+- **C7 — Type split defined by payload for externalise, by
+  content type for the index.**
+  Externalise candidates: (externalisable type AND text > limit)
+  OR html > limit OR rtf > limit, regardless of type — so an
+  imported image/file item carrying large HTML/RTF is not dropped
+  (today it is already missed by externalise when its text is
+  small). Index passes: small (128), large-text
+  (`text`/`richText`/`code` AND `byteCount > limit`, batch 16),
+  large-metadata (other types AND `byteCount > limit`, batch
+  128, FTS body empty for images). The metadata path must still
+  insert `clip_keys` *and* a `clips` row with title/app and
+  empty body, or title/app search for images regresses. The
+  split's real win is images; files/colours/URLs are usually
+  already in the small pass and the plan no longer implies
+  otherwise. Regression tests: imported image-with-large-HTML,
+  file-with-large-RTF.
+- **C8 — Delta reconciliation replaces the count gate.**
+  The old `phase == "complete" AND countsMatch()` gate is changed,
+  not supplemented: on complete-but-mismatched, run a bounded
+  ID-only diff (SQLite `clip_keys` IDs vs. SwiftData IDs fetched
+  in keyset batches — full models only for IDs that actually
+  differ), apply the diff, log its size (number only), and set
+  `ready`. Per-ID errors in `applyChanges` are isolated: one bad
+  ID no longer flips `ready = false` for the whole index.
+  Escalation: if a mismatch persists across two launches at a
+  size above 1,000 rows or 5% (tracked in a dedicated UserDefaults
+  counter, *not* the dirty flag), or if `PRAGMA integrity_check`
+  / FTS integrity fails, run a full rebuild on the new fast
+  path. Never "keep ready and silently log" forever.
+- **C9 — Purge deferral has a backstop.**
+  Deferral is until first page painted, with a hard 60 s backstop
+  (first idle period counts as painted for this purpose), and
+  the purge backlog size is logged at startup so deferral cannot
+  hide store growth. A ready-gated purge with no backstop would
+  deadlock exactly when the index never reaches ready.
+- **C10 — Existing log leaks are P0, and the grep test is
+  replaced.**
+  New safe logs do not make the branch's privacy claim true
+  while these remain: `pasteLog` pre-formatted strings (frontmost
+  app name/bundle/pid, exact byte counts), `ClipboardMonitor`
+  capture logs (source app name, exact byte count, image path),
+  `URLMetadataService` (full URL, fetched title), `ImageStorage`
+  (filenames), `SyncMonitor` free-form message, `Accessibility`
+  app path (reveals the macOS username, marked `.public`), and
+  `NSLog %@` in `AppState` (no Logger redaction). Fix: delete or
+  bucket these (exact byte count → size bucket, app name/path/
+  URL/title/filename → drop), redesign `pasteLog` to structured
+  fields (type enum, size bucket, counts, elapsed — never a
+  pre-formatted string containing an app name or path), and
+  replace `NSLog` with `Logger` for index errors (error kind
+  only). The test is now: (a) grep over *all* log entry points
+  (`Logger`, `NSLog`, `print`, `pasteLog`, signposts) including
+  multi-line calls and pre-assigned variables, with a deny-list
+  covering bundle ID / app name / path / URL / title / hash /
+  label / search text; (b) a canary test — a fixture containing
+  a unique URL and title must produce no log line containing
+  that canary.
+- **C11 — Aggregates only at phase completion.**
+  Per-batch and per-1,000 type/size aggregates are removed: with
+  a 2-item (now 16/128-item) batch, a slow-batch composition is
+  effectively per-item size disclosure, and timestamp-ordered
+  type deltas reveal history sequence. Slow batches log only
+  elapsed + batch size. Type/size aggregates, if any, are logged
+  once at phase completion, never per batch.
+- **C12 — Page resolution, specified honestly.**
+  `propertiesToFetch`-style lightweight resolution cannot satisfy
+  first paint because card bodies read full models on the main
+  thread. The worker already faults for matching off-main; the
+  fix is bounded main-context resolution (existing yield every
+  8, plus a time budget per runloop turn with continuation) and
+  measuring card-body faulting in the budget, not just `nextPage`.
+- **C13 — Reordered slices, schema changes stated.**
+  New order: (1) keyset + checkpoint + delta reconciliation,
+  (2) partial browsing with cursor invalidation, (3) reload
+  gating, (4) off-main work *as the safe interim slice above*.
+  `build_state` migration is explicit: new cursor tables
+  (`rebuild_state`, `externalize_state`) are created with
+  `CREATE TABLE IF NOT EXISTS` and are additive — `user_version`
+  is NOT bumped through the old drop path, and a complete index
+  is not destroyed by this slice. The v2 claim "no change to
+  what is stored" is deleted. One consequence is accepted and
+  stated: the first launch after this slice runs one rebuild on
+  the new fast path (old `build_state` offsets are not reused),
+  because the cursor format changed; that rebuild is the price
+  of fixing the format, and it is fast by design.
+- **C14 — Tests split into tiers.**
+  `Tests/` are standalone executables, not XCTest, and this VM
+  has no Swift toolchain; SwiftData/AppKit/MenuBarExtra are
+  macOS-only. Tiers: (1) CI-runnable — grep/canary script and
+  any pure logic on a macOS runner; (2) macOS-only, mandatory
+  before leaving draft — a manual/UI reproduction script (launch
+  with a 100k fixture, click menu-bar icon, Settings General
+  and History tabs, panel item, record with a watchdog whether
+  each surface appears within N seconds, plus Time Profiler /
+  main-thread hang sample, not log timestamps); (3) the 50 ms
+  rule is replaced by signpost-based Instruments measurement
+  (p95, not a hard per-op 50 ms, which is below normal SwiftUI
+  layout variance). Breadcrumb logs are a locator, not a timer:
+  a log line from a blocked main thread is itself delayed.
+
+### Minor issues accepted (M1–M6)
+
+- M1: auto-open condition defined as "first partial page of 12
+  IDs from the index, with the incomplete marker shown even for
+  empty search" — not "ready".
+- M2: signposts follow the same allowlist as logs, and intervals
+  are ended on cancellation/error.
+- M3: slow-batch warnings are rate-limited (first N, then a
+  summary) so logging cannot flood on a slow disk.
+- M4: card-icon win is sized by *visible* cards (`LazyVStack`),
+  not the 150 resident items.
+- M5: `recentSourceApps` (2,000 items, called when the filter
+  row opens) is added to the contention inventory and logged
+  (elapsed + count only); bounding it further is a follow-up.
+- M6: `DuplicateScanWorker` offset pagination over `contentHash`
+  is the same anti-pattern, gated to sync-enabled users. It is
+  *not* rewritten in this slice (dedup correctness risk); it is
+  logged, and its rewrite is a named follow-up in the plan, not
+  a footnote.
+
+### What is intentionally NOT in this slice (follow-ups, not dropped)
+
+- Full off-main dedup and background-context purge/backfill
+  (requires the C3/C4 designs: dedicated actor context, nonisolated
+  cleanup, explicit main refresh, label-mutation gate, CloudKit-on
+  test).
+- A monotonic sequence column on `ClipboardItem` (only if the
+  timestamp+tie cursor proves fiddly in review).
+- Bounding `recentSourceApps` below 2,000 and rewriting
+  `DuplicateScanWorker` pagination.
+- Any telemetry upload, any "verbose logging" mode, any change
+  to retention semantics, sync semantics, or stored data.
+
 ## Revised plan v2 — new click evidence + safe logging (2026-10-28)
 
 ### New evidence that changes the ranking

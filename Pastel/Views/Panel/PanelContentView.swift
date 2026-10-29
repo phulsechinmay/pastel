@@ -171,7 +171,7 @@ struct PanelContentView: View {
                 }
             }
 
-            if appState.searchIndexBuilding && !debouncedSearchText.isEmpty {
+            if appState.searchIndexBuilding {
                 Text("Indexing older clips; more matches may appear")
                     .font(.caption2)
                     .foregroundStyle(.secondary)

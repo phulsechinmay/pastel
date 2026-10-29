@@ -35,7 +35,12 @@ struct AsyncThumbnailView: View {
             if let warm = ThumbnailLoader.shared.cached(filename: filename, maxPixelSize: maxPixelSize) {
                 image = warm
             } else {
-                image = await ThumbnailLoader.shared.load(filename: filename, maxPixelSize: maxPixelSize)
+                // v3: ThumbnailLoader's continuation is not itself
+                // cancellable; at least do not apply a stale decode after
+                // the card's task was cancelled (fast scrolling).
+                let decoded = await ThumbnailLoader.shared.load(filename: filename, maxPixelSize: maxPixelSize)
+                guard !Task.isCancelled else { return }
+                image = decoded
             }
         }
         .onDisappear { image = nil }

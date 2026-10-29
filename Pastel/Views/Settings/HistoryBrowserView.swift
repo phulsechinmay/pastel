@@ -48,7 +48,7 @@ struct HistoryBrowserView: View {
 
             Divider()
 
-            if appState.searchIndexBuilding && !debouncedSearchText.isEmpty {
+            if appState.searchIndexBuilding {
                 Text("Indexing older clips; more matches may appear")
                     .font(.caption)
                     .foregroundStyle(.secondary)

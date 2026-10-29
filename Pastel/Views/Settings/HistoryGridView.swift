@@ -69,7 +69,8 @@ struct HistoryGridView: View {
         self.onPastePlainText = onPastePlainText
     }
 
-    private var visibleItems: [ClipboardItem] { isReplacingResults ? [] : memoizedFilteredItems }
+    // v3: see FilteredCardListView — never empty the visible list on replace.
+    private var visibleItems: [ClipboardItem] { memoizedFilteredItems }
 
     /// Compact signature for label metadata that affects labelKey filtering.
     private var labelFilterSignature: String {
@@ -263,7 +264,7 @@ struct HistoryGridView: View {
                 }
             }
         }
-        .allowsHitTesting(!isReplacingResults)
+        .allowsHitTesting(true)
         .overlay {
             if isReplacingResults && showRefreshIndicator {
                 ProgressView("Loading history…")
@@ -290,7 +291,9 @@ struct HistoryGridView: View {
         .onAppear { reload() }
         .onChange(of: appState.itemCount) { _, _ in reload() }
         .onChange(of: appState.pinRevision) { _, _ in reload() }
-        .onChange(of: appState.searchIndexRevision) { _, _ in reload() }
+        .onChange(of: appState.searchIndexRevision) { _, _ in
+            if !appState.searchIndexBuilding { reload() }
+        }
         .onChange(of: searchText) { _, _ in reload() }
         .onChange(of: appState.deletionManager.softDeletedIDs) { _, _ in reload() }
         .onChange(of: selectedLabelIDs) { _, _ in reload() }
