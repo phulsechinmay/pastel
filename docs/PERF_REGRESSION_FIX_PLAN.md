@@ -1,5 +1,197 @@
 # perf-regression-fix — discussion plan (draft, no code changes yet)
 
+## Revised plan v2 — new click evidence + safe logging (2026-10-28)
+
+### New evidence that changes the ranking
+
+The user reports the freeze is **not paste-specific**. The same
+beachball happens on:
+
+- clicks on panel items,
+- the settings button in the panel — the Settings window *opens*
+  but then freezes,
+- the Pastel menu-bar icon — the dropdown *never opens* and freezes.
+
+Checked code, and this matters:
+
+- `StatusPopoverView` (the menu-bar dropdown) does **no store fetch
+  at all** — it is buttons bound to `AppState` / `ClipboardMonitor`
+  state. A dropdown that never opens therefore means the **main
+  thread / main runloop is already blocked globally**, not that the
+  menu-bar code itself is slow.
+- The Settings window is created synchronously
+  (`SettingsWindowController.showSettings`, `@MainActor`), and its
+  History tab goes through the same `HistoryPageLoader` /
+  `HistoryPageCursor` machinery as the panel (first page 12, then
+  100, up to 300 resident), with the same main-context model
+  resolution. So Settings freezing after opening is consistent with
+  the same shared-store / main-actor block, not a separate Settings
+  bug.
+- Consequence: **paste-image TIFF on the main actor is demoted
+  from "top suspect" to "one of several main-thread suspects".**
+  It can still beachball a paste click, but it cannot explain a
+  menu-bar dropdown that never opens. The fix must therefore
+  address main-actor work globally, not just the paste path.
+
+### Revised P0, in order
+
+1. **Move startup work off the main actor, and stagger it.**
+   - `RetentionService` is `@MainActor` and runs an immediate purge
+     on the main context at startup. Move the purge to a background
+     `ModelContext` (own container context, batched saves), and
+     defer the first purge until the index reports `ready` (or at
+     least until the panel's first page is shown). A purge must
+     never compete with first paint.
+   - `backfillLabelIndex` runs synchronously on the main actor in
+     `setup()` (bounded to 200 + 200, so not the whole hang, but
+     still main-thread store work at launch). Move it to a
+     background context, or run it after first paint.
+   - Do not auto-open the panel 0.5 s after launch into a rebuild
+     storm; either delay auto-open until the first page can be
+     served from a ready/partial index, or open it with the stale
+     / partial page and an "indexing…" state (see browsing fix
+     below).
+2. **Let browsing use the partial index (was P1-adjacent, now P0).**
+   `browsingIDs()` returns `nil` unless `ready`, while
+   `matchingIDs()` already serves a partial index while rebuilding.
+   Change browsing to serve the indexed subset while rebuilding,
+   marked incomplete in the UI, instead of falling back to a full
+   SwiftData offset scan for the default panel — and for the
+   Settings History tab, which uses the same loader.
+3. **Keyset pagination + type-split large pass + checkpointed
+   externalise** (unchanged from v1: see P0 items 1–3 below).
+   This reduces the shared-store contention that is blocking the
+   main thread, rather than just making the rebuild faster in
+   isolation.
+4. **Kill the reset loop + second sync rebuild** (unchanged from
+   v1: delta reconciliation, narrow dirty flag, incremental sync
+   refresh).
+5. **Panel / Settings reload storm** (unchanged from v1, now
+   extended to `HistoryGridView`): gate `searchIndexRevision`
+   reloads while building, never empty the visible list or disable
+   hit-testing during a replace, cap restore size — in both
+   `FilteredCardListView` and `HistoryGridView`.
+6. **Main-context page resolution: bound it.**
+   `HistoryPageLoader.nextPage` is `@MainActor` and resolves IDs
+   on the main context, yielding only every 8 items. Cap the
+   synchronous resolution work per runloop turn, use
+   `propertiesToFetch`-style lightweight resolution where the UI
+   only needs identity/sort keys for the first paint, and never
+   fault a large external payload on the main thread to decide
+   whether a row matches (that faulting belongs in the worker).
+   If a page cannot be resolved promptly, show the previous page
+   rather than blocking the runloop.
+7. **Paste-image decode off the main actor** (still in scope, now
+   P1, not P0): move `Data(contentsOf:)` + `NSImage` + TIFF
+   conversion in `PasteService.representations()` to a background
+   task; the pasteboard write itself stays on the main actor.
+   Same treatment for per-card app-icon TIFF conversion in
+   `AppIconColorService` / `AppIconCache` where it still runs
+   synchronously on the main actor.
+
+### Logging design — diagnostics without clip content (P0, ships with the fix)
+
+Goal: the next hang must be diagnosable from `log stream`
+alone, without ever logging anything a user copied.
+
+**Hard rules (non-negotiable, enforced in review):**
+
+- NEVER log: clip text, HTML, RTF, URLs, file paths, image data
+  or filenames, titles, source app names, bundle IDs, label
+  names/IDs, search text, content hashes, or persistent IDs.
+  These are all either clip content or content-derived identifiers.
+- ONLY log: phase names, counts, durations in ms, batch sizes,
+  offsets/cursors (as numbers), content-type *counts aggregated
+  by type* (e.g. `image: 412, text: 9031` — never per-item), size
+  buckets (e.g. `<=64KiB`, `64KiB-1MiB`, `>1MiB` counts), boolean
+  flags (`ready`, `dirty`, `rebuilding`), trigger names
+  (`searchIndexRevision`, `itemCount`, `filter`, `settingsOpen`
+  — never the filter value or search string), and error *kinds*
+  (e.g. `outOfSync`, `database`) without payloads.
+- All `Logger` interpolations for numbers/durations use
+  `privacy: .public` explicitly; no string interpolation of any
+  item field is allowed in a log call. A grep-based check for
+  forbidden interpolations in logging calls is part of the
+  test/CI story for this branch (see Tests below).
+- Log volume must not itself become the hang: log per phase
+  transition, per 1,000 indexed items, per batch *only if that
+  batch took > 50 ms*, and a summary at completion/failure.
+  No per-item logging, ever.
+
+**Breadcrumb log points (start + end, so a hang leaves a last
+line pointing at the blocker):**
+
+- `AppState.setup`: start, `wasDirty` (bool), index phase at
+  start, retention days (integer setting only), monitor started.
+- `ClipboardSearchIndex.rebuild`: phase transitions
+  (`small` → `large` → `complete`), per-1,000 cumulative indexed
+  count + elapsed, slow-batch warnings (> 50 ms) with batch size
+  and size-bucket counts only, final `ready` + total elapsed,
+  and on failure the error kind + indexed-vs-expected counts
+  (numbers only) for a count mismatch.
+- `externalizeLegacyLargeClips`: start/end, per-batch changed
+  count and skipped count (numbers only), final walked/changed
+  totals. This is how we will prove whether it still walks the
+  whole large set on every launch after the fix.
+- `applyChanges` (didSave path): upserted/deleted *counts*,
+  elapsed, failure kind. This shows whether save-time index
+  updates are queueing behind the rebuild.
+- Panel + Settings first page: trigger name, index mode vs
+  fallback mode (bool), page size, cursor offset, elapsed,
+  first-page-ready. Never the search string, label, or app filter
+  value. A reload that starts but never logs "ready" is the
+  smoking gun for the reload storm.
+- Retention purge: batch elapsed, purged/kept counts, cutoff
+  days. Proves whether the purge is still running during first
+  paint.
+- Paste: content type only, size bucket, elapsed for decode vs
+  write separately. Proves whether a paste click is the beachball
+  or an innocent bystander.
+- Thumbnail decode: cache hit/miss counts and slow-decode
+  warnings (> 100 ms) with size bucket only, no filename.
+- Settings / menu-bar: `showSettings` start with tab name
+  (enum name only, e.g. `general`/`history` — not user content),
+  Settings first-page-ready, menu-bar popover appear. If the
+  dropdown never logs "appear", the main thread was already
+  blocked before it — which is itself the diagnosis.
+- Use `OSLog` signposts (`os_signpost`) around rebuild batches
+  and panel page loads in addition to log lines, so Instruments
+  can show the same timeline without any content.
+
+**What logging must NOT do:** it must not change behaviour
+(no logging-gated logic), must not write clip-derived data to
+disk beyond the existing OSLog stream, and must not be
+configurable to a "verbose" mode that logs content — there is
+no such mode in this branch, by design.
+
+### Tests added by v2
+
+- A source-grep test asserting no logging call interpolates a
+  forbidden item field (text, title, URL, path, hash, bundle ID,
+  label, search text).
+- A 100k-item, image-heavy fixture (as in v1 P2) asserting:
+  rebuild + externalise time, resume-after-interrupt, no reset
+  on count drift, externalise skips images, panel/Settings first
+  page while rebuilding serves the partial index, and a
+  `searchIndexRevision` bump does not empty the visible list
+  in either surface.
+- A main-thread regression check where feasible in the harness:
+  no known main-actor operation (purge batch, page resolution,
+  paste decode) is allowed to run synchronously for > 50 ms on
+  the fixture without yielding or moving off-main — measured
+  via the breadcrumb logs, not by asserting exact timings.
+
+### What v2 deliberately does NOT change
+
+- No change to what is stored, synced, or retained; no new
+  required model field in this slice (the keyset cursor uses
+  timestamp + overlap first; a sequence column remains a
+  follow-up only if overlap handling proves fiddly).
+- No "verbose logging" toggle, no content-bearing diagnostics,
+  no telemetry upload — logs stay in the local OSLog stream
+  the user can already view with `log stream`.
+
+
 ## Problem, in one paragraph
 
 v1.0.19 (v1.0.18 → v1.0.19, performance merge `ae4718b`) can hang on
