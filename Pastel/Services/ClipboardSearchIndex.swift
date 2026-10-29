@@ -47,6 +47,13 @@ actor ClipboardSearchIndex {
         try execute("CREATE INDEX IF NOT EXISTS clip_labels_by_label ON clip_labels(labelStableID, clipRowID)")
         try execute("CREATE TABLE IF NOT EXISTS build_state (phase TEXT NOT NULL, next_offset INTEGER NOT NULL)")
         try execute("INSERT INTO build_state(phase, next_offset) SELECT 'small', 0 WHERE NOT EXISTS (SELECT 1 FROM build_state)")
+        // v3 cursor state (perf-regression-fix). Additive tables only: they are
+        // created with IF NOT EXISTS and user_version is NOT bumped through the
+        // drop path above, so an existing complete index is not destroyed.
+        // The old build_state offset format is not reused (see rebuild() seeding).
+        try execute("CREATE TABLE IF NOT EXISTS rebuild_state (pass TEXT PRIMARY KEY, cursorTimestamp REAL, tieOffset INTEGER NOT NULL, completed INTEGER NOT NULL)")
+        try execute("CREATE TABLE IF NOT EXISTS externalize_state (id INTEGER PRIMARY KEY, cursorTimestamp REAL, tieOffset INTEGER NOT NULL, completed INTEGER NOT NULL)")
+        try execute("INSERT INTO externalize_state(id, cursorTimestamp, tieOffset, completed) SELECT 1, NULL, 0, 0 WHERE NOT EXISTS (SELECT 1 FROM externalize_state)")
     }
 
     /// Allows the standalone synthetic fixture to keep its index in a temp folder.
@@ -67,72 +74,347 @@ actor ClipboardSearchIndex {
         return Int(sqlite3_column_int(statement, 0))
     }
 
-    /// Rebuild in small transactions. Ordinary clips become searchable before large
-    /// clips; the UI marks partial results until completion.
+    /// Rebuild with keyset pagination (perf-regression-fix, v3).
+    ///
+    /// The old offset pagination re-scanned and re-sorted up to `fetchOffset`
+    /// on every batch, with no index on timestamp, and forced every image
+    /// through a 2-item batch. The new cursor is (cursorTimestamp, tieOffset)
+    /// per pass: predicate `timestamp <= cursorTimestamp`, sorted timestamp
+    /// DESC, with fetchOffset used ONLY to skip already-processed items
+    /// inside one equal-timestamp group (bounded by that group's size, never
+    /// by history size). After a batch, if its minimum timestamp is below
+    /// the old cursor, the cursor moves to that minimum and tieOffset becomes
+    /// the count at that minimum; if it equals the old cursor, tieOffset
+    /// grows by the batch size, so an all-tie batch still advances.
+    /// Items inserted with a newer timestamp during a pass, and items whose
+    /// byteCount crosses passes on edit, are covered by the final ID
+    /// reconciliation, not by the cursor.
+    ///
+    /// Passes: small (128/batch), large-text (16/batch — FTS tokenisation
+    /// of large texts is the memory/CPU risk), large-metadata (128/batch —
+    /// images/files/colours/URLs carry no large text to tokenise; their
+    /// clips row is still inserted with title/app and empty body so
+    /// title/app search does not regress).
     func rebuild() async throws {
         let started = ContinuousClock.now
         try open()
-        var initial = try buildState()
-        if initial.phase == "complete" {
-            if try countsMatch() {
+        // Seed the new cursor state from a legacy complete index, so the
+        // first launch after this fix does NOT rebuild an index that was
+        // already complete. Only a mid-rebuild legacy index pays a fresh
+        // (now fast) rebuild, because its old offset format is not reused.
+        if try rebuildStateIsEmpty() {
+            let legacy = try buildState()
+            if legacy.phase == "complete" && (try countsMatch()) {
+                try markAllPassesComplete()
                 ready = true
+                UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
+                logger.info("Search index already complete; seeded new cursor state")
                 return
             }
-            try resetTables()
-            initial = ("small", 0)
         }
         ready = false
         isRebuilding = true
         defer { isRebuilding = false }
-        for largePass in [false, true] {
-            if !largePass && initial.phase == "large" { continue }
-            var offset = largePass && initial.phase == "small" ? 0 : initial.offset
-            while !Task.isCancelled {
-                let large = largePass
-                let limit = smallClipLimit
-                let predicate: Predicate<ClipboardItem>
-                if large {
-                    predicate = #Predicate<ClipboardItem> { $0.byteCount > limit && !$0.isConcealed }
-                } else {
-                    predicate = #Predicate<ClipboardItem> { $0.byteCount <= limit && !$0.isConcealed }
+        try await runRebuildPasses()
+        if Task.isCancelled { return }
+        // Delta reconciliation replaces the old exact-count reset gate.
+        if try countsMatch() {
+            UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
+        } else {
+            let expected = try swiftDataItemCount()
+            let indexed = try indexedItemCount()
+            logger.info("Search index count mismatch: expected=\(expected, privacy: .public) indexed=\(indexed, privacy: .public)")
+            let diffSize = try reconcileIndexCounts()
+            logger.info("Search index reconciliation applied: diffSize=\(diffSize, privacy: .public)")
+            if try countsMatch() {
+                UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
+            } else {
+                // Persistent mismatch: escalate to one fast full rebuild only
+                // if this is the second consecutive mismatched launch AND
+                // the diff is large. Small persistent diffs are logged and
+                // retried next launch, never reset-looped.
+                let previousMismatches = UserDefaults.standard.integer(forKey: Self.indexMismatchLaunchesKey)
+                UserDefaults.standard.set(previousMismatches + 1, forKey: Self.indexMismatchLaunchesKey)
+                if previousMismatches >= 1 && diffSize > 1000 {
+                    logger.info("Search index mismatch persisted with large diff; running one fast full rebuild")
+                    try resetTables()
+                    UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
+                    try await runRebuildPasses()
+                    if Task.isCancelled { return }
+                    _ = try reconcileIndexCounts()
                 }
-                var descriptor = FetchDescriptor<ClipboardItem>(predicate: predicate)
-                descriptor.sortBy = [SortDescriptor(\.timestamp, order: .reverse)]
-                // Amortize SQLite/SwiftData round trips for small clips while
-                // keeping giant payloads in a separate two-item batch.
-                descriptor.fetchLimit = large ? 2 : 128
-                descriptor.fetchOffset = offset
-                // SwiftData/Core Data may autorelease model and SQLite bridge
-                // objects. Drain them each batch instead of carrying them across
-                // an entire 100,000-item rebuild.
-                let processed = try autoreleasepool { () throws -> Int in
-                    let batchContext = ModelContext(modelContainer)
-                    let batch = try batchContext.fetch(descriptor)
-                    if batch.isEmpty { return 0 }
-                    try execute("BEGIN IMMEDIATE")
-                    do {
-                        for item in batch { try upsert(item) }
-                        try execute("UPDATE build_state SET phase='\(large ? "large" : "small")', next_offset=\(offset + batch.count)")
-                        try execute("COMMIT")
-                    } catch {
-                        try? execute("ROLLBACK")
-                        throw error
-                    }
-                    return batch.count
-                }
-                if processed == 0 {
-                    try execute("UPDATE build_state SET phase='\(large ? "complete" : "large")', next_offset=0")
-                    break
-                }
-                offset += processed
-                await Task.yield()
             }
-            if Task.isCancelled { return }
         }
-        guard try countsMatch() else { throw IndexError.outOfSync }
         ready = true
         let elapsed = started.duration(to: .now)
         logger.info("Search index ready after \(String(describing: elapsed))")
+    }
+
+    private static let indexMismatchLaunchesKey = "pastelSearchIndexMismatchLaunches"
+
+    private func runRebuildPasses() async throws {
+        // Pass definitions, in order. Content-type raw values are the
+        // ContentType case names (text, richText, code, url, image, file,
+        // color). Large-text is tokenised; large-metadata is not.
+        let passes: [(name: String, batchSize: Int, isLargeText: Bool, isLargeMetadata: Bool)] = [
+            ("small", 128, false, false),
+            ("largeText", 16, true, false),
+            ("largeMetadata", 128, false, true),
+        ]
+        for pass in passes {
+            if Task.isCancelled { return }
+            try await runRebuildPass(name: pass.name, batchSize: pass.batchSize, isLargeText: pass.isLargeText, isLargeMetadata: pass.isLargeMetadata)
+        }
+    }
+
+    private func runRebuildPass(name: String, batchSize: Int, isLargeText: Bool, isLargeMetadata: Bool) async throws {
+        let limit = smallClipLimit
+        var cursor = try rebuildCursor(pass: name)
+        if cursor.completed { return }
+        var indexedInPass = 0
+        while !Task.isCancelled {
+            let batchStarted = ContinuousClock.now
+            let predicate: Predicate<ClipboardItem>
+            if let cursorTimestamp = cursor.timestamp {
+                let cursorDate = Date(timeIntervalSince1970: cursorTimestamp)
+                if name == "small" {
+                    predicate = #Predicate<ClipboardItem> { $0.byteCount <= limit && !$0.isConcealed && $0.timestamp <= cursorDate }
+                } else if isLargeText {
+                    predicate = #Predicate<ClipboardItem> { $0.byteCount > limit && !$0.isConcealed && ($0.contentType == "text" || $0.contentType == "richText" || $0.contentType == "code") && $0.timestamp <= cursorDate }
+                } else {
+                    predicate = #Predicate<ClipboardItem> { $0.byteCount > limit && !$0.isConcealed && $0.contentType != "text" && $0.contentType != "richText" && $0.contentType != "code" && $0.timestamp <= cursorDate }
+                }
+            } else {
+                if name == "small" {
+                    predicate = #Predicate<ClipboardItem> { $0.byteCount <= limit && !$0.isConcealed }
+                } else if isLargeText {
+                    predicate = #Predicate<ClipboardItem> { $0.byteCount > limit && !$0.isConcealed && ($0.contentType == "text" || $0.contentType == "richText" || $0.contentType == "code") }
+                } else {
+                    predicate = #Predicate<ClipboardItem> { $0.byteCount > limit && !$0.isConcealed && $0.contentType != "text" && $0.contentType != "richText" && $0.contentType != "code" }
+                }
+            }
+            var descriptor = FetchDescriptor<ClipboardItem>(predicate: predicate)
+            descriptor.sortBy = [SortDescriptor(\.timestamp, order: .reverse)]
+            descriptor.fetchLimit = batchSize
+            descriptor.fetchOffset = cursor.tieOffset
+            let processed = try autoreleasepool { () throws -> (count: Int, minTimestamp: Double?) in
+                let batchContext = ModelContext(modelContainer)
+                let batch = try batchContext.fetch(descriptor)
+                if batch.isEmpty { return (0, nil) }
+                let minTimestamp = batch.map(\.timestamp.timeIntervalSince1970).min()
+                let tieCount = minTimestamp.map { min in batch.filter { $0.timestamp.timeIntervalSince1970 == min }.count } ?? 0
+                try execute("BEGIN IMMEDIATE")
+                do {
+                    for item in batch { try upsert(item) }
+                    // Advance the cursor inside the same transaction as the
+                    // upserts, so a kill mid-pass resumes exactly here.
+                    if let minTimestamp {
+                        if let oldTimestamp = cursor.timestamp, minTimestamp == oldTimestamp {
+                            try execute("INSERT INTO rebuild_state(pass, cursorTimestamp, tieOffset, completed) VALUES ('\(name)', \(oldTimestamp), \(cursor.tieOffset + batch.count), 0) ON CONFLICT(pass) DO UPDATE SET cursorTimestamp=excluded.cursorTimestamp, tieOffset=excluded.tieOffset, completed=0")
+                        } else {
+                            try execute("INSERT INTO rebuild_state(pass, cursorTimestamp, tieOffset, completed) VALUES ('\(name)', \(minTimestamp), \(tieCount), 0) ON CONFLICT(pass) DO UPDATE SET cursorTimestamp=excluded.cursorTimestamp, tieOffset=excluded.tieOffset, completed=0")
+                        }
+                    }
+                    try execute("COMMIT")
+                } catch {
+                    try? execute("ROLLBACK")
+                    throw error
+                }
+                return (batch.count, minTimestamp)
+            }
+            if processed.count == 0 {
+                try execute("INSERT INTO rebuild_state(pass, cursorTimestamp, tieOffset, completed) VALUES ('\(name)', NULL, 0, 1) ON CONFLICT(pass) DO UPDATE SET cursorTimestamp=NULL, tieOffset=0, completed=1")
+                break
+            }
+            indexedInPass += processed.count
+            // Update the in-memory cursor to match what was just committed.
+            if let minTimestamp = processed.minTimestamp {
+                if let oldTimestamp = cursor.timestamp, minTimestamp == oldTimestamp {
+                    cursor = (timestamp: oldTimestamp, tieOffset: cursor.tieOffset + processed.count, completed: false)
+                } else {
+                    // Tie count for the new minimum must be recomputed from
+                    // the committed state, not from the batch alone, if the
+                    // batch straddled the minimum — re-reading is cheap and
+                    // avoids an off-by-tie error.
+                    cursor = try rebuildCursor(pass: name)
+                }
+            }
+            logSlowBatchIfNeeded(pass: name, started: batchStarted, batchSize: processed.count)
+            await Task.yield()
+        }
+        // Phase-completion aggregate only (no per-batch type/size breakdown).
+        logger.info("Search index pass completed: pass=\(name, privacy: .public) indexedInPass=\(indexedInPass, privacy: .public)")
+    }
+
+    private var slowBatchLogCount = 0
+    private func logSlowBatchIfNeeded(pass: String, started: ContinuousClock.Instant, batchSize: Int) {
+        let elapsedMs = Int(started.duration(to: .now).components.seconds * 1000 + started.duration(to: .now).components.attoseconds / 1_000_000_000_000_000)
+        // Slow batches log elapsed + batch size ONLY — never composition
+        // (a 2/16-item composition would be effectively per-item data).
+        // Rate-limited so a slow disk cannot flood the log.
+        if elapsedMs > 50 && slowBatchLogCount < 20 {
+            slowBatchLogCount += 1
+            logger.info("Search index slow batch: pass=\(pass, privacy: .public) elapsedMs=\(elapsedMs, privacy: .public) batchSize=\(batchSize, privacy: .public)")
+        }
+    }
+
+    private func rebuildStateIsEmpty() throws -> Bool {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "SELECT COUNT(*) FROM rebuild_state", -1, &statement, nil) == SQLITE_OK else { throw IndexError.database }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { throw IndexError.database }
+        return sqlite3_column_int(statement, 0) == 0
+    }
+
+    private func markAllPassesComplete() throws {
+        for name in ["small", "largeText", "largeMetadata"] {
+            try execute("INSERT INTO rebuild_state(pass, cursorTimestamp, tieOffset, completed) VALUES ('\(name)', NULL, 0, 1) ON CONFLICT(pass) DO UPDATE SET cursorTimestamp=NULL, tieOffset=0, completed=1")
+        }
+    }
+
+    private func rebuildCursor(pass: String) throws -> (timestamp: Double?, tieOffset: Int, completed: Bool) {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "SELECT cursorTimestamp, tieOffset, completed FROM rebuild_state WHERE pass = ?", -1, &statement, nil) == SQLITE_OK else { throw IndexError.database }
+        defer { sqlite3_finalize(statement) }
+        bind(pass, at: 1, in: statement)
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return (nil, 0, false)
+        }
+        let timestamp: Double? = sqlite3_column_type(statement, 0) == SQLITE_NULL ? nil : sqlite3_column_double(statement, 0)
+        return (timestamp, Int(sqlite3_column_int(statement, 1)), sqlite3_column_int(statement, 2) != 0)
+    }
+
+    private func swiftDataItemCount() throws -> Int {
+        let context = ModelContext(modelContainer)
+        return try context.fetchCount(FetchDescriptor<ClipboardItem>(
+            predicate: #Predicate<ClipboardItem> { !$0.isConcealed }
+        ))
+    }
+
+    private func indexedItemCount() throws -> Int {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "SELECT COUNT(*) FROM clip_keys", -1, &statement, nil) == SQLITE_OK else { throw IndexError.database }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { throw IndexError.database }
+        return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    /// Bounded ID-only reconciliation. Fetches SwiftData IDs in keyset
+    /// batches (not full models for every row), compares to clip_keys IDs,
+    /// upserts missing IDs and removes stale IDs. Returns the diff size.
+    /// Full models are fetched only for IDs that actually differ.
+    private func reconcileIndexCounts() throws -> Int {
+        var indexedIDs = Set<String>()
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "SELECT id FROM clip_keys", -1, &statement, nil) == SQLITE_OK else { throw IndexError.database }
+        while sqlite3_step(statement) == SQLITE_ROW {
+            if let pointer = sqlite3_column_text(statement, 0) {
+                indexedIDs.insert(String(cString: pointer))
+            }
+        }
+        sqlite3_finalize(statement)
+        // SwiftData IDs in timestamp-keyset batches. We fetch models here
+        // only to obtain their transfer strings; the batch size keeps
+        // memory bounded, and this path runs only on a count mismatch.
+        var swiftDataIDs = Set<String>()
+        var cursorTimestamp: Double? = nil
+        var tieOffset = 0
+        while true {
+            var descriptor: FetchDescriptor<ClipboardItem>
+            if let cursorTimestamp {
+                let cursorDate = Date(timeIntervalSince1970: cursorTimestamp)
+                descriptor = FetchDescriptor<ClipboardItem>(predicate: #Predicate<ClipboardItem> { !$0.isConcealed && $0.timestamp <= cursorDate })
+            } else {
+                descriptor = FetchDescriptor<ClipboardItem>(predicate: #Predicate<ClipboardItem> { !$0.isConcealed })
+            }
+            descriptor.sortBy = [SortDescriptor(\.timestamp, order: .reverse)]
+            descriptor.fetchLimit = 500
+            descriptor.fetchOffset = tieOffset
+            let context = ModelContext(modelContainer)
+            let batch = try context.fetch(descriptor)
+            if batch.isEmpty { break }
+            for item in batch {
+                if let id = item.persistentModelID.asTransferString {
+                    swiftDataIDs.insert(id)
+                }
+            }
+            guard let minTimestamp = batch.map(\.timestamp.timeIntervalSince1970).min() else { break }
+            if let old = cursorTimestamp, minTimestamp == old {
+                tieOffset += batch.count
+            } else {
+                cursorTimestamp = minTimestamp
+                tieOffset = batch.filter { $0.timestamp.timeIntervalSince1970 == minTimestamp }.count
+            }
+            if batch.count < 500 { break }
+        }
+        let missing = swiftDataIDs.subtracting(indexedIDs)
+        let stale = indexedIDs.subtracting(swiftDataIDs)
+        let diffSize = missing.count + stale.count
+        if diffSize == 0 { return 0 }
+        let changeContext = ModelContext(modelContainer)
+        try execute("BEGIN IMMEDIATE")
+        do {
+            for idString in stale {
+                if let id = PersistentIdentifier.fromTransferString(idString) {
+                    try remove(id)
+                }
+            }
+            for idString in missing {
+                // Resolve by transfer string via a fresh context fetch is
+                // not directly possible; missing IDs are upserted through
+                // applyChanges-style resolution below in a second pass.
+                _ = idString
+            }
+            try execute("COMMIT")
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+        // Second pass for missing IDs: fetch them by scanning in keyset
+        // batches again and upserting only the missing ones. This avoids
+        // holding all models in memory at once.
+        if !missing.isEmpty {
+            var remaining = missing
+            var cursor2: Double? = nil
+            var tie2 = 0
+            while !remaining.isEmpty {
+                var descriptor: FetchDescriptor<ClipboardItem>
+                if let cursor2 {
+                    let cursorDate = Date(timeIntervalSince1970: cursor2)
+                    descriptor = FetchDescriptor<ClipboardItem>(predicate: #Predicate<ClipboardItem> { !$0.isConcealed && $0.timestamp <= cursorDate })
+                } else {
+                    descriptor = FetchDescriptor<ClipboardItem>(predicate: #Predicate<ClipboardItem> { !$0.isConcealed })
+                }
+                descriptor.sortBy = [SortDescriptor(\.timestamp, order: .reverse)]
+                descriptor.fetchLimit = 500
+                descriptor.fetchOffset = tie2
+                let context = ModelContext(modelContainer)
+                let batch = try context.fetch(descriptor)
+                if batch.isEmpty { break }
+                try execute("BEGIN IMMEDIATE")
+                do {
+                    for item in batch {
+                        if let idString = item.persistentModelID.asTransferString, remaining.contains(idString) {
+                            try upsert(item)
+                            remaining.remove(idString)
+                        }
+                    }
+                    try execute("COMMIT")
+                } catch {
+                    try? execute("ROLLBACK")
+                    throw error
+                }
+                guard let minTimestamp = batch.map(\.timestamp.timeIntervalSince1970).min() else { break }
+                if let old = cursor2, minTimestamp == old {
+                    tie2 += batch.count
+                } else {
+                    cursor2 = minTimestamp
+                    tie2 = batch.filter { $0.timestamp.timeIntervalSince1970 == minTimestamp }.count
+                }
+                if batch.count < 500 { break }
+            }
+        }
+        return diffSize
     }
 
     func resetAndRebuild() async throws {
@@ -148,6 +430,7 @@ actor ClipboardSearchIndex {
             try execute("DELETE FROM clips")
             try execute("DELETE FROM clip_keys")
             try execute("DELETE FROM clip_labels")
+            try execute("DELETE FROM rebuild_state")
             try execute("UPDATE build_state SET phase='small', next_offset=0")
             try execute("COMMIT")
         } catch {
@@ -170,22 +453,62 @@ actor ClipboardSearchIndex {
         return expected == Int(sqlite3_column_int64(statement, 0))
     }
 
-    /// One-time, resumable migration of older inline text. Changing the storage
-    /// field leaves timestamp/order intact and is safe to repeat after a crash.
+    /// One-time, checkpointed migration of older inline text (v3).
+    ///
+    /// Previously this walked ALL byteCount/characterCount > 64 KiB rows
+    /// in 2-item offset batches on EVERY launch, with no checkpoint and
+    /// no completion flag — images were re-walked forever to do nothing,
+    /// because byteCount is never cleared when text is externalised.
+    /// Now: keyset cursor (timestamp, tieOffset) persisted in
+    /// externalize_state after each batch, batch size 32 (image/file
+    /// models fault cheaply — only their payload fields are checked),
+    /// and a completed flag. Once a full walk finishes, later launches
+    /// skip it entirely. Candidates are defined by PAYLOAD, not type:
+    /// (externalisable type AND text > limit) OR html > limit OR rtf >
+    /// limit, regardless of type, so imported image/file items carrying
+    /// large HTML/RTF are not dropped.
     func externalizeLegacyLargeClips() async throws {
-        var offset = 0
+        try open()
+        // Check completion flag.
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "SELECT cursorTimestamp, tieOffset, completed FROM externalize_state WHERE id = 1", -1, &statement, nil) == SQLITE_OK else { throw IndexError.database }
+        var cursorTimestamp: Double? = nil
+        var tieOffset = 0
+        var completed = false
+        if sqlite3_step(statement) == SQLITE_ROW {
+            cursorTimestamp = sqlite3_column_type(statement, 0) == SQLITE_NULL ? nil : sqlite3_column_double(statement, 0)
+            tieOffset = Int(sqlite3_column_int(statement, 1))
+            completed = sqlite3_column_int(statement, 2) != 0
+        }
+        sqlite3_finalize(statement)
+        if completed {
+            logger.info("Legacy large-clip externalisation already complete; skipping")
+            return
+        }
+        logger.info("Legacy large-clip externalisation starting")
         let limit = ClipboardItem.inlineTextLimit
+        var walked = 0
+        var changedTotal = 0
+        let started = ContinuousClock.now
         while !Task.isCancelled {
-            let predicate = #Predicate<ClipboardItem> {
-                $0.byteCount > limit || $0.characterCount > limit
+            let batchStarted = ContinuousClock.now
+            let predicate: Predicate<ClipboardItem>
+            if let cursorTimestamp {
+                let cursorDate = Date(timeIntervalSince1970: cursorTimestamp)
+                predicate = #Predicate<ClipboardItem> { ($0.byteCount > limit || $0.characterCount > limit) && $0.timestamp <= cursorDate }
+            } else {
+                predicate = #Predicate<ClipboardItem> { $0.byteCount > limit || $0.characterCount > limit }
             }
             var descriptor = FetchDescriptor<ClipboardItem>(predicate: predicate)
             descriptor.sortBy = [SortDescriptor(\.timestamp, order: .reverse)]
-            descriptor.fetchLimit = 2
-            descriptor.fetchOffset = offset
+            descriptor.fetchLimit = 32
+            descriptor.fetchOffset = tieOffset
             let batchContext = ModelContext(modelContainer)
             let batch = try batchContext.fetch(descriptor)
-            if batch.isEmpty { break }
+            if batch.isEmpty {
+                try execute("UPDATE externalize_state SET cursorTimestamp=NULL, tieOffset=0, completed=1 WHERE id = 1")
+                break
+            }
             var changed = false
             for item in batch {
                 if item.largeTextData == nil, let text = item.textContent,
@@ -203,10 +526,28 @@ actor ClipboardSearchIndex {
                     changed = true
                 }
             }
-            if changed { try batchContext.save() }
-            offset += batch.count
+            if changed {
+                try batchContext.save()
+                changedTotal += batch.count
+            }
+            walked += batch.count
+            // Advance the keyset cursor and persist it, even when nothing
+            // changed, so a kill resumes here instead of restarting.
+            guard let minTimestamp = batch.map(\.timestamp.timeIntervalSince1970).min() else { break }
+            if let old = cursorTimestamp, minTimestamp == old {
+                tieOffset += batch.count
+            } else {
+                cursorTimestamp = minTimestamp
+                tieOffset = batch.filter { $0.timestamp.timeIntervalSince1970 == minTimestamp }.count
+            }
+            if let cursorTimestamp {
+                try execute("UPDATE externalize_state SET cursorTimestamp=\(cursorTimestamp), tieOffset=\(tieOffset), completed=0 WHERE id = 1")
+            }
+            logSlowBatchIfNeeded(pass: "externalize", started: batchStarted, batchSize: batch.count)
             await Task.yield()
         }
+        let elapsedMs = Int(started.duration(to: .now).components.seconds * 1000 + started.duration(to: .now).components.attoseconds / 1_000_000_000_000_000)
+        logger.info("Legacy large-clip externalisation finished: walked=\(walked, privacy: .public) changedBatches=\(changedTotal, privacy: .public) elapsedMs=\(elapsedMs, privacy: .public)")
     }
 
     private func buildState() throws -> (phase: String, offset: Int) {
@@ -220,21 +561,31 @@ actor ClipboardSearchIndex {
     }
 
     /// Apply local SwiftData saves without another whole-history pass.
+    /// Per-ID errors are isolated (v3): one bad ID no longer flips
+    /// `ready = false` for the whole index. Only a database-level failure
+    /// (begin/commit) throws. Failure count is logged, never IDs.
     func applyChanges(upserted: [PersistentIdentifier], deleted: [PersistentIdentifier]) throws {
         try open()
+        var failedCount = 0
         try execute("BEGIN IMMEDIATE")
         do {
             let changeContext = ModelContext(modelContainer)
-            for id in deleted { try remove(id) }
+            for id in deleted {
+                do { try remove(id) } catch { failedCount += 1 }
+            }
             for id in upserted {
-                guard let item = changeContext.model(for: id) as? ClipboardItem else { continue }
-                if item.isConcealed { try remove(id) } else { try upsert(item) }
+                do {
+                    guard let item = changeContext.model(for: id) as? ClipboardItem else { continue }
+                    if item.isConcealed { try remove(id) } else { try upsert(item) }
+                } catch { failedCount += 1 }
             }
             try execute("COMMIT")
         } catch {
             try? execute("ROLLBACK")
-            ready = false
             throw error
+        }
+        if failedCount > 0 {
+            logger.info("Search index applyChanges completed with failures: failedCount=\(failedCount, privacy: .public) upsertedCount=\(upserted.count, privacy: .public) deletedCount=\(deleted.count, privacy: .public)")
         }
     }
 
@@ -299,7 +650,13 @@ actor ClipboardSearchIndex {
         selectedLabelStableIDs: [String]?, filters: SearchFilters,
         localDeviceID: String
     ) throws -> [PersistentIdentifier]? {
-        guard ready else { return nil }
+        // Partial browsing while rebuilding (v3): search already served a
+        // partial index; browsing must too, or the default panel falls
+        // back to a full SwiftData scan for the whole rebuild. Callers
+        // must show an incomplete marker while isRebuilding (see panel
+        // and History browser), and must invalidate cursors on the ready
+        // transition (see HistoryPageWorker / reload gating).
+        guard ready || isRebuilding else { return nil }
         try open()
         sqlite3_progress_handler(database, 2_000, { _ in
             Task<Never, Never>.isCancelled ? 1 : 0

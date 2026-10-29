@@ -115,7 +115,7 @@ final class ImageStorageService: Sendable {
                 Self.logger.warning("Failed to generate thumbnail for image")
             }
 
-            Self.logger.info("Saved image: \(imageFilename), thumb: \(thumbnailFilename ?? "none")")
+            Self.logger.info("Saved image")
             DispatchQueue.main.async { completion(imageFilename, thumbnailFilename, contentHash) }
         }
     }
@@ -157,7 +157,7 @@ final class ImageStorageService: Sendable {
                 let url = imagesDirectory.appendingPathComponent(filename)
                 do {
                     try data.write(to: url)
-                    Self.logger.info("Saved favicon: \(filename)")
+                    Self.logger.info("Saved favicon")
                     continuation.resume(returning: filename)
                 } catch {
                     Self.logger.warning("Failed to save favicon: \(error.localizedDescription)")
@@ -189,7 +189,7 @@ final class ImageStorageService: Sendable {
 
                 do {
                     try imageData.write(to: url)
-                    Self.logger.info("Saved preview image: \(filename)")
+                    Self.logger.info("Saved preview image")
                     continuation.resume(returning: filename)
                 } catch {
                     Self.logger.warning("Failed to save preview image: \(error.localizedDescription)")

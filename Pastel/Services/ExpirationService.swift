@@ -59,32 +59,46 @@ final class ExpirationService {
     /// Expire all overdue concealed items. Call on app launch to clean up items
     /// that expired while the app was not running.
     func expireOverdueItems() {
+        // v3: batched (100/batch, offset = retained count) instead of
+        // fetching all concealed items at once on the main actor.
+        // Concealed counts are normally small; this bounds the worst case
+        // without changing semantics (labeled items are kept).
         let now = Date.now
-
+        var expiredCount = 0
+        var retainedOffset = 0
         do {
-            let descriptor = FetchDescriptor<ClipboardItem>(
-                predicate: #Predicate<ClipboardItem> { item in
-                    item.isConcealed == true && item.expiresAt != nil
+            while true {
+                var descriptor = FetchDescriptor<ClipboardItem>(
+                    predicate: #Predicate<ClipboardItem> { item in
+                        item.isConcealed == true && item.expiresAt != nil
+                    }
+                )
+                descriptor.fetchLimit = 100
+                descriptor.fetchOffset = retainedOffset
+                let batch = try modelContext.fetch(descriptor)
+                if batch.isEmpty { break }
+                var expiredInBatch = 0
+                var retainedInBatch = 0
+                for item in batch {
+                    guard item.safeLabels.isEmpty else { retainedInBatch += 1; continue }
+                    if let expiresAt = item.expiresAt, expiresAt < now {
+                        deleteClipboardItemWithCleanup(item, from: modelContext)
+                        expiredInBatch += 1
+                    } else {
+                        retainedInBatch += 1
+                    }
                 }
-            )
-            let concealedItems = try modelContext.fetch(descriptor)
-
-            var expiredCount = 0
-            for item in concealedItems {
-                // Labeled concealed items are kept — the user explicitly opted in.
-                guard item.safeLabels.isEmpty else { continue }
-                if let expiresAt = item.expiresAt, expiresAt < now {
-                    deleteClipboardItemWithCleanup(item, from: modelContext)
-                    expiredCount += 1
-                }
+                if expiredInBatch > 0 { try modelContext.save() }
+                expiredCount += expiredInBatch
+                retainedOffset += retainedInBatch
+                if batch.count < 100 { break }
             }
-
             if expiredCount > 0 {
-                try modelContext.save()
                 Self.logger.info("Expired \(expiredCount) overdue concealed items on launch")
             }
         } catch {
-            Self.logger.error("Failed to expire overdue items: \(error.localizedDescription)")
+            // Error kind only; localized descriptions can embed item data.
+            Self.logger.error("Failed to expire overdue items")
         }
     }
 

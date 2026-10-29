@@ -85,7 +85,11 @@ struct FilteredCardListView: View {
 
     // Old cards can remain on screen during a filter transition, but must not
     // remain keyboard targets for a paste from the newly selected filter.
-    private var visibleItems: [ClipboardItem] { isReplacingResults ? [] : filteredItems }
+    // v3: never empty the visible list during a replace. The stale page
+    // stays on screen (with a refresh indicator) and stays clickable;
+    // emptying it + disabling hit-testing is what turned 'slow' into
+    // 'dead after a click or two'.
+    private var visibleItems: [ClipboardItem] { filteredItems }
 
     /// Indices (into `visibleItems`) currently selected. A single cursor when
     /// `selectionAnchor` is nil, otherwise the contiguous anchor…cursor range.
@@ -389,7 +393,7 @@ struct FilteredCardListView: View {
 
     var body: some View {
         resultsContent
-        .allowsHitTesting(!isReplacingResults && rawSearchText == searchText)
+        .allowsHitTesting(true)
         .overlay {
             if isReplacingResults && showRefreshIndicator {
                 ProgressView("Loading clips…")
@@ -468,7 +472,11 @@ struct FilteredCardListView: View {
             selectedIdentityIDs = []
             selectionAnchor = nil
         }
-        .onChange(of: appState.searchIndexRevision) { _, _ in reload(scanAll: true) }
+        .onChange(of: appState.searchIndexRevision) { _, _ in
+            // v3: gate reloads while building; the ready transition
+            // (building already false when the revision bumps) still reloads.
+            if !appState.searchIndexBuilding { reload(scanAll: true) }
+        }
         .onChange(of: appState.pinRevision) { _, _ in
             reload(scanAll: true)
         }
