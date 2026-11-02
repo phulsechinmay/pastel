@@ -62,6 +62,37 @@ macOS 26.3, Xcode 26.2, Swift 6.2.3, SDK 26.2, M4.
   a complete, count-matched index — not the 100k+ store from the
   original hang report.
 
+## Run test on MacBook Air against the real store — 2026-11-02
+
+With Chinmay's approval, his running Pastel (dev build) was quit, his
+store was backed up (`~/pastel-perf-test/store-backup-2026-11-02`,
+119.7 MB), and the unsigned test build was ad-hoc signed with stripped
+entitlements (sandbox + network only; his `iCloudSyncEnabled` is
+false, so no CloudKit entitlement is exercised) and launched against
+his real store (993 items):
+
+- **Legacy upgrade path verified:** `Search index already complete;
+  seeded new cursor state` — the existing complete index was NOT
+  rebuilt; the new additive `rebuild_state` / `externalize_state`
+  tables were created alongside the old `build_state`.
+- **Externalise:** walked exactly the 93 large candidates
+  (keyset batches), changed 0, in 54 ms, and set its completion
+  flag — the old code re-walked these on every launch.
+- **Panel first page ready in 187 ms** (12 clips) on the real store.
+- **Captures:** two test copies took store and index 993 → 995 in
+  sync (delta `applyChanges` path); a 2 s `sample` showed the main
+  thread idle in the runloop.
+- Caveat: the ad-hoc test build has no Accessibility grant
+  (`isGranted=false`), so paste-back was not exercised.
+- Afterwards: test build quit, store + prefs restored from backup
+  (993 items, new tables gone, byte-state as before), and Chinmay's
+  own Pastel build was relaunched and verified running idle.
+
+Still outstanding for this PR: UI click-through (panel item /
+Settings tabs) with Accessibility granted, and the 100k-item fixture
+for rebuild timing at scale. The Air's store is small (993), so the
+original 100k hang itself was not reproduced here.
+
 ## Implementation v3.1 — what actually landed in this branch (2026-10-28)
 
 This section is the honest scope record for reviewers. It supersedes
