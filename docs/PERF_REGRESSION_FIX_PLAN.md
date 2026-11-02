@@ -42,6 +42,26 @@ Findings, in order:
    after the smoke test; nothing was installed over
    `/Applications/Pastel.app` (still 1.0.14 on that machine).
 
+## Strict build on MacBook Air — 2026-11-02 (the compile gate is closed)
+
+Built as-is (clean clone, no local patches) on Chinmay's MacBook Air:
+macOS 26.3, Xcode 26.2, Swift 6.2.3, SDK 26.2, M4.
+
+- **All Swift compilation passed with zero errors** under the default
+  strict settings — including every file that failed on the
+  MacBook Pro's Xcode 16.3 (glass view, thumbnail concurrency,
+  `AppRelaunchService`) and all files changed by this branch.
+- The only failing build step was **CodeSign of Sparkle.framework**
+  (`errSecInternalComponent`) — the known limitation of using a
+  keychain signing key from an SSH session, not a code issue.
+- Rebuilt with `CODE_SIGNING_ALLOWED=NO`: **BUILD SUCCEEDED**.
+- Not yet done: running this build on the Air. His own Pastel
+  (dev build from `~/Desktop/Projects/pastel`) is running there;
+  launching the test build needs that instance quit first.
+  Side finding: the Air's live store is currently 993 items with
+  a complete, count-matched index — not the 100k+ store from the
+  original hang report.
+
 ## Implementation v3.1 — what actually landed in this branch (2026-10-28)
 
 This section is the honest scope record for reviewers. It supersedes
