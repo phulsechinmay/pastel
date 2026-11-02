@@ -104,7 +104,8 @@ actor ClipboardSearchIndex {
         // (now fast) rebuild, because its old offset format is not reused.
         if try rebuildStateIsEmpty() {
             let legacy = try buildState()
-            if legacy.phase == "complete" && (try countsMatch()) {
+            let legacyCountsMatch = try countsMatch()
+            if legacy.phase == "complete" && legacyCountsMatch {
                 try markAllPassesComplete()
                 ready = true
                 UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
