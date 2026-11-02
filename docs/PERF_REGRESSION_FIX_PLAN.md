@@ -1,5 +1,47 @@
 # perf-regression-fix — discussion plan (draft, no code changes yet)
 
+## Build verification on MacBook Pro — 2026-11-02 (supersedes "no macOS build" below)
+
+Built and run on Chinmay's headless MacBook Pro (M1 Pro, macOS 15.2,
+Xcode 16.3 / SDK 15.4) in a Mac-local clone (`~/pastel-perf-test`).
+Findings, in order:
+
+1. **The project does not build as-is on that toolchain — and neither
+   does `main`.** Pre-existing, not caused by this branch:
+   `PanelController` references `NSGlassEffectView` (macOS 26 SDK
+   symbol, runtime `#available` guard only), and several files fail
+   Swift 6 strict-concurrency checking under Swift 6.1
+   (`ThumbnailLoader` continuation resume, `URLCardView` /
+   `AsyncThumbnailView` `NSImage?` sends, `AppRelaunchService`
+   `NSApp`). The branch is written against the macOS 26 / Xcode 26
+   SDK, which the MacBook Pro (macOS 15) cannot run.
+2. **One real compile error WAS in this branch** and is fixed in
+   commit `fa7c47a`: `try` inside the `&&` in `rebuild()`'s
+   legacy-seeding check (rethrows autoclosure) — hoisted
+   `countsMatch()` into a `let`. This would not have compiled
+   anywhere; the Mac build caught what the VM could not.
+3. With three **Mac-local-only patches (not in this PR)** — runtime
+   `NSClassFromString` lookup for `NSGlassEffectView`, a boxed
+   `ThumbnailLoader` result for `URLCardView`, an
+   `nonisolated(unsafe)` transfer in the decode-resume loop — and
+   `SWIFT_VERSION=5.0 SWIFT_STRICT_CONCURRENCY=minimal`,
+   **BUILD SUCCEEDED**, and the app was launched and smoke-tested:
+   - First launch (empty store): all three rebuild passes completed,
+     `Search index ready`, externalisation ran once (walked=0).
+   - Two `pbcopy` captures were captured by the monitor; a 2-second
+     `sample` showed the main thread idle in the runloop
+     (1391/1394 samples in `mach_msg`), not blocked.
+   - Second launch: index ready with no pass re-runs, and
+     `Legacy large-clip externalisation already complete; skipping`
+     — the every-restart walk fix verified live.
+   - Log lines carried no clip content (type/size/elapsed shown as
+     `<private>`), consistent with the safe-logging design.
+4. **Still not done:** a strict Swift 6 / Xcode 26 build (needs his
+   macOS 26 machine), UI click reproduction (panel / Settings /
+   menu-bar), and the 100k-item fixture. The test app was quit
+   after the smoke test; nothing was installed over
+   `/Applications/Pastel.app` (still 1.0.14 on that machine).
+
 ## Implementation v3.1 — what actually landed in this branch (2026-10-28)
 
 This section is the honest scope record for reviewers. It supersedes
