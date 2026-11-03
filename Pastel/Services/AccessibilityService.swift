@@ -176,10 +176,10 @@ enum AccessibilityService {
         // overlap for ~200 ms, then the old one exits.
         cfg.createsNewApplicationInstance = true
         cfg.activates = true
-        logger.info("performRelaunch: requesting new instance at \(url.path, privacy: .public)")
+        logger.info("performRelaunch: requesting new instance")
         NSWorkspace.shared.openApplication(at: url, configuration: cfg) { app, error in
             if let error {
-                logger.error("Relaunch openApplication failed: \(error.localizedDescription, privacy: .public)")
+                logger.error("Relaunch openApplication failed")
             } else if let app {
                 logger.info("Relaunch new instance pid=\(app.processIdentifier)")
             }

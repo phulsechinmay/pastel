@@ -38,6 +38,8 @@ final class AppState {
     var searchIndexRevision = 0
     @ObservationIgnored private var pendingSyncIndexRefresh = false
     @ObservationIgnored private var pendingIndexSaves = 0
+    @ObservationIgnored private var indexRepairNeeded = false
+    @ObservationIgnored private var startupMigrationActive = false
     @ObservationIgnored private var historyRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var indexWillSaveObserver: NSObjectProtocol?
     @ObservationIgnored private var indexSaveObserver: NSObjectProtocol?
@@ -113,23 +115,32 @@ final class AppState {
         historyPageWorker = HistoryPageWorker(modelContainer: modelContext.container)
         searchIndexBuilding = true
         let wasDirty = UserDefaults.standard.bool(forKey: Self.indexDirtyKey)
+        NSLog("Pastel startup: search index setup starting, wasDirty=%d", wasDirty ? 1 : 0)
         Task(priority: .utility) { [weak self] in
             do {
-                if wasDirty { try await index.resetAndRebuild() }
-                else { try await index.rebuild() }
+                // A dirty flag means a save may not have reached the index.
+                // Keep any committed rebuild cursor and reconcile changed
+                // rows instead of erasing a large interrupted build.
+                try await index.rebuild(reconcilePendingSaves: wasDirty)
                 if self?.pendingSyncIndexRefresh == true {
                     self?.pendingSyncIndexRefresh = false
                     try await index.resetAndRebuild()
                 }
+                self?.startupMigrationActive = true
                 self?.searchIndexBuilding = false
                 self?.searchIndexRevision &+= 1
-                if self?.pendingIndexSaves == 0 {
+                if self?.pendingIndexSaves == 0 && self?.indexRepairNeeded == false {
                     UserDefaults.standard.set(false, forKey: Self.indexDirtyKey)
                 }
                 try await index.externalizeLegacyLargeClips()
+                self?.startupMigrationActive = false
+                self?.searchIndexRevision &+= 1
             } catch {
+                self?.startupMigrationActive = false
                 self?.searchIndexBuilding = false
-                NSLog("Search index rebuild failed: %@", String(describing: error))
+                // Error kind only — never interpolate an error that could
+                // carry item data. IndexError currently carries no payload.
+                NSLog("Search index rebuild failed: kind=%@", String(describing: type(of: error)))
             }
         }
         indexWillSaveObserver = NotificationCenter.default.addObserver(
@@ -153,11 +164,14 @@ final class AppState {
                         self.scheduleHistoryRefresh()
                     }
                     self.pendingIndexSaves = max(0, self.pendingIndexSaves - 1)
-                    if self.pendingIndexSaves == 0 && !self.searchIndexBuilding {
+                    if self.pendingIndexSaves == 0 && !self.searchIndexBuilding && !self.indexRepairNeeded {
                         UserDefaults.standard.set(false, forKey: Self.indexDirtyKey)
                     }
                 } catch {
-                    NSLog("Search index update failed: %@", String(describing: error))
+                    self.pendingIndexSaves = max(0, self.pendingIndexSaves - 1)
+                    self.indexRepairNeeded = true
+                    UserDefaults.standard.set(true, forKey: Self.indexDirtyKey)
+                    NSLog("Search index update failed: kind=%@", String(describing: type(of: error)))
                 }
             }
         }
@@ -171,11 +185,31 @@ final class AppState {
         self.clipboardMonitor = monitor
 
         let retention = RetentionService(modelContext: modelContext)
-        retention.startPeriodicPurge()
         self.retentionService = retention
+        // Defer the first purge until indexing and legacy migration stop, or
+        // 60 s, whichever comes first (hard backstop, so a never-ready
+        // index cannot suppress retention forever). Purge stays on the
+        // main context in this slice (see plan v3 C3) — deferral, not a
+        // background context, is the safe interim change.
+        // Task inherits @MainActor from setup(), matching the rebuild
+        // task above, so accessing searchIndexBuilding here is isolated.
+        Task { [weak self] in
+            for _ in 0..<600 {
+                guard let self else { return }
+                if !self.searchIndexBuilding && !self.startupMigrationActive { break }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            retention.startPeriodicPurge()
+        }
     }
 
     private func scheduleHistoryRefresh() {
+        // v3: gate the reload storm while building. Revisions from saves
+        // during the rebuild are coalesced away; the setup task bumps
+        // searchIndexRevision exactly once on the ready transition (after
+        // searchIndexBuilding is set false), which is the one reload that
+        // must run, with a fresh cursor.
+        guard !searchIndexBuilding && !startupMigrationActive else { return }
         historyRefreshTask?.cancel()
         historyRefreshTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
@@ -194,11 +228,12 @@ final class AppState {
         Task(priority: .utility) { [weak self] in
             do {
                 try await index.resetAndRebuild()
+                self?.searchIndexBuilding = false
                 self?.searchIndexRevision &+= 1
             } catch {
-                NSLog("Search index sync refresh failed: %@", String(describing: error))
+                self?.searchIndexBuilding = false
+                NSLog("Search index sync refresh failed: kind=%@", String(describing: type(of: error)))
             }
-            self?.searchIndexBuilding = false
         }
     }
 

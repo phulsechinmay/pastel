@@ -188,7 +188,7 @@ final class PasteService {
             }
 
             let frontmost = NSWorkspace.shared.frontmostApplication
-            pasteLog("[PASTE] posting now. frontmostApp=\(frontmost?.localizedName ?? "nil") bundle=\(frontmost?.bundleIdentifier ?? "nil") pid=\(frontmost?.processIdentifier ?? -1)")
+            pasteLog("[PASTE] posting now")
             if let expectedTargetPID,
                frontmost?.processIdentifier != expectedTargetPID {
                 Self.showFailureAlert(title: "Copied to Clipboard",
@@ -414,8 +414,16 @@ final class PasteService {
                 let imageURL = ImageStorageService.shared.resolveImageURL(imagePath)
                 if let imageData = try? Data(contentsOf: imageURL), !imageData.isEmpty {
                     writes.append(.data(imageData, .png))
-                    // Also write TIFF for broader app compatibility
-                    if let nsImage = NSImage(data: imageData),
+                    // TIFF is a legacy fallback, not the primary format.
+                    // For large images, decoding + re-encoding an
+                    // uncompressed TIFF on the main actor is the
+                    // click -> beachball path (v3). PNG is universally
+                    // supported in modern apps, so skip TIFF above 2 MB
+                    // rather than expanding it on the UI thread. A full
+                    // async paste-decode refactor is a follow-up, not
+                    // this slice (see plan v3).
+                    if imageData.count <= 2_000_000,
+                       let nsImage = NSImage(data: imageData),
                        let tiffData = nsImage.tiffRepresentation {
                         writes.append(.data(tiffData, .tiff))
                     }
@@ -599,7 +607,7 @@ final class PasteService {
     // MARK: - Logging & Alert helpers
 
     private static func logEntry(method: String, source: String, item: ClipboardItem) {
-        pasteLog("[PASTE] \(method)() ENTRY source=\(source) type=\(item.type.rawValue) behavior=\(pasteBehavior.rawValue) bytes=\(item.byteCount)")
+        pasteLog("[PASTE] \(method)() ENTRY source=\(source) type=\(item.type.rawValue) behavior=\(pasteBehavior.rawValue) sizeBucket=\(item.byteCount <= 64 * 1024 ? "small" : item.byteCount <= 1024 * 1024 ? "medium" : "large")")
     }
 
     /// Display an NSAlert so paste failures are user-visible.

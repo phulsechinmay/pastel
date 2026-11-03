@@ -36,13 +36,20 @@ actor HistoryPageWorker {
     private let logger = Logger(subsystem: "app.pastel.Pastel", category: "HistoryPage")
 
     func recentSourceApps() throws -> [SourceAppOption] {
+        // v3: contention inventory item (plan M5) — 2,000 recent items
+        // fetched when the filter row opens, during a rebuild. Log
+        // elapsed + count only, never app names or bundle IDs.
+        let started = ContinuousClock.now
         var descriptor = FetchDescriptor<ClipboardItem>(
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         descriptor.fetchLimit = 2_000
         descriptor.propertiesToFetch = [\.sourceAppBundleID, \.sourceAppName]
         let context = ModelContext(modelContainer)
-        return SourceAppOption.derive(from: try context.fetch(descriptor))
+        let result = SourceAppOption.derive(from: try context.fetch(descriptor))
+        let elapsedMs = started.duration(to: .now).components.seconds * 1000 + started.duration(to: .now).components.attoseconds / 1_000_000_000_000_000
+        logger.debug("recentSourceApps ready: count=\(result.count) elapsedMs=\(elapsedMs)")
+        return result
     }
 
     func nextIDs(
@@ -62,7 +69,9 @@ actor HistoryPageWorker {
             let elapsed = started.duration(to: .now)
             let milliseconds = elapsed.components.seconds * 1000 +
                 elapsed.components.attoseconds / 1_000_000_000_000_000
-            logger.debug("Loaded \(ids.count) history IDs in \(milliseconds) ms; query length \(searchText.count)")
+            // v3: never log search length — for 1-2 character queries it is
+            // a fingerprint. Log only empty/non-empty and counts.
+            logger.debug("Loaded \(ids.count) history IDs in \(milliseconds) ms; searchEmpty=\(searchText.isEmpty)")
         }
         let localDeviceID = DeviceIdentifier.current
         let cutoff = filters.dateRange?.cutoff()
@@ -242,12 +251,21 @@ enum HistoryPageLoader {
         cursor = page.cursor
         var items: [ClipboardItem] = []
         items.reserveCapacity(page.ids.count)
+        // v3: bounded main-context resolution. Yield every 8 items AND
+        // whenever a runloop turn has spent > 20 ms resolving, so a
+        // 150-item page cannot monopolise the main thread while the
+        // rebuild/retention contend for the same store. Card-body
+        // faulting during SwiftUI evaluation is still part of the
+        // budget to measure on macOS (see plan v3 C12) — this bounds
+        // nextPage itself, it does not claim to bound rendering.
+        var turnStarted = ContinuousClock.now
         for (index, id) in page.ids.enumerated() {
             try Task.checkCancellation()
             if let item = context.model(for: id) as? ClipboardItem { items.append(item) }
-            // Model resolution can fault SQLite rows. Give AppKit a chance to
-            // process key events between small groups of results.
-            if index % 8 == 7 { await Task.yield() }
+            if index % 8 == 7 { await Task.yield(); turnStarted = ContinuousClock.now }
+            else if turnStarted.duration(to: .now).components.seconds * 1000 + turnStarted.duration(to: .now).components.attoseconds / 1_000_000_000_000_000 > 20 {
+                await Task.yield(); turnStarted = ContinuousClock.now
+            }
         }
         return items
     }

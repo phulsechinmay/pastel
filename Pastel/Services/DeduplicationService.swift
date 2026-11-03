@@ -73,6 +73,8 @@ final class DeduplicationService {
     }
 
     private func deduplicateItems() async {
+        // v3 breadcrumb: group count only, never IDs or hashes.
+        logger.info("Dedup: starting pass")
         guard let duplicateGroups = try? await worker.duplicateGroups() else {
             logger.error("Dedup: failed to scan item hashes")
             return

@@ -64,6 +64,10 @@ final class SettingsWindowController {
         let selectedTab = initialTab
             ?? SettingsTab(rawValue: UserDefaults.standard.string(forKey: lastTabKey) ?? "")
             ?? .general
+        // v3 breadcrumb (tab enum name only — never user content). If the
+        // window freezes on General, that proves a global main block, not
+        // a History-grid bug (see plan v3 C1).
+        NSLog("Pastel settings opening: tab=%@", selectedTab.rawValue)
         let baseView = SettingsView(initialTab: selectedTab)
             .modelContainer(modelContainer)
             .environment(appState)
@@ -96,6 +100,7 @@ final class SettingsWindowController {
             defer: true
         )
         window.contentView = hostingView
+        NSLog("Pastel settings window created: tab=%@", selectedTab.rawValue)
         window.title = "Pastel Settings"
         window.center()
         window.isReleasedWhenClosed = false

@@ -211,6 +211,17 @@ struct PerformanceUpgradeSmoke {
         try await reopened.rebuild()
         let reopenedMatches = try await reopened.matchingIDs("cafe", offset: 0, limit: 20, pinsFirst: true)
         check(reopenedMatches?.contains(accented.persistentModelID) == true, "completed index reopens")
+        // Simulate a process exit after SwiftData saved an edit but before its
+        // didSave notification updated the disposable search index. The row
+        // count is unchanged, so a count-only repair cannot find this edit.
+        accented.title = "recovered after interrupted save"
+        try context.save()
+        let repaired = ClipboardSearchIndex(modelContainer: container)
+        await repaired.useDatabase(at: directory.appendingPathComponent("search.sqlite"))
+        try await repaired.rebuild(reconcilePendingSaves: true)
+        let recoveredMatches = try await repaired.matchingIDs("recovered after interrupted", offset: 0, limit: 20, pinsFirst: true)
+        check(recoveredMatches?.contains(accented.persistentModelID) == true,
+              "dirty launch repairs a same-count edit")
         print("Performance upgrade smoke checks passed (\(itemCount) ordinary clips, \(onDisk ? "disk" : "memory"); sparse pages \(pageDuration); index \(indexDuration))")
     }
 

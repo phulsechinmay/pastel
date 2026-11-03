@@ -238,7 +238,7 @@ final class ClipboardMonitor {
         if let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
             let ignored = Set(UserDefaults.standard.stringArray(forKey: "ignoredAppBundleIDs") ?? [])
             if ignored.contains(bundleID) {
-                Self.logger.debug("Skipping capture from ignored app: \(bundleID)")
+                Self.logger.debug("Skipping capture from ignored app")
                 return
             }
         }
@@ -367,7 +367,7 @@ final class ClipboardMonitor {
             try modelContext.save()
             itemCount += 1
             let elapsed = captureStarted.duration(to: .now)
-            Self.logger.info("Captured \(detectedContentType.rawValue) item from \(sourceAppName ?? "unknown") (\(byteCount) bytes, \(String(describing: elapsed)))")
+            Self.logger.info("Captured item: type=\(detectedContentType.rawValue) sizeBucket=\(byteCount <= 64 * 1024 ? "small" : byteCount <= 1024 * 1024 ? "medium" : "large") elapsed=\(String(describing: elapsed))")
 
             // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
             if let bundleID = sourceAppBundleID {
@@ -492,7 +492,7 @@ final class ClipboardMonitor {
             do {
                 try self.modelContext.save()
                 self.itemCount += 1
-                Self.logger.info("Captured image from \(sourceAppName ?? "unknown") (\(imageByteCount) bytes, path: \(imagePath ?? "none"))")
+                Self.logger.info("Captured image: sizeBucket=\(imageByteCount <= 64 * 1024 ? "small" : imageByteCount <= 1024 * 1024 ? "medium" : "large")")
 
                 // Pre-warm caches so panel open is instant (no disk I/O or CIFilter per card)
                 if let bundleID = sourceAppBundleID {

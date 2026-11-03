@@ -35,6 +35,7 @@ struct HistoryGridView: View {
     private let maxResidentItems = 300
     private let logger = Logger(subsystem: "app.pastel.Pastel", category: "HistoryResults")
     private let searchText: String
+    private let rawSearchText: String
 
     // Labels passed from parent for ClipboardCardView context menus
     let allLabels: [Label]
@@ -57,8 +58,9 @@ struct HistoryGridView: View {
         GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 12)
     ]
 
-    init(searchText: String, selectedLabelIDs: Set<PersistentIdentifier>, allLabels: [Label] = [], selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}, onPastePlainText: @escaping (ClipboardItem) -> Void = { _ in }) {
+    init(searchText: String, rawSearchText: String, selectedLabelIDs: Set<PersistentIdentifier>, allLabels: [Label] = [], selectedIDs: Binding<Set<PersistentIdentifier>>, resolvedItems: Binding<[ClipboardItem]>, onBulkCopy: @escaping () -> Void = {}, onBulkPaste: @escaping () -> Void = {}, onRequestBulkDelete: @escaping () -> Void = {}, onPastePlainText: @escaping (ClipboardItem) -> Void = { _ in }) {
         self.searchText = searchText
+        self.rawSearchText = rawSearchText
         self.allLabels = allLabels
         self.selectedLabelIDs = selectedLabelIDs
         _selectedIDs = selectedIDs
@@ -69,7 +71,9 @@ struct HistoryGridView: View {
         self.onPastePlainText = onPastePlainText
     }
 
-    private var visibleItems: [ClipboardItem] { isReplacingResults ? [] : memoizedFilteredItems }
+    // The previous page remains visible but cannot act on a changed query.
+    private var visibleItems: [ClipboardItem] { memoizedFilteredItems }
+    private var isShowingStaleResults: Bool { isReplacingResults || rawSearchText != searchText }
 
     /// Compact signature for label metadata that affects labelKey filtering.
     private var labelFilterSignature: String {
@@ -189,6 +193,7 @@ struct HistoryGridView: View {
                     LazyVGrid(columns: columns, spacing: 12) {
                         if windowStart > 0 {
                             Button("Newest results") { reload() }
+                                .disabled(isShowingStaleResults)
                         }
                         ForEach(Array(memoizedFilteredItems.enumerated()), id: \.element.id) { index, item in
                             let isInSelection = selectedIDs.contains(item.persistentModelID)
@@ -254,16 +259,17 @@ struct HistoryGridView: View {
                                     }
                                 }
                             }
+                            .allowsHitTesting(!isShowingStaleResults)
                         }
                         if memoizedFilteredItems.count >= maxResidentItems && !cursor.isExhausted {
                             Button("Older results") { advanceToOlderResults() }
+                                .disabled(isShowingStaleResults)
                         }
                     }
                     .padding(12)
                 }
             }
         }
-        .allowsHitTesting(!isReplacingResults)
         .overlay {
             if isReplacingResults && showRefreshIndicator {
                 ProgressView("Loading history…")
@@ -290,7 +296,9 @@ struct HistoryGridView: View {
         .onAppear { reload() }
         .onChange(of: appState.itemCount) { _, _ in reload() }
         .onChange(of: appState.pinRevision) { _, _ in reload() }
-        .onChange(of: appState.searchIndexRevision) { _, _ in reload() }
+        .onChange(of: appState.searchIndexRevision) { _, _ in
+            if !appState.searchIndexBuilding { reload() }
+        }
         .onChange(of: searchText) { _, _ in reload() }
         .onChange(of: appState.deletionManager.softDeletedIDs) { _, _ in reload() }
         .onChange(of: selectedLabelIDs) { _, _ in reload() }

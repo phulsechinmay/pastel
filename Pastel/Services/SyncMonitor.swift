@@ -165,7 +165,7 @@ final class SyncMonitor {
             setupDelayWorkItem?.cancel()
             let message = friendlyErrorMessage(from: error)
             state = .error(message)
-            logger.warning("Sync error (\(String(describing: type))): \(message)")
+            logger.warning("Sync error: type=\(String(describing: type))")
         } else {
             // Event succeeded
             setupDelayWorkItem?.cancel()
