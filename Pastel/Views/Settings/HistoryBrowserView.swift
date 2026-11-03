@@ -58,6 +58,7 @@ struct HistoryBrowserView: View {
             // Responsive card grid with multi-selection
             HistoryGridView(
                 searchText: debouncedSearchText,
+                rawSearchText: searchText,
                 selectedLabelIDs: selectedLabelIDs,
                 allLabels: labels,
                 selectedIDs: $selectedIDs,
@@ -92,7 +93,7 @@ struct HistoryBrowserView: View {
             debouncedSearchText = searchText
         }
         .fontDesign(.rounded)
-        .onChange(of: debouncedSearchText) { _, _ in selectedIDs.removeAll() }
+        .onChange(of: searchText) { _, _ in selectedIDs.removeAll() }
         .onChange(of: selectedLabelIDs) { _, _ in selectedIDs.removeAll() }
         .alert("Delete \(selectedIDs.count) Items", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {

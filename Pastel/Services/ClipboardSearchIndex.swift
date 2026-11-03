@@ -92,10 +92,10 @@ actor ClipboardSearchIndex {
     ///
     /// Passes: small (128/batch), large-text (16/batch — FTS tokenisation
     /// of large texts is the memory/CPU risk), large-metadata (128/batch —
-    /// images/files/colours/URLs carry no large text to tokenise; their
-    /// clips row is still inserted with title/app and empty body so
-    /// title/app search does not regress).
-    func rebuild() async throws {
+    /// images/files/colours/URLs normally carry only small metadata; the
+    /// clips row still contains their available text/title/app so search
+    /// behavior is preserved).
+    func rebuild(reconcilePendingSaves: Bool = false) async throws {
         let started = ContinuousClock.now
         try open()
         // Seed the new cursor state from a legacy complete index, so the
@@ -105,12 +105,14 @@ actor ClipboardSearchIndex {
         if try rebuildStateIsEmpty() {
             let legacy = try buildState()
             let legacyCountsMatch = try countsMatch()
-            if legacy.phase == "complete" && legacyCountsMatch {
+            if legacy.phase == "complete" {
                 try markAllPassesComplete()
-                ready = true
-                UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
-                logger.info("Search index already complete; seeded new cursor state")
-                return
+                if legacyCountsMatch && !reconcilePendingSaves {
+                    ready = true
+                    UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
+                    logger.info("Search index already complete; seeded new cursor state")
+                    return
+                }
             }
         }
         ready = false
@@ -118,6 +120,10 @@ actor ClipboardSearchIndex {
         defer { isRebuilding = false }
         try await runRebuildPasses()
         if Task.isCancelled { return }
+        if reconcilePendingSaves {
+            try await reconcilePendingChanges()
+            if Task.isCancelled { return }
+        }
         // Delta reconciliation replaces the old exact-count reset gate.
         if try countsMatch() {
             UserDefaults.standard.set(0, forKey: Self.indexMismatchLaunchesKey)
@@ -285,6 +291,55 @@ actor ClipboardSearchIndex {
         return (timestamp, Int(sqlite3_column_int(statement, 1)), sqlite3_column_int(statement, 2) != 0)
     }
 
+    /// A save interrupted by termination may have changed an existing clip
+    /// without changing the item count. Walk metadata in bounded pages and
+    /// let `upsert` skip unchanged fingerprints; keep the rebuild checkpoints.
+    private func reconcilePendingChanges() async throws {
+        let started = ContinuousClock.now
+        var cursorTimestamp: Double?
+        var tieOffset = 0
+        var examined = 0
+        while !Task.isCancelled {
+            var descriptor: FetchDescriptor<ClipboardItem>
+            if let cursorTimestamp {
+                let cursorDate = Date(timeIntervalSince1970: cursorTimestamp)
+                descriptor = FetchDescriptor<ClipboardItem>(predicate: #Predicate<ClipboardItem> {
+                    !$0.isConcealed && $0.timestamp <= cursorDate
+                })
+            } else {
+                descriptor = FetchDescriptor<ClipboardItem>(predicate: #Predicate<ClipboardItem> { !$0.isConcealed })
+            }
+            descriptor.sortBy = [SortDescriptor(\.timestamp, order: .reverse)]
+            descriptor.fetchLimit = 256
+            descriptor.fetchOffset = tieOffset
+            let page = try autoreleasepool { () throws -> (count: Int, minimum: Double, ties: Int)? in
+                let context = ModelContext(modelContainer)
+                let batch = try context.fetch(descriptor)
+                guard let minimum = batch.map(\.timestamp.timeIntervalSince1970).min() else { return nil }
+                let ties = batch.filter { $0.timestamp.timeIntervalSince1970 == minimum }.count
+                try execute("BEGIN IMMEDIATE")
+                do {
+                    for item in batch { try upsert(item) }
+                    try execute("COMMIT")
+                } catch {
+                    try? execute("ROLLBACK")
+                    throw error
+                }
+                return (batch.count, minimum, ties)
+            }
+            guard let page else { break }
+            examined += page.count
+            if let old = cursorTimestamp, page.minimum == old {
+                tieOffset += page.count
+            } else {
+                cursorTimestamp = page.minimum
+                tieOffset = page.ties
+            }
+            await Task.yield()
+        }
+        logger.info("Search index dirty reconciliation finished: examined=\(examined, privacy: .public) elapsed=\(String(describing: started.duration(to: .now)))")
+    }
+
     private func swiftDataItemCount() throws -> Int {
         let context = ModelContext(modelContainer)
         return try context.fetchCount(FetchDescriptor<ClipboardItem>(
@@ -352,7 +407,6 @@ actor ClipboardSearchIndex {
         let stale = indexedIDs.subtracting(swiftDataIDs)
         let diffSize = missing.count + stale.count
         if diffSize == 0 { return 0 }
-        let changeContext = ModelContext(modelContainer)
         try execute("BEGIN IMMEDIATE")
         do {
             for idString in stale {
@@ -587,6 +641,7 @@ actor ClipboardSearchIndex {
         }
         if failedCount > 0 {
             logger.info("Search index applyChanges completed with failures: failedCount=\(failedCount, privacy: .public) upsertedCount=\(upserted.count, privacy: .public) deletedCount=\(deleted.count, privacy: .public)")
+            throw IndexError.partialUpdate
         }
     }
 
@@ -862,5 +917,5 @@ actor ClipboardSearchIndex {
         value.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
     }
 
-    private enum IndexError: Error { case database, outOfSync }
+    private enum IndexError: Error { case database, outOfSync, partialUpdate }
 }

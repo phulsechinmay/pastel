@@ -85,11 +85,10 @@ struct FilteredCardListView: View {
 
     // Old cards can remain on screen during a filter transition, but must not
     // remain keyboard targets for a paste from the newly selected filter.
-    // v3: never empty the visible list during a replace. The stale page
-    // stays on screen (with a refresh indicator) and stays clickable;
-    // emptying it + disabling hit-testing is what turned 'slow' into
-    // 'dead after a click or two'.
+    // Keep the previous page visible during a refresh, but never let it act
+    // on a query or filter that has already changed.
     private var visibleItems: [ClipboardItem] { filteredItems }
+    private var isShowingStaleResults: Bool { isReplacingResults || rawSearchText != searchText }
 
     /// Indices (into `visibleItems`) currently selected. A single cursor when
     /// `selectionAnchor` is nil, otherwise the contiguous anchor…cursor range.
@@ -337,9 +336,11 @@ struct FilteredCardListView: View {
                         LazyHStack(spacing: PanelLayout.cardSpacing) {
                             if windowStart > 0 {
                                 Button("Newest results") { reload() }
+                                    .disabled(isShowingStaleResults)
                             }
                             ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
+                                    .allowsHitTesting(!isShowingStaleResults)
                                     // Height is whatever is left under the header row, not a
                                     // hardcoded 200. The panel is a fixed height, so a fixed
                                     // card height left a dead band below the row whose size
@@ -349,6 +350,7 @@ struct FilteredCardListView: View {
                             }
                             if filteredItems.count >= maxResidentItems && !cursor.isExhausted {
                                 Button("Older results") { advanceToOlderResults() }
+                                    .disabled(isShowingStaleResults)
                             }
                         }
                         .padding(PanelLayout.selectionRingGutter)
@@ -369,12 +371,15 @@ struct FilteredCardListView: View {
                         LazyVStack(spacing: PanelLayout.cardSpacing) {
                             if windowStart > 0 {
                                 Button("Newest results") { reload() }
+                                    .disabled(isShowingStaleResults)
                             }
                             ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                                 cardView(for: item, at: index)
+                                    .allowsHitTesting(!isShowingStaleResults)
                             }
                             if filteredItems.count >= maxResidentItems && !cursor.isExhausted {
                                 Button("Older results") { advanceToOlderResults() }
+                                    .disabled(isShowingStaleResults)
                             }
                         }
                         .padding(PanelLayout.selectionRingGutter)
@@ -393,7 +398,6 @@ struct FilteredCardListView: View {
 
     var body: some View {
         resultsContent
-        .allowsHitTesting(true)
         .overlay {
             if isReplacingResults && showRefreshIndicator {
                 ProgressView("Loading clips…")
@@ -444,7 +448,7 @@ struct FilteredCardListView: View {
             let query = rawSearchText
             guard pendingActivationQuery == nil else { return }
             if loadedQuery == query, searchText == query, !isLoading,
-               !isReplacingResults, let index = selectedIndex, index < visibleItems.count {
+               !isShowingStaleResults, let index = selectedIndex, index < visibleItems.count {
                 onPaste(visibleItems[index])
             } else {
                 pendingActivationQuery = query
@@ -567,7 +571,7 @@ struct FilteredCardListView: View {
             // The field editor owns its own arrows, Return, Undo and Copy.
             if event.window?.firstResponder is NSTextView { return event }
             // A pending debounce must never activate the previous query's cards.
-            if rawSearchText != searchText { return event }
+            if isShowingStaleResults { return event }
 
             // ⌘-letter shortcuts dispatch on the character the key actually produces,
             // not on where it sits. Virtual key codes name positions: 0x08 is C's

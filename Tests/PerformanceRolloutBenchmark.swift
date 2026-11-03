@@ -10,6 +10,7 @@ struct PerformanceRolloutBenchmark {
     @MainActor
     static func main() async throws {
         let itemCount = Int(ProcessInfo.processInfo.environment["PASTEL_FIXTURE_ITEMS"] ?? "1000") ?? 1000
+        let imageEvery = Int(ProcessInfo.processInfo.environment["PASTEL_FIXTURE_IMAGE_EVERY"] ?? "0") ?? 0
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("pastel-perf-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -26,11 +27,13 @@ struct PerformanceRolloutBenchmark {
             let context = ModelContext(container)
             let batchLabel = context.model(for: labelID) as? Label
             for number in batchStart..<min(batchStart + 500, itemCount) {
+                let isImage = imageEvery > 0 && number % imageEvery == 0
                 let item = ClipboardItem(
-                    textContent: "ordinary item \(number) searchable",
+                    textContent: isImage ? nil : "ordinary item \(number) searchable",
+                    contentType: isImage ? .image : .text,
                     timestamp: Date(timeIntervalSince1970: Double(number + 1)),
-                    characterCount: 32,
-                    byteCount: 32,
+                    characterCount: isImage ? 0 : 32,
+                    byteCount: isImage ? 2_000_000 : 32,
                     contentHash: "fixture-\(number)"
                 )
                 if number % 100 == 0, let batchLabel {
@@ -64,13 +67,39 @@ struct PerformanceRolloutBenchmark {
         let index = ClipboardSearchIndex(modelContainer: container)
         await index.useDatabase(at: directory.appendingPathComponent("search.sqlite"))
         let indexStarted = ContinuousClock.now
-        try await index.rebuild()
+        if ProcessInfo.processInfo.environment["PASTEL_FIXTURE_PARTIAL"] == "1" {
+            let rebuildTask = Task { try await index.rebuild() }
+            var partialCount = 0
+            for _ in 0..<50 where partialCount == 0 {
+                try await Task.sleep(for: .milliseconds(100))
+                partialCount = try await index.browsingIDs(
+                    offset: 0, limit: 12, pinsFirst: true,
+                    selectedLabelStableIDs: nil, filters: SearchFilters(),
+                    localDeviceID: DeviceIdentifier.current
+                )?.count ?? 0
+            }
+            precondition(partialCount > 0, "partial index did not serve the first page")
+            print("partialPage count=\(partialCount) elapsed=\(indexStarted.duration(to: .now))")
+            fflush(stdout)
+            try await rebuildTask.value
+        } else {
+            try await index.rebuild()
+        }
         let indexDuration = indexStarted.duration(to: .now)
         let indexSize = (try? FileManager.default.attributesOfItem(
             atPath: directory.appendingPathComponent("search.sqlite").path
         )[.size] as? Int) ?? 0
         print("index=\(indexDuration) indexBytes=\(indexSize) residentMB=\(residentBytes() / 1_048_576)")
         fflush(stdout)
+        if ProcessInfo.processInfo.environment["PASTEL_FIXTURE_DIRTY"] == "1" {
+            let repaired = ClipboardSearchIndex(modelContainer: container)
+            await repaired.useDatabase(at: directory.appendingPathComponent("search.sqlite"))
+            let repairStarted = ContinuousClock.now
+            try await repaired.rebuild(reconcilePendingSaves: true)
+            print("dirtyRepair=\(repairStarted.duration(to: .now)) residentMB=\(residentBytes() / 1_048_576)")
+            fflush(stdout)
+        }
+        if ProcessInfo.processInfo.environment["PASTEL_FIXTURE_INDEX_ONLY"] == "1" { return }
 
         let worker = HistoryPageWorker(modelContainer: container)
         let pageContext = ModelContext(container)

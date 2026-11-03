@@ -1,4 +1,36 @@
-# perf-regression-fix — discussion plan (draft, no code changes yet)
+# perf-regression-fix — investigation and implementation record
+
+## Review follow-up — 2026-11-02
+
+The post-implementation review found four remaining failure paths, now
+addressed on this branch:
+
+- A dirty save no longer calls `resetAndRebuild()` at startup. The existing
+  rebuild cursor is resumed, then a bounded fingerprint reconciliation
+  repairs missed edits even when the item count did not change. A disk-backed
+  smoke fixture covers a saved-but-unindexed title edit.
+- Per-item `applyChanges` failures now propagate after the transaction
+  commits. `AppState` keeps the dirty flag for repair on the next launch.
+- A prior card page stays visible and scrollable during a query/filter
+  transition, but its card actions, quick-paste targets, and paging controls
+  are inactive until the replacement arrives. History selection clears as
+  soon as search text changes, before its debounce completes.
+- Legacy externalisation no longer releases retention or schedules repeated
+  history reloads while it saves batches. One refresh follows completion.
+
+An image-heavy 100,000-item disk fixture (half image metadata, half text)
+served its first 12 partial-index results in 0.20 s. The full index finished
+in 53.26 s, and a forced dirty reconciliation finished in 39.13 s on this
+Mac (Xcode 26.2, optimized standalone benchmark). These are component
+measurements, not an AppKit click-through or a main-thread hang sample.
+SwiftData's `#Index` macro could reduce repeated timestamp sorting, but it
+requires macOS 15 while Pastel deploys to macOS 14; adding it failed the
+deployment-target build. The deployment target was preserved.
+
+Still unverified here: a 100k-store panel/Settings/menu-bar click-through
+with a watchdog and a private-data logging canary. The 100k fixture has no
+image files, so it measures the index's image-metadata path rather than
+thumbnail decoding.
 
 ## Build verification on MacBook Pro — 2026-11-02 (supersedes "no macOS build" below)
 
@@ -107,7 +139,8 @@ any earlier "will implement" wording where it differs.
   indexes are seeded as complete (no rebuild on first fix launch);
   legacy mid-rebuild indexes pay one fast rebuild.
 - Delta reconciliation replacing the count gate, with per-ID
-  error isolation in `applyChanges`, a mismatch counter in
+  error isolation within `applyChanges` transactions and a propagated
+  partial-failure status for restart repair, a mismatch counter in
   UserDefaults (not the dirty flag), and escalation to one fast
   full rebuild only on a second consecutive large (>1,000) mismatch.
 - Checkpointed, completion-flagged externalise: 32-item keyset
@@ -116,9 +149,9 @@ any earlier "will implement" wording where it differs.
 - Partial-index browsing (`browsingIDs` now serves while
   rebuilding), incomplete marker for empty search in both panel
   and History browser, reload gating while building (ready
-  transition still reloads), and never-empty visible lists with
-  hit-testing kept on in both `FilteredCardListView` and
-  `HistoryGridView`.
+  transition still reloads), and never-empty visible lists. The
+  follow-up above keeps scrolling available while stale card actions
+  are disabled in both `FilteredCardListView` and `HistoryGridView`.
 - Retention purge deferred until building stops or 60 s, on the
   main context (safe interim per C3); expiration batched to
   100/batch; `scheduleHistoryRefresh` gated while building;
