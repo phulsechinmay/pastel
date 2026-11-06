@@ -39,3 +39,25 @@ final class Label {
         self.items = []
     }
 }
+
+enum LabelName {
+    static func normalized(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+enum LabelDeletion {
+    @MainActor
+    static func warning(for label: Label) -> String {
+        let count = label.safeItems.count
+        let name = "“\(label.name)”"
+        switch count {
+        case 0:
+            return "\(name) isn't attached to anything. The clips themselves are not affected."
+        case 1:
+            return "\(name) will be removed from 1 clip. The clip itself is kept."
+        default:
+            return "\(name) will be removed from \(count) clips. The clips themselves are kept."
+        }
+    }
+}

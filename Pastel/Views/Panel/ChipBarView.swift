@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import SwiftData
 
@@ -15,8 +16,8 @@ struct ChipBarView: View {
 
     let labels: [Label]
     @Binding var selectedLabelIDs: Set<PersistentIdentifier>
-    var isAllHistoryActive: Bool = true
-    var onSelectAllHistory: (() -> Void)?
+    var isAllHistoryActive: Bool
+    var onSelectAllHistory: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
@@ -24,6 +25,7 @@ struct ChipBarView: View {
     // MARK: - Label Edit State
 
     @State private var editingLabel: Label?
+    @State private var labelPendingDeletion: Label?
 
     // MARK: - Label Creation State
 
@@ -53,7 +55,7 @@ struct ChipBarView: View {
     }
 
     private var canCreate: Bool {
-        !newLabelName.trimmingCharacters(in: .whitespaces).isEmpty
+        !LabelName.normalized(newLabelName).isEmpty
     }
 
     /// Labels past the row cap, folded behind the overflow chip.
@@ -104,12 +106,27 @@ struct ChipBarView: View {
         // Release the shrink-only ratchet whenever the thing being measured changes,
         // so the bar can grow back after a label is deleted or the panel widens.
         .onChange(of: labels.count) { _, _ in placedChipCount = .max }
+        .onChange(of: labels.map(\.persistentModelID)) { _, labelIDs in
+            selectedLabelIDs.formIntersection(Set(labelIDs))
+        }
         .onChange(of: isExpanded) { _, _ in placedChipCount = .max }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in
             placedChipCount = .max
         }
         .sheet(item: $editingLabel) { label in
             LabelEditPalette(label: label, onDismiss: { editingLabel = nil })
+        }
+        .alert("Delete Label?", isPresented: Binding(
+            get: { labelPendingDeletion != nil },
+            set: { if !$0 { labelPendingDeletion = nil } }
+        ), presenting: labelPendingDeletion) { label in
+            Button("Delete", role: .destructive) {
+                deleteLabel(label)
+                labelPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) { labelPendingDeletion = nil }
+        } message: { label in
+            Text(LabelDeletion.warning(for: label))
         }
     }
 
@@ -158,7 +175,7 @@ struct ChipBarView: View {
 
     private var allHistoryChip: some View {
         Button {
-            onSelectAllHistory?()
+            onSelectAllHistory()
         } label: {
             HStack(spacing: 4) {
                 // `arrow.counterclockwise.circle.fill` reads as Reload. The clock face
@@ -173,6 +190,7 @@ struct ChipBarView: View {
             .chipChrome(isActive: isAllHistoryActive)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isAllHistoryActive ? .isSelected : [])
     }
 
     // MARK: - Label Chip
@@ -181,15 +199,18 @@ struct ChipBarView: View {
     private func labelChip(for label: Label) -> some View {
         let isActive = selectedLabelIDs.contains(label.persistentModelID)
 
-        LabelChipView(label: label, isActive: isActive)
-            .contentShape(Capsule())
-            .onTapGesture {
+        Button {
                 if isActive {
                     selectedLabelIDs.removeAll()
                 } else {
                     selectedLabelIDs = [label.persistentModelID]
                 }
+        } label: {
+            LabelChipView(label: label, isActive: isActive)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label.name)
+            .accessibilityAddTraits(isActive ? .isSelected : [])
             .draggable(label.persistentModelID.asTransferString ?? "") {
                 LabelChipView(label: label)
             }
@@ -213,7 +234,7 @@ struct ChipBarView: View {
                 Divider()
 
                 Button(role: .destructive) {
-                    deleteLabel(label)
+                    labelPendingDeletion = label
                 } label: {
                     SwiftUI.Label("Delete", systemImage: "trash")
                 }
@@ -262,11 +283,12 @@ struct ChipBarView: View {
                     .animation(.easeInOut(duration: 0.12), value: isHoveringStyle)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Choose appearance for new label")
             .onHover { isHoveringStyle = $0 }
             .popover(isPresented: $showStylePicker, arrowEdge: .bottom) {
                 LabelStyleSelector(colorName: $newLabelColorName, emoji: $newLabelEmoji)
                     .padding(12)
-                    .frame(width: 220)
+                    .frame(width: LabelStyleSelector.popoverWidth)
             }
 
             FocusableTextField(
@@ -338,7 +360,7 @@ struct ChipBarView: View {
     }
 
     private func createLabel() {
-        let trimmedName = newLabelName.trimmingCharacters(in: .whitespaces)
+        let trimmedName = LabelName.normalized(newLabelName)
         guard !trimmedName.isEmpty else { return }
 
         // Determine next sort order
@@ -371,6 +393,8 @@ struct ChipBarView: View {
 /// changes animate so the highlight glides between swatches.
 struct LabelStyleSelector: View {
 
+    static let popoverWidth: CGFloat = 240
+
     /// Bound to the label's `colorName` (a `LabelColor` raw value).
     @Binding var colorName: String
     /// Bound to the label's optional emoji.
@@ -384,60 +408,86 @@ struct LabelStyleSelector: View {
         "💬", "📧", "🔒", "🌟", "💎", "🚀"
     ]
 
+    private static let emojiNames: [String: String] = [
+        "📌": "pushpin", "📎": "paperclip", "📝": "memo", "📋": "clipboard",
+        "📂": "folder", "💡": "light bulb", "⭐": "star", "❤️": "heart",
+        "🔥": "fire", "🎯": "target", "🏷️": "tag", "🔖": "bookmark",
+        "✅": "check mark", "❌": "cross mark", "⚡": "lightning",
+        "🎨": "palette", "🔧": "wrench", "🐛": "bug", "💬": "speech bubble",
+        "📧": "email", "🔒": "lock", "🌟": "glowing star",
+        "💎": "gem", "🚀": "rocket"
+    ]
+
     private var isColorSelected: Bool { emoji?.isEmpty ?? true }
 
-    private let columns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 6)
+    private let columns = Array(repeating: GridItem(.fixed(28), spacing: 8), count: 6)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Text("Color")
+                .font(PanelStyle.Text.control.weight(.medium))
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(LabelColor.allCases, id: \.self) { labelColor in
                     let selected = isColorSelected && colorName == labelColor.rawValue
-                    Circle()
-                        .fill(labelColor.color)
-                        .frame(width: 22, height: 22)
-                        .overlay {
-                            Circle()
-                                .strokeBorder(PanelStyle.swatchSelectionRing, lineWidth: 2)
-                                .padding(-3)
-                                .opacity(selected ? 1 : 0)
-                        }
-                        .contentShape(Circle())
-                        .onTapGesture {
-                            withAnimation(.snappy(duration: 0.2)) {
+                    Button {
+                        withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                                      ? nil : .easeOut(duration: 0.18)) {
                                 colorName = labelColor.rawValue
                                 emoji = nil
-                            }
                         }
+                    } label: {
+                        Circle()
+                            .fill(labelColor.color)
+                            .frame(width: 22, height: 22)
+                            .frame(width: 28, height: 28)
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(PanelStyle.swatchSelectionRing, lineWidth: 2)
+                                    .padding(-2)
+                                    .opacity(selected ? 1 : 0)
+                            }
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(labelColor.rawValue.capitalized) label color")
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
 
+            Text("Emoji")
+                .font(PanelStyle.Text.control.weight(.medium))
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(Self.curatedEmojis, id: \.self) { curatedEmoji in
                     let selected = emoji == curatedEmoji
-                    Text(curatedEmoji)
-                        .font(PanelStyle.Icon.content)
-                        .frame(width: 22, height: 22)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(selected ? PanelStyle.surfaceActive : Color.clear)
-                        )
-                        // Same ring as the colour swatches above, so "selected" is one
-                        // thing in this control rather than a fill here and a ring there.
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .strokeBorder(PanelStyle.swatchSelectionRing, lineWidth: 2)
-                                .padding(-3)
-                                .opacity(selected ? 1 : 0)
-                        }
-                        .contentShape(RoundedRectangle(cornerRadius: 5))
-                        .onTapGesture {
-                            withAnimation(.snappy(duration: 0.2)) {
+                    Button {
+                        withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                                      ? nil : .easeOut(duration: 0.18)) {
                                 emoji = curatedEmoji
-                            }
                         }
+                    } label: {
+                        Text(curatedEmoji)
+                            .font(PanelStyle.Icon.content)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(selected ? PanelStyle.surfaceActive : Color.clear)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .strokeBorder(PanelStyle.swatchSelectionRing, lineWidth: 2)
+                                    .padding(-2)
+                                    .opacity(selected ? 1 : 0)
+                            }
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(Self.emojiNames[curatedEmoji] ?? "Emoji") label emoji")
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
+            Text("Emoji replaces the color dot")
+                .font(PanelStyle.Text.meta)
+                .foregroundStyle(.secondary)
         }
     }
 }
@@ -446,40 +496,69 @@ struct LabelStyleSelector: View {
 
 /// Inline edit palette for modifying a label's name, color, and emoji.
 private struct LabelEditPalette: View {
-    @Bindable var label: Label
+    let label: Label
     @Environment(\.modelContext) private var modelContext
     var onDismiss: () -> Void
+
+    @State private var draftName = ""
+    @State private var draftColorName = LabelColor.blue.rawValue
+    @State private var draftEmoji: String?
+    @State private var nameError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Edit Label")
                 .font(.headline)
 
-            TextField("Label name", text: $label.name)
+            TextField("Label name", text: $draftName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 180)
-                .onSubmit {
-                    saveWithLogging(modelContext, operation: "update label name")
-                }
+                .onSubmit(saveChanges)
 
-            LabelStyleSelector(colorName: $label.colorName, emoji: $label.emoji)
-                .onChange(of: label.colorName) { _, _ in
-                    saveWithLogging(modelContext, operation: "update label color")
-                }
-                .onChange(of: label.emoji) { _, _ in
-                    saveWithLogging(modelContext, operation: "update label emoji")
-                }
+            if let nameError {
+                Text(nameError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            LabelStyleSelector(colorName: $draftColorName, emoji: $draftEmoji)
 
             HStack {
                 Spacer()
-                Button("Done") {
-                    saveWithLogging(modelContext, operation: "update label")
-                    onDismiss()
-                }
+                Button("Cancel", action: onDismiss)
+                Button("Done", action: saveChanges)
             }
         }
         .padding(12)
-        .frame(width: 220)
+        .frame(width: LabelStyleSelector.popoverWidth)
+        .onAppear {
+            draftName = label.name
+            draftColorName = label.colorName
+            draftEmoji = label.emoji
+        }
+    }
+
+    private func saveChanges() {
+        let normalized = LabelName.normalized(draftName)
+        guard !normalized.isEmpty else {
+            nameError = "Enter a label name."
+            return
+        }
+        let previousName = label.name
+        let previousColor = label.colorName
+        let previousEmoji = label.emoji
+        label.name = normalized
+        label.colorName = draftColorName
+        label.emoji = draftEmoji
+        do {
+            try modelContext.save()
+            onDismiss()
+        } catch {
+            label.name = previousName
+            label.colorName = previousColor
+            label.emoji = previousEmoji
+            nameError = "Couldn't save this label. Try again."
+        }
     }
 }
 
